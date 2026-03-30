@@ -58,6 +58,10 @@ http://localhost:4200/
 
 Contribuições são bem-vindas. Abra issues para bugs ou propostas de melhoria e envie pull requests com novidades.
 
+## Licença
+
+Este repositório está licenciado sob a Licença MIT. Consulte o arquivo `LICENSE` para obter os termos completos.
+
 ## Observações
 
 Este README descreve o frontend do Mintly. Se você estiver procurando pelo serviço de backend, verifique o repositório correspondente ou adicione a API separadamente.
