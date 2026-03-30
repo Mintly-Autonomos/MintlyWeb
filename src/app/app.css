@@ -1,0 +1,80 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: #f4f6fb;
+  color: #111827;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.app-shell {
+  min-height: 100dvh;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  text-align: center;
+}
+
+.hero-card {
+  width: min(720px, 100%);
+  background: #ffffff;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  box-shadow: 0 22px 64px rgba(15, 23, 42, 0.08);
+}
+
+.hero-card h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+
+.hero-card p {
+  margin: 1rem 0 0;
+  color: #475569;
+  font-size: 1.05rem;
+}
+
+.primary-button,
+.secondary-button {
+  border: none;
+  border-radius: 0.9rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button {
+  margin-top: 1.5rem;
+  padding: 1rem 1.75rem;
+  background: #2563eb;
+  color: white;
+}
+
+.primary-button:hover {
+  background: #1d4ed8;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.secondary-button {
+  padding: 0.85rem 1.5rem;
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.secondary-button:hover {
+  background: #cbd5e1;
+}
+
+@media (max-width: 640px) {
+  .hero-card {
+    padding: 1.5rem;
+  }
+}

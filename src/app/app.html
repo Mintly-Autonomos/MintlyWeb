@@ -1,0 +1,25 @@
+<main class="app-shell">
+  <mat-card class="hero-card mat-elevation-z8">
+    <div>
+      <h1>Mintly — assistente financeiro para autônomos</h1>
+      <p>Um frontend Angular simples com Material para mostrar UI moderna e responsiva.</p>
+    </div>
+    <button mat-flat-button color="primary" (click)="openModal()">
+      Abrir modal
+    </button>
+  </mat-card>
+
+  <app-modal
+    *ngIf="showModal()"
+    title="Modal padrão"
+    width="20%"
+    (close)="closeModal()"
+  >
+    <p>Use esse modal como base para outros tipos de modais. Ele suporta conteúdo personalizado via <code>&lt;ng-content&gt;</code>.</p>
+    <div class="actions">
+      <button mat-stroked-button color="primary" type="button" (click)="closeModal()">
+        Fechar
+      </button>
+    </div>
+  </app-modal>
+</main>
