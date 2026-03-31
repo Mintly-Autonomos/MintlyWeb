@@ -1,0 +1,85 @@
+.navbar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(251, 245, 237, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+}
+
+.navbar.top {
+  position: relative;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border-radius: 0 0 1rem 1rem;
+}
+
+.navbar.lateral {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 220px;
+  min-height: 100vh;
+  border-radius: 0 1rem 1rem 0;
+  box-sizing: border-box;
+  padding-top: 2rem;
+}
+
+.navbar-items {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.navbar.lateral .navbar-items {
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 800;
+  color: #0f766e;
+  margin-right: 1rem;
+}
+
+.navbar.top .navbar-brand {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 0;
+}
+
+.brand-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.brand-text {
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+
+.navbar.lateral .navbar-brand {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.navbar.lateral .brand-text {
+  display: none;
+}
+
+button[mat-button] {
+  text-transform: none;
+  font-weight: 700;
+}

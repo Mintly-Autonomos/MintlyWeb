@@ -1,0 +1,34 @@
+<div class="popup-host" *ngIf="popups.length">
+  <div class="popup-container top-left">
+    <ng-container *ngFor="let popup of popups; trackBy: trackByPopup">
+      <mat-card *ngIf="popup.position === 'top-left'" class="popup-card" [ngClass]="popup.status">
+        <div class="popup-header">
+          <span class="popup-icon">{{ popup.status === 'success' ? '✅' : popup.status === 'error' ? '❌' : popup.status === 'warning' ? '⚠️' : 'ℹ️' }}</span>
+          <div>
+            <h3>{{ popup.title }}</h3>
+            <p>{{ popup.message }}</p>
+          </div>
+          <button mat-icon-button type="button" aria-label="Fechar popup" (click)="onClosePopup(popup.id)">
+            ×
+          </button>
+        </div>
+      </mat-card>
+    </ng-container>
+  </div>
+  <div class="popup-container top-right">
+    <ng-container *ngFor="let popup of popups; trackBy: trackByPopup">
+      <mat-card *ngIf="popup.position === 'top-right'" class="popup-card" [ngClass]="popup.status">
+        <div class="popup-header">
+          <span class="popup-icon">{{ popup.status === 'success' ? '✅' : popup.status === 'error' ? '❌' : popup.status === 'warning' ? '⚠️' : 'ℹ️' }}</span>
+          <div>
+            <h3>{{ popup.title }}</h3>
+            <p>{{ popup.message }}</p>
+          </div>
+          <button mat-icon-button type="button" aria-label="Fechar popup" (click)="onClosePopup(popup.id)">
+            ×
+          </button>
+        </div>
+      </mat-card>
+    </ng-container>
+  </div>
+</div>

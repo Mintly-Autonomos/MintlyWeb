@@ -1,25 +1,48 @@
-<main class="app-shell">
-  <mat-card class="hero-card mat-elevation-z8">
-    <div>
-      <h1>Mintly — assistente financeiro para autônomos</h1>
-      <p>Um frontend Angular simples com Material para mostrar UI moderna e responsiva.</p>
-    </div>
-    <button mat-flat-button color="primary" (click)="openModal()">
-      Abrir modal
-    </button>
-  </mat-card>
+<main class="app-shell" [ngClass]="{ 'lateral-layout': navbarPosition() === 'lateral' }">
+  <app-navbar
+    [position]="navbarPosition()"
+    [items]="navItems"
+    (itemClick)="handleNav($event)"
+  ></app-navbar>
 
-  <app-modal
-    *ngIf="showModal()"
-    title="Modal padrão"
-    width="20%"
-    (close)="closeModal()"
-  >
-    <p>Use esse modal como base para outros tipos de modais. Ele suporta conteúdo personalizado via <code>&lt;ng-content&gt;</code>.</p>
-    <div class="actions">
-      <button mat-stroked-button color="primary" type="button" (click)="closeModal()">
-        Fechar
-      </button>
-    </div>
-  </app-modal>
+  <div class="page-shell">
+    <section *ngIf="currentPage() === 'home'" class="home-page">
+      <mat-card class="hero-card mat-elevation-z8">
+        <div class="hero-copy">
+          <div>
+            <span class="tag">Mintly</span>
+            <h1>Assistente financeiro moderno para autônomos</h1>
+            <p>Experimente um frontend Angular com Material, design limpo e modais responsivos para notificações e alertas.</p>
+          </div>
+          <div class="hero-actions">
+            <button mat-flat-button color="primary" (click)="openModal()">Ver notificação</button>
+          </div>
+        </div>
+      </mat-card>
+
+      <div class="feature-grid">
+        <mat-card class="feature-card">
+          <h2>Controle rápido</h2>
+          <p>Registre despesas e receitas com rapidez, com uma interface leve pensada para autônomos.</p>
+        </mat-card>
+        <mat-card class="feature-card">
+          <h2>Notificações intuitivas</h2>
+          <p>Modal de alerta e notificações com status e duração personalizada para testes reais.</p>
+        </mat-card>
+      </div>
+    </section>
+
+    <section *ngIf="currentPage() === 'dev-test'" class="dev-test-page">
+      <app-dev-test
+        (closeView)="setPage('home')"
+        (toggleNavbar)="toggleNavbarPosition()"
+      ></app-dev-test>
+    </section>
+  </div>
+
+  <app-popup
+    *ngIf="popups().length > 0"
+    [popups]="popups()"
+    (close)="closePopup($event)"
+  ></app-popup>
 </main>

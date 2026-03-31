@@ -1,0 +1,17 @@
+<nav class="navbar" [ngClass]="position">
+  <div class="navbar-brand">
+    <span class="brand-icon">🍃</span>
+    <span class="brand-text" *ngIf="position === 'top'">Mintly</span>
+  </div>
+
+  <div class="navbar-items">
+    <button
+      mat-button
+      type="button"
+      *ngFor="let item of items"
+      (click)="onItemClick(item)"
+    >
+      {{ item.label }}
+    </button>
+  </div>
+</nav>

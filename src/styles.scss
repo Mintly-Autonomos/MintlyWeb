@@ -1,0 +1,54 @@
+@use 'sass:map';
+@use '@angular/material' as mat;
+
+$mintly-primary: map.merge(
+  mat.$green-palette,
+  (
+    secondary: mat.$cyan-palette,
+    error: mat.$red-palette,
+  )
+);
+$mintly-tertiary: mat.$blue-palette;
+
+$mintly-theme: mat.define-theme(
+  (
+    color: (
+      primary: $mintly-primary,
+      tertiary: $mintly-tertiary,
+    ),
+    typography: (),
+    density: (),
+  )
+);
+
+@include mat.all-component-themes($mintly-theme);
+
+:root {
+  color-scheme: light;
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #FBF5ED 0%, #F7E8D8 55%, #F0DCC5 100%);
+  color: #1B3E2E;
+}
+
+.mat-app-background,
+body {
+  background: #FBF5ED;
+}
+
+.mat-card {
+  background: #F7EBDD;
+  color: #1B3E2E;
+}
+
+.mat-mdc-button.mat-primary,
+.mat-primary.mat-mdc-button,
+button.mat-flat-button.mat-primary,
+button.mat-raised-button.mat-primary,
+button.mat-stroked-button.mat-primary {
+  border-color: transparent;
+}

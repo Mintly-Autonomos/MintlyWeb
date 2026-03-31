@@ -1,20 +1,25 @@
 <div class="modal-backdrop" (click)="onBackdropClick($event)">
-  <mat-card class="modal-panel" [style.width]="width">
+  <mat-card class="modal-panel" [style.width]="width" [ngClass]="status">
     <mat-card-header class="modal-header">
-      <mat-card-title>{{ title }}</mat-card-title>
-      <button
-        *ngIf="!hideClose"
-        mat-icon-button
-        type="button"
-        aria-label="Fechar modal"
-        (click)="onClose()"
-      >
-        ×
-      </button>
+      <div class="modal-header-title">
+        <div class="modal-title-wrapper">
+          <span class="modal-status" *ngIf="statusIcon">{{ statusIcon }}</span>
+          <mat-card-title class="modal-title">{{ title }}</mat-card-title>
+        </div>
+      </div>
     </mat-card-header>
 
+    <div class="validation-banner" *ngIf="sizeError">{{ sizeError }}</div>
+
     <mat-card-content class="modal-body">
-      <ng-content></ng-content>
+      <p class="message-text" *ngIf="message; else projectedContent">{{ message }}</p>
+      <ng-template #projectedContent>
+        <ng-content></ng-content>
+      </ng-template>
     </mat-card-content>
+
+    <div class="modal-footer" *ngIf="!hideClose">
+      <button mat-flat-button color="primary" type="button" (click)="onClose()">{{ closeLabel }}</button>
+    </div>
   </mat-card>
 </div>

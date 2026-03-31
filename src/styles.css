@@ -1,3 +1,81 @@
 @import "@angular/material/prebuilt-themes/indigo-pink.css";
 
+:root {
+  --mdc-theme-primary: #6BC0A7;
+  --mdc-theme-secondary: #4A8FD7;
+  --mdc-theme-surface: #F7EBDD;
+  --mdc-theme-background: #FBF5ED;
+  --mdc-theme-on-primary: #ffffff;
+  --mdc-theme-on-secondary: #ffffff;
+  --mdc-theme-on-surface: #1B3E2E;
+  --mdc-theme-on-background: #1B3E2E;
+  --mdc-theme-error: #F87171;
+  --mdc-theme-surface-variant: #E5D8C6;
+  --mdc-theme-outline: #1F523D;
+  --app-contrast-green: #16402B;
+}
+
+body {
+  background: linear-gradient(180deg, #FBF5ED 0%, #F7EBDD 60%);
+}
+
+.mat-mdc-button.mat-flat-button.mat-primary,
+.mat-flat-button.mat-primary,
+button.mat-flat-button.mat-primary,
+button.mat-raised-button.mat-primary,
+button.mat-stroked-button.mat-primary,
+button.mat-button.mat-primary,
+.mat-mdc-button.mat-primary,
+.mat-primary.mat-mdc-button {
+  background-color: var(--mdc-theme-primary) !important;
+  color: var(--mdc-theme-on-primary) !important;
+  background-image: none !important;
+  border-color: var(--mdc-theme-primary) !important;
+}
+
+.mat-mdc-button.mat-stroked-button.mat-primary,
+.mat-stroked-button.mat-primary,
+button.mat-stroked-button.mat-primary {
+  color: var(--mdc-theme-primary) !important;
+  border-color: var(--mdc-theme-primary) !important;
+  background-color: transparent !important;
+}
+
+.mat-mdc-button.mat-flat-button.mat-primary:hover,
+.mat-flat-button.mat-primary:hover,
+button.mat-flat-button.mat-primary:hover,
+button.mat-raised-button.mat-primary:hover,
+button.mat-button.mat-primary:hover {
+  background-color: #4EA58E !important;
+}
+
+.mat-mdc-button.mat-stroked-button.mat-primary:hover,
+.mat-stroked-button.mat-primary:hover,
+button.mat-stroked-button.mat-primary:hover {
+  background-color: rgba(107, 192, 167, 0.16) !important;
+}
+
+.mat-mdc-button.mat-primary .mat-button-focus-overlay,
+button.mat-flat-button.mat-primary .mat-button-focus-overlay,
+button.mat-raised-button.mat-primary .mat-button-focus-overlay,
+button.mat-stroked-button.mat-primary .mat-button-focus-overlay {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.mat-card {
+  background: var(--mdc-theme-surface) !important;
+  color: var(--mdc-theme-on-surface) !important;
+  border-color: rgba(27, 62, 46, 0.12) !important;
+}
+
+.mat-card .mat-mdc-button,
+.mat-card button.mat-mdc-button {
+  color: var(--mdc-theme-primary) !important;
+}
+
+button.mat-flat-button.color-primary,
+button.mat-flat-button[color="primary"] {
+  box-shadow: 0 10px 20px rgba(27, 62, 46, 0.08);
+}
+
 /* You can add global styles to this file, and also import other style files */

@@ -1,0 +1,51 @@
+<div class="dev-test-shell">
+  <mat-card class="dev-test-card mat-elevation-z8">
+    <div class="dev-test-header">
+      <div>
+        <h1>dev-test</h1>
+        <p>Use esta tela para testar variações de modal e verificar diferentes tamanhos, status e posições de notificação.</p>
+      </div>
+      <div class="dev-test-actions">
+        <button mat-stroked-button color="primary" type="button" (click)="toggleNavbarType()">
+          Alternar navbar
+        </button>
+        <button mat-stroked-button color="primary" type="button" (click)="backToHome()">Voltar</button>
+      </div>
+    </div>
+
+    <div class="buttons-grid">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        *ngFor="let example of examples"
+        (click)="openExample(example)"
+      >
+        {{ example.label }}
+      </button>
+    </div>
+
+    <div class="info-panel">
+      <p>Cada botão abre um modal diferente. Use o botão "Voltar" para retornar à tela inicial.</p>
+    </div>
+  </mat-card>
+
+  <ng-container *ngIf="selectedExample() as example">
+    <app-modal
+      *ngIf="example.type === 'modal'"
+      [title]="example.title"
+      [status]="example.status"
+      [size]="example.size || 'm'"
+      [message]="example.message"
+      (close)="closeModal()"
+    >
+      <p>Conteúdo adicional específico desta variação de modal.</p>
+    </app-modal>
+  </ng-container>
+
+  <app-popup
+    *ngIf="activePopups().length > 0"
+    [popups]="activePopups()"
+    (close)="closePopup($event)"
+  ></app-popup>
+</div>
