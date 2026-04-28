@@ -12,7 +12,10 @@
           <div>
             <span class="tag">Mintly</span>
             <h1>Assistente financeiro moderno para autônomos</h1>
-            <p>Experimente um frontend Angular com Material, design limpo e modais responsivos para notificações e alertas.</p>
+            <p>
+              Experimente um frontend Angular com Material, design limpo e modais responsivos para
+              notificações e alertas.
+            </p>
           </div>
           <div class="hero-actions">
             <button mat-flat-button color="primary" (click)="openModal()">Ver notificação</button>
@@ -23,11 +26,15 @@
       <div class="feature-grid">
         <mat-card class="feature-card">
           <h2>Controle rápido</h2>
-          <p>Registre despesas e receitas com rapidez, com uma interface leve pensada para autônomos.</p>
+          <p>
+            Registre despesas e receitas com rapidez, com uma interface leve pensada para autônomos.
+          </p>
         </mat-card>
         <mat-card class="feature-card">
           <h2>Notificações intuitivas</h2>
-          <p>Modal de alerta e notificações com status e duração personalizada para testes reais.</p>
+          <p>
+            Modal de alerta e notificações com status e duração personalizada para testes reais.
+          </p>
         </mat-card>
       </div>
     </section>
@@ -43,6 +50,6 @@
   <app-popup
     *ngIf="popups().length > 0"
     [popups]="popups()"
-    (close)="closePopup($event)"
+    (closed)="closePopup($event)"
   ></app-popup>
 </main>

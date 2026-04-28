@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 
@@ -24,7 +32,7 @@ export interface PopupItem {
 })
 export class PopupComponent implements OnChanges, OnDestroy {
   @Input() popups: PopupItem[] = [];
-  @Output() close = new EventEmitter<string>();
+  @Output() closed = new EventEmitter<string>();
 
   private popupTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -44,7 +52,7 @@ export class PopupComponent implements OnChanges, OnDestroy {
 
   onClosePopup(id: string): void {
     this.clearTimer(id);
-    this.close.emit(id);
+    this.closed.emit(id);
   }
 
   private syncTimers(): void {

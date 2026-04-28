@@ -9,7 +9,14 @@ import { NavbarComponent, NavItem } from './navbar/navbar.component';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, NavbarComponent, PopupComponent, DevTestComponent, MatButtonModule, MatCardModule],
+  imports: [
+    CommonModule,
+    NavbarComponent,
+    PopupComponent,
+    DevTestComponent,
+    MatButtonModule,
+    MatCardModule,
+  ],
   templateUrl: './app.html',
   styleUrls: ['./app.css'],
 })
@@ -32,7 +39,8 @@ export class App {
       {
         id: `home-popup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         title: 'Notificação Mintly',
-        message: 'Sua conta foi atualizada com sucesso. Continue usando Mintly para controlar suas finanças.',
+        message:
+          'Sua conta foi atualizada com sucesso. Continue usando Mintly para controlar suas finanças.',
         status: 'success',
         position: 'top-right',
         duration: 4,
@@ -63,4 +71,3 @@ export class App {
     this.navbarPosition.set(this.navbarPosition() === 'top' ? 'lateral' : 'top');
   }
 }
-

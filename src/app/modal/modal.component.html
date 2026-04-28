@@ -1,4 +1,9 @@
-<div class="modal-backdrop" (click)="onBackdropClick($event)">
+<div
+  class="modal-backdrop"
+  tabindex="0"
+  (click)="onBackdropClick($event)"
+  (keydown)="onBackdropKeydown($event)"
+>
   <mat-card class="modal-panel" [style.width]="width" [ngClass]="status">
     <mat-card-header class="modal-header">
       <div class="modal-header-title">
@@ -19,7 +24,9 @@
     </mat-card-content>
 
     <div class="modal-footer" *ngIf="!hideClose">
-      <button mat-flat-button color="primary" type="button" (click)="onClose()">{{ closeLabel }}</button>
+      <button mat-flat-button color="primary" type="button" (click)="onClose()">
+        {{ closeLabel }}
+      </button>
     </div>
   </mat-card>
 </div>

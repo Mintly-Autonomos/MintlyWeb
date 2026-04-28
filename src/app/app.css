@@ -1,8 +1,8 @@
 :host {
   display: block;
   min-height: 100dvh;
-  background: linear-gradient(180deg, #FBF5ED 0%, #F7E8D8 55%, #F0DCC5 100%);
-  color: #1B3E2E;
+  background: linear-gradient(180deg, #fbf5ed 0%, #f7e8d8 55%, #f0dcc5 100%);
+  color: #1b3e2e;
   font-family: Inter, system-ui, sans-serif;
 }
 

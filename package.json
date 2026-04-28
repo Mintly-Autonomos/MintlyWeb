@@ -5,8 +5,14 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:ci": "ng build --configuration production",
+    "lint": "ng lint",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "test:ci": "ng test --watch=false",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
   },
   "private": true,
   "packageManager": "npm@11.11.0",
@@ -24,12 +30,16 @@
     "tslib": "^2.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.35.0",
     "@angular/build": "^21.2.5",
     "@angular/cli": "^21.2.5",
     "@angular/compiler-cli": "^21.2.0",
+    "angular-eslint": "^21.3.1",
+    "eslint": "^9.25.0",
     "jsdom": "^28.0.0",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2",
+    "typescript-eslint": "^8.42.0",
     "vitest": "^4.0.8"
   }
 }
