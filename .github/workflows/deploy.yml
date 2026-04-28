@@ -1,0 +1,168 @@
+name: MintlyWeb Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to deploy
+        required: true
+        type: choice
+        options:
+          - vercel
+          - aws
+      environment:
+        description: Which environment to deploy
+        required: true
+        default: production
+        type: choice
+        options:
+          - staging
+          - production
+      confirm_deploy:
+        description: Confirm that you want to run this deployment
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: mintlyweb-deploy-${{ inputs.target }}-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  verify-inputs:
+    name: Confirm deployment request
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ inputs.confirm_deploy }}" != "true" ]; then
+            echo "Deployment cancelled because confirm_deploy was not checked."
+            exit 1
+          fi
+
+      - name: Print deployment summary
+        run: |
+          echo "Target: ${{ inputs.target }}"
+          echo "Environment: ${{ inputs.environment }}"
+
+  deploy-vercel:
+    name: Deploy to Vercel
+    needs: verify-inputs
+    if: ${{ inputs.target == 'vercel' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Prettier check
+        run: npm run format:check
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:ci
+
+      - name: Production build
+        run: npm run build:ci
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          else
+            vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+          fi
+
+      - name: Build Vercel artifacts
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          else
+            vercel build --token=${{ secrets.VERCEL_TOKEN }}
+          fi
+
+      - name: Deploy to Vercel
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+          else
+            vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+          fi
+
+  deploy-aws:
+    name: Deploy to AWS
+    needs: verify-inputs
+    if: ${{ inputs.target == 'aws' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      S3_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
+      DIST_PATH: dist/mintly-front-end/browser
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Prettier check
+        run: npm run format:check
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:ci
+
+      - name: Production build
+        run: npm run build:ci
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload build to S3
+        run: aws s3 sync ${{ env.DIST_PATH }} s3://${{ env.S3_BUCKET_NAME }} --delete
+
+      - name: Invalidate CloudFront cache
+        if: ${{ env.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        run: aws cloudfront create-invalidation --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
