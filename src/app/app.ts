@@ -1,7 +1,8 @@
-import { Component, isDevMode, signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { environment } from '../environments/environment';
 import { PopupComponent, PopupItem } from './popup/popup.component';
 import { DevTestComponent } from './dev-test/dev-test.component';
 import { NavbarComponent, NavItem } from './navbar/navbar.component';
@@ -23,7 +24,8 @@ import { NavbarComponent, NavItem } from './navbar/navbar.component';
 export class App {
   protected readonly currentPage = signal<'home' | 'dev-test'>('home');
   protected readonly popups = signal<PopupItem[]>([]);
-  protected readonly isDev = isDevMode();
+  protected readonly isDev = environment.enableDevTools;
+  protected readonly appEnvironment = environment.name;
   protected readonly navbarPosition = signal<'top' | 'lateral'>('top');
 
   protected readonly navItems: NavItem[] = this.isDev

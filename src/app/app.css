@@ -1,18 +1,22 @@
 :host {
   display: block;
   min-height: 100dvh;
-  background: linear-gradient(180deg, #fbf5ed 0%, #f7e8d8 55%, #f0dcc5 100%);
+  background:
+    radial-gradient(circle at top left, rgba(222, 243, 230, 0.9), transparent 36%),
+    linear-gradient(180deg, #fbf5ed 0%, #f7e8d8 55%, #f0dcc5 100%);
   color: #1b3e2e;
   font-family: Inter, system-ui, sans-serif;
 }
 
 .app-shell {
   min-height: 100dvh;
+  width: 100%;
   padding: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0;
+  box-sizing: border-box;
 }
 
 .app-shell.lateral-layout {
@@ -26,11 +30,12 @@
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 2rem clamp(1rem, 3vw, 2rem) 3rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   align-items: center;
+  box-sizing: border-box;
 }
 
 .app-shell.lateral-layout .page-shell {
@@ -49,26 +54,28 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  width: min(100%, 1120px);
 }
 
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
 
 .feature-card {
   padding: 1.5rem;
-  border-radius: 1.5rem;
+  border-radius: 1rem;
   background: rgba(247, 235, 221, 0.95);
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
 }
 
 .hero-card {
   background: rgba(251, 245, 237, 0.98);
-  border-radius: 1.75rem;
-  padding: 2rem;
+  border-radius: 1rem;
+  padding: clamp(1.5rem, 3vw, 2.25rem);
   box-shadow: 0 35px 90px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
 }
 
 .hero-copy {
@@ -79,6 +86,14 @@
   flex-wrap: wrap;
 }
 
+.hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
 .tag {
   display: inline-flex;
   padding: 0.5rem 0.9rem;
@@ -87,32 +102,71 @@
   color: #0f766e;
   font-weight: 700;
   font-size: 0.9rem;
-  margin-bottom: 1rem;
+}
+
+.environment-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.12);
+  color: #115e59;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .hero-card h1 {
   margin: 0;
   font-size: clamp(2rem, 4vw, 3.25rem);
-  line-height: 1.02;
+  line-height: 1.08;
+  max-width: 14ch;
 }
 
 .hero-card p {
   margin: 1rem 0 0;
   color: #475569;
   font-size: 1rem;
-  max-width: 52rem;
+  max-width: 38rem;
+  line-height: 1.65;
 }
 
 .hero-actions {
   display: flex;
   gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .modal-details {
   color: #475569;
 }
 
+@media (max-width: 1100px) {
+  .feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
+  :host {
+    background:
+      radial-gradient(circle at top center, rgba(222, 243, 230, 0.85), transparent 42%),
+      linear-gradient(180deg, #fbf5ed 0%, #f7e8d8 58%, #f0dcc5 100%);
+  }
+
+  .app-shell,
+  .app-shell.lateral-layout {
+    display: flex;
+    grid-template-columns: none;
+    gap: 0;
+  }
+
+  .app-shell.lateral-layout .page-shell,
+  .page-shell {
+    padding: 1rem 1rem 2rem;
+  }
+
   .hero-card {
     padding: 1.5rem;
   }
@@ -123,6 +177,30 @@
   }
 
   .hero-actions {
-    justify-content: center;
+    justify-content: stretch;
+  }
+
+  .hero-actions > * {
+    width: 100%;
+  }
+
+  .hero-card h1 {
+    max-width: none;
+    font-size: clamp(1.75rem, 7vw, 2.3rem);
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .page-shell {
+    padding-inline: 0.75rem;
+  }
+
+  .feature-card,
+  .hero-card {
+    padding: 1.15rem;
   }
 }
