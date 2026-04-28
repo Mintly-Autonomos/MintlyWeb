@@ -31,13 +31,15 @@ $mintly-theme: mat.define-theme(
 body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(180deg, #fbf5ed 0%, #f7e8d8 55%, #f0dcc5 100%);
+  background:
+    radial-gradient(circle at top left, rgba(222, 243, 230, 0.92), transparent 36%),
+    linear-gradient(180deg, #fbf5ed 0%, #f7e8d8 55%, #f0dcc5 100%);
   color: #1b3e2e;
 }
 
 .mat-app-background,
 body {
-  background: #fbf5ed;
+  background-color: #fbf5ed;
 }
 
 .mat-card {
@@ -51,4 +53,18 @@ button.mat-flat-button.mat-primary,
 button.mat-raised-button.mat-primary,
 button.mat-stroked-button.mat-primary {
   border-color: transparent;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
 }

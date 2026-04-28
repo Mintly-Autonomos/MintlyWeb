@@ -82,3 +82,18 @@ button[mat-icon-button] {
   font-size: 1.1rem;
   line-height: 1;
 }
+
+@media (max-width: 720px) {
+  .popup-container.top-left,
+  .popup-container.top-right {
+    left: 0.75rem;
+    right: 0.75rem;
+    align-items: stretch;
+  }
+
+  .popup-card {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+}

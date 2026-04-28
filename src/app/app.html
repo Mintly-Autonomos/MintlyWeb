@@ -10,30 +10,40 @@
       <mat-card class="hero-card mat-elevation-z8">
         <div class="hero-copy">
           <div>
-            <span class="tag">Mintly</span>
-            <h1>Assistente financeiro moderno para autônomos</h1>
+            <div class="hero-meta">
+              <span class="tag">Mintly</span>
+              <span class="environment-chip" *ngIf="isDev">{{ appEnvironment }}</span>
+            </div>
+            <h1>Assistente financeiro moderno para autonomos</h1>
             <p>
               Experimente um frontend Angular com Material, design limpo e modais responsivos para
-              notificações e alertas.
+              notificacoes e alertas.
             </p>
           </div>
           <div class="hero-actions">
-            <button mat-flat-button color="primary" (click)="openModal()">Ver notificação</button>
+            <button mat-flat-button color="primary" (click)="openModal()">Ver notificacao</button>
           </div>
         </div>
       </mat-card>
 
       <div class="feature-grid">
         <mat-card class="feature-card">
-          <h2>Controle rápido</h2>
+          <h2>Controle rapido</h2>
           <p>
-            Registre despesas e receitas com rapidez, com uma interface leve pensada para autônomos.
+            Registre despesas e receitas com rapidez, com uma interface leve pensada para autonomos.
           </p>
         </mat-card>
         <mat-card class="feature-card">
-          <h2>Notificações intuitivas</h2>
+          <h2>Notificacoes intuitivas</h2>
           <p>
-            Modal de alerta e notificações com status e duração personalizada para testes reais.
+            Modal de alerta e notificacoes com status e duracao personalizada para testes reais.
+          </p>
+        </mat-card>
+        <mat-card class="feature-card">
+          <h2>Experiencia adaptavel</h2>
+          <p>
+            Layout otimizado para desktop e celular, com navegacao, espacamento e feedback visual
+            ajustados para telas menores.
           </p>
         </mat-card>
       </div>

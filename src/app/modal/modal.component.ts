@@ -38,12 +38,16 @@ export class ModalComponent {
   }
 
   get width(): string {
+    return '';
+  }
+
+  get sizeClass(): string {
     if (this.sizeError) {
-      return '20%';
+      return 'size-m';
     }
 
     const value = this.size.toLowerCase();
-    return value === 'g' ? '40%' : value === 'm' ? '30%' : '20%';
+    return value === 'g' ? 'size-g' : value === 'm' ? 'size-m' : 'size-s';
   }
 
   get statusIcon(): string {
