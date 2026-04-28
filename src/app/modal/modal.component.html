@@ -4,7 +4,7 @@
   (click)="onBackdropClick($event)"
   (keydown)="onBackdropKeydown($event)"
 >
-  <mat-card class="modal-panel" [ngClass]="[status, sizeClass]">
+  <mat-card class="modal-panel" [ngClass]="[status, getSizeClass()]">
     <mat-card-header class="modal-header">
       <div class="modal-header-title">
         <div class="modal-title-wrapper">

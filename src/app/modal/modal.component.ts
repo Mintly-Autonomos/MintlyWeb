@@ -12,6 +12,12 @@ type ModalStatus = 'success' | 'error' | 'warning' | 'information';
   styleUrls: ['./modal.component.css'],
 })
 export class ModalComponent {
+  private readonly sizeClassMap = {
+    g: 'size-g',
+    m: 'size-m',
+    s: 'size-s',
+  } as const;
+
   @Input() title = '';
   @Input() size = 's';
   @Input() status: ModalStatus = 'information';
@@ -37,17 +43,13 @@ export class ModalComponent {
     return null;
   }
 
-  get width(): string {
-    return '';
-  }
-
-  get sizeClass(): string {
+  protected getSizeClass(): string {
     if (this.sizeError) {
       return 'size-m';
     }
 
     const value = this.size.toLowerCase();
-    return value === 'g' ? 'size-g' : value === 'm' ? 'size-m' : 'size-s';
+    return this.sizeClassMap[value as keyof typeof this.sizeClassMap] ?? 'size-s';
   }
 
   get statusIcon(): string {
