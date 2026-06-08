@@ -1,0 +1,315 @@
+<!-- Toast rack -->
+<div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+  @for (t of toasts(); track t.id) {
+    <div class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg border border-border bg-card min-w-[300px] animate-in slide-in-from-bottom-4">
+      <app-icon [name]="toastIcon(t.tone)" [style]="{fontSize:'20px'}" [className]="toastColor(t.tone)" />
+      <span class="text-sm flex-1">{{ t.message }}</span>
+    </div>
+  }
+</div>
+
+<div class="p-6 max-w-7xl mx-auto space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Contas financeiras</h1>
+      <p class="text-muted-foreground text-sm mt-1">Gerencie suas contas bancárias, caixas e carteiras digitais.</p>
+    </div>
+    <button (click)="openCreate()" class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0">
+      <app-icon name="add" [style]="{fontSize:'20px'}" />
+      <span>Nova conta</span>
+    </button>
+  </div>
+
+  <!-- Summary -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="m3-card p-5 flex flex-col gap-1">
+      <span class="text-[12px] text-muted-foreground font-medium uppercase tracking-wide">Saldo total</span>
+      <span class="text-2xl font-bold text-foreground">{{ fmtBRL(total()) }}</span>
+      <span class="text-[12px] text-muted-foreground">{{ activeCount() }} conta(s) ativa(s)</span>
+    </div>
+    <div class="m3-card p-5 flex flex-col gap-1">
+      <span class="text-[12px] text-muted-foreground font-medium uppercase tracking-wide">Saldo previsto</span>
+      <span class="text-2xl font-bold text-foreground">{{ fmtBRL(totalPredicted()) }}</span>
+      <span class="text-[12px] text-muted-foreground">Inclui movimentações pendentes</span>
+    </div>
+    <div class="m3-card p-5 flex flex-col gap-1">
+      <span class="text-[12px] text-muted-foreground font-medium uppercase tracking-wide">Total de contas</span>
+      <span class="text-2xl font-bold text-foreground">{{ accounts().length }}</span>
+      <span class="text-[12px] text-muted-foreground">{{ accounts().length - activeCount() }} inativa(s)</span>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <app-filter-bar [query]="query()" (queryChange)="query.set($event)" [activeCount]="activeFilters()">
+    <app-filter-select label="Tipo" [value]="typeFilter()" [options]="typeOpts" (valueChange)="typeFilter.set($any($event))" />
+    <app-filter-select label="Status" [value]="statusFilter()" [options]="statusOpts" (valueChange)="statusFilter.set($any($event))" />
+  </app-filter-bar>
+
+  <!-- Account cards grid -->
+  @if (sorted().length === 0) {
+    <app-empty-state icon="account_balance_wallet" title="Nenhuma conta encontrada"
+      description="Tente ajustar os filtros ou crie uma nova conta." />
+  } @else {
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      @for (a of sorted(); track a.id) {
+        <div [class]="'m3-card p-5 flex flex-col gap-4 relative ' + (!a.active ? 'opacity-60' : '')">
+          <!-- Card header -->
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div [class]="'h-11 w-11 rounded-2xl grid place-items-center shrink-0 ' + typeMeta[a.type].bg">
+                <app-icon [name]="typeMeta[a.type].icon" [style]="{fontSize:'22px'}" [className]="typeMeta[a.type].color" />
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-semibold text-sm leading-tight">{{ a.name }}</span>
+                  @if (a.isDefault) {
+                    <app-chip tone="mint" icon="star" label="Padrão" />
+                  }
+                </div>
+                <span class="text-[12px] text-muted-foreground">{{ typeMeta[a.type].label }}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button (click)="openEdit(a)" class="h-8 w-8 rounded-xl grid place-items-center text-muted-foreground hover:bg-muted transition cursor-pointer" title="Editar">
+                <app-icon name="edit" [style]="{fontSize:'17px'}" />
+              </button>
+              <button (click)="details.set(getDetails(a))" class="h-8 w-8 rounded-xl grid place-items-center text-muted-foreground hover:bg-muted transition cursor-pointer" title="Detalhes">
+                <app-icon name="info" [style]="{fontSize:'17px'}" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Balances -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="p-3 rounded-xl bg-muted/60 flex flex-col gap-0.5">
+              <span class="text-[11px] text-muted-foreground uppercase tracking-wide">Saldo atual</span>
+              <span class="text-base font-bold">{{ fmtBRL(a.balance) }}</span>
+            </div>
+            <div class="p-3 rounded-xl bg-muted/60 flex flex-col gap-0.5">
+              <span class="text-[11px] text-muted-foreground uppercase tracking-wide">Saldo previsto</span>
+              <span class="text-base font-bold">{{ fmtBRL(a.predictedBalance) }}</span>
+            </div>
+          </div>
+
+          <!-- Platform fields -->
+          @if (a.type === 'Financial Platform' && (a.taxPct != null || a.settlementDays != null)) {
+            <div class="flex gap-3 text-[12px] text-muted-foreground">
+              @if (a.taxPct != null) { <span class="flex items-center gap-1"><app-icon name="percent" [style]="{fontSize:'14px'}" />{{ a.taxPct }}% de taxa</span> }
+              @if (a.settlementDays != null) { <span class="flex items-center gap-1"><app-icon name="schedule" [style]="{fontSize:'14px'}" />{{ a.settlementDays }}d repasse</span> }
+            </div>
+          }
+
+          <!-- Toggle -->
+          <div class="flex items-center justify-between pt-1 border-t border-border">
+            <span class="text-[12px]" [class]="a.active ? 'text-success' : 'text-muted-foreground'">
+              {{ a.active ? 'Conta ativa' : 'Conta inativa' }}
+            </span>
+            <div [title]="toggleReason(a)">
+              <app-toggle [checked]="a.active" [disabled]="toggleDisabled(a)" (changed)="handleToggle(a, $event)" />
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<!-- ─── Account Modal (create / edit) ─── -->
+@if (creating() || editing()) {
+  <app-modal [title]="editing() ? 'Editar conta' : 'Nova conta'" [subtitle]="editing() ? 'Atualize os dados da conta.' : 'Preencha os dados para criar uma nova conta.'" size="lg" (closed)="closeModal()">
+    <div class="space-y-5">
+
+      <!-- Type selector -->
+      @if (!editing()) {
+        <div>
+          <div class="text-[13px] font-medium mb-2">Tipo de conta</div>
+          <div class="grid grid-cols-2 gap-2">
+            @for (t of accTypes; track t) {
+              <button type="button" (click)="setFormType(t)"
+                [class]="'flex items-center gap-3 p-3 rounded-xl border text-left transition cursor-pointer ' + (form().type === t ? 'border-mint bg-mint-soft' : 'border-border bg-card hover:bg-muted')">
+                <div [class]="'h-9 w-9 rounded-xl grid place-items-center shrink-0 ' + typeMeta[t].bg">
+                  <app-icon [name]="typeMeta[t].icon" [style]="{fontSize:'18px'}" [className]="typeMeta[t].color" />
+                </div>
+                <span class="text-[13px] font-medium">{{ typeMeta[t].label }}</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Name -->
+      <label class="block">
+        <span class="text-[13px] font-medium block mb-1.5">Nome da conta</span>
+        <input [value]="form().name" (input)="setFormName($any($event.target).value)" type="text" placeholder="Ex.: Itaú PJ, Caixa Principal…"
+          [class]="'w-full h-12 rounded-xl border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground ' + (nameError ? 'border-error' : 'border-border')" />
+        @if (nameError) { <p class="text-error text-[12px] mt-1">{{ nameError }}</p> }
+      </label>
+
+      <!-- Platform fields -->
+      @if (isPlatform) {
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-[13px] font-medium block mb-1.5">Taxa (%)</span>
+            <input [value]="form().taxPct" (input)="setFormTaxPct($any($event.target).value)" type="number" min="0" max="100" step="0.01" placeholder="Ex.: 12.5"
+              class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground" />
+          </label>
+          <label class="block">
+            <span class="text-[13px] font-medium block mb-1.5">Prazo de repasse (dias)</span>
+            <input [value]="form().settlementDays" (input)="setFormDays($any($event.target).value)" type="number" min="0" step="1" placeholder="Ex.: 2"
+              class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground" />
+          </label>
+        </div>
+      }
+
+      <!-- Toggles -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between py-3 border-t border-border">
+          <div>
+            <div class="text-[13px] font-medium">Conta padrão</div>
+            <div class="text-[12px] text-muted-foreground">Usada automaticamente em novas movimentações</div>
+          </div>
+          <app-toggle [checked]="form().isDefault" [disabled]="editing()?.isDefault ?? false" (changed)="setFormDefault($event)" />
+        </div>
+        @if (editing()?.active) {
+          <div class="flex items-center justify-between py-3 border-t border-border">
+            <div>
+              <div class="text-[13px] font-medium">Conta ativa</div>
+              @if (deactivateReason) { <div class="text-[12px] text-error">{{ deactivateReason }}</div> }
+              @else { <div class="text-[12px] text-muted-foreground">Desative para ocultar em novas movimentações</div> }
+            </div>
+            <app-toggle [checked]="form().active" [disabled]="!!deactivateReason" (changed)="setFormActive($event)" />
+          </div>
+        }
+      </div>
+    </div>
+
+    <ng-container ngProjectAs="[slot=footer]">
+      <div class="flex justify-end gap-3">
+        <button type="button" (click)="closeModal()" class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted transition cursor-pointer">Cancelar</button>
+        <button type="button" (click)="save()" [disabled]="saveDisabled" class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 disabled:opacity-50 transition cursor-pointer">
+          {{ editing() ? 'Salvar alterações' : 'Criar conta' }}
+        </button>
+      </div>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ─── Blocked modal (has balance) ─── -->
+@if (blocked()) {
+  <app-modal title="Não é possível desativar" subtitle="Esta conta possui saldo vinculado." (closed)="blocked.set(null)">
+    <div class="space-y-4">
+      <div class="p-4 rounded-2xl bg-warning/10 border border-warning/30 text-[13px] space-y-1">
+        <p><strong>Saldo atual:</strong> {{ fmtBRL(blocked()!.balance) }}</p>
+        <p><strong>Saldo previsto:</strong> {{ fmtBRL(blocked()!.predictedBalance) }}</p>
+      </div>
+      <p class="text-[13px] text-muted-foreground">Para desativar esta conta, zere os saldos primeiro transferindo ou estornando as movimentações associadas.</p>
+    </div>
+    <ng-container ngProjectAs="[slot=footer]">
+      <button type="button" (click)="blocked.set(null)" class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 cursor-pointer">Entendido</button>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ─── Reassign default modal ─── -->
+@if (reassign()) {
+  <app-modal title="Definir nova conta padrão" subtitle="Antes de desativar, escolha qual conta será a nova padrão." (closed)="reassign.set(null)">
+    <div class="space-y-3">
+      @for (c of reassignCandidates(); track c.id) {
+        <button type="button" (click)="selectedReassignId.set(c.id)"
+          [class]="'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition cursor-pointer ' + (selectedReassignId() === c.id ? 'border-mint bg-mint-soft' : 'border-border hover:bg-muted')">
+          <div [class]="'h-9 w-9 rounded-xl grid place-items-center shrink-0 ' + typeMeta[c.type].bg">
+            <app-icon [name]="typeMeta[c.type].icon" [style]="{fontSize:'18px'}" [className]="typeMeta[c.type].color" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[13px] font-medium truncate">{{ c.name }}</div>
+            <div class="text-[12px] text-muted-foreground">{{ typeMeta[c.type].label }} · {{ fmtBRL(c.balance) }}</div>
+          </div>
+          @if (selectedReassignId() === c.id) { <app-icon name="check_circle" [style]="{fontSize:'20px'}" className="text-mint shrink-0" /> }
+        </button>
+      }
+    </div>
+    <ng-container ngProjectAs="[slot=footer]">
+      <div class="flex justify-end gap-3">
+        <button type="button" (click)="reassign.set(null)" class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted transition cursor-pointer">Cancelar</button>
+        <button type="button" (click)="confirmReassign()" [disabled]="!selectedReassignId()" class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 disabled:opacity-50 cursor-pointer">Confirmar</button>
+      </div>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ─── Confirm default swap modal ─── -->
+@if (confirmDefault()) {
+  <app-modal title="Alterar conta padrão" subtitle="Confirme a troca da conta padrão do sistema." (closed)="confirmDefault.set(null)">
+    <div class="space-y-3 text-[13px]">
+      <p>A conta <strong>{{ confirmDefault()!.prev?.name }}</strong> deixará de ser padrão e a conta <strong>{{ confirmDefault()!.next.name }}</strong> passará a ser a padrão para novas movimentações.</p>
+      <div class="p-3 rounded-xl bg-ocean-soft border border-ocean/20 text-muted-foreground">Esta alteração afeta somente novas movimentações. Movimentações existentes não são alteradas.</div>
+    </div>
+    <ng-container ngProjectAs="[slot=footer]">
+      <div class="flex justify-end gap-3">
+        <button type="button" (click)="confirmDefault.set(null)" class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted transition cursor-pointer">Cancelar</button>
+        <button type="button" (click)="applyDefault()" class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 cursor-pointer">Confirmar troca</button>
+      </div>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ─── Details modal ─── -->
+@if (details()) {
+  <app-modal title="Detalhes da conta" [subtitle]="details()!.name" size="lg" (closed)="details.set(null)">
+    <div class="space-y-5">
+      <!-- Meta grid -->
+      <div class="grid grid-cols-2 gap-3 text-[13px]">
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block">Tipo</span>
+          <span class="font-medium">{{ typeMeta[details()!.type].label }}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block">Status</span>
+          <span [class]="'font-medium ' + (details()!.active ? 'text-success' : 'text-muted-foreground')">{{ details()!.active ? 'Ativa' : 'Inativa' }}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block">Criada em</span>
+          <span class="font-medium">{{ fmtDate(details()!.createdAt) }}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block">Atualizada em</span>
+          <span class="font-medium">{{ fmtDate(details()!.updatedAt) }}</span>
+        </div>
+        @if (details()!.type === 'Financial Platform') {
+          <div class="p-3 rounded-xl bg-muted/60">
+            <span class="text-muted-foreground block">Taxa</span>
+            <span class="font-medium">{{ details()!.taxPct ?? 0 }}%</span>
+          </div>
+          <div class="p-3 rounded-xl bg-muted/60">
+            <span class="text-muted-foreground block">Prazo de repasse</span>
+            <span class="font-medium">{{ details()!.settlementDays ?? 0 }} dia(s)</span>
+          </div>
+        }
+      </div>
+
+      <!-- Audit timeline -->
+      <div>
+        <div class="text-[13px] font-semibold mb-3">Histórico</div>
+        <div class="space-y-2">
+          @for (ev of details()!.history; track ev.id) {
+            <div class="flex gap-3 text-[13px]">
+              <div class="h-7 w-7 rounded-xl bg-muted grid place-items-center shrink-0 mt-0.5">
+                <app-icon [name]="ev.icon" [style]="{fontSize:'15px'}" className="text-muted-foreground" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium">{{ ev.action }}</div>
+                @if (ev.detail) { <div class="text-muted-foreground text-[12px]">{{ ev.detail }}</div> }
+                <div class="text-[11px] text-muted-foreground mt-0.5">{{ fmtDate(ev.at) }} · {{ ev.by }}</div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+    <ng-container ngProjectAs="[slot=footer]">
+      <button type="button" (click)="details.set(null)" class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 cursor-pointer">Fechar</button>
+    </ng-container>
+  </app-modal>
+}

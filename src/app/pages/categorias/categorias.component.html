@@ -1,0 +1,257 @@
+<!-- Toast rack -->
+<div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+  @for (t of toasts(); track t.id) {
+    <div class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg border border-border bg-card min-w-[300px]">
+      <app-icon [name]="toastIcon(t.tone)" [style]="{fontSize:'20px'}" [className]="toastColor(t.tone)" />
+      <span class="text-sm flex-1">{{ t.message }}</span>
+    </div>
+  }
+</div>
+
+<div class="p-6 max-w-7xl mx-auto space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Categorias</h1>
+      <p class="text-muted-foreground text-sm mt-1">Organize suas movimentações com categorias personalizadas.</p>
+    </div>
+    <button (click)="openCreate()" class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0">
+      <app-icon name="add" [style]="{fontSize:'20px'}" /><span>Nova categoria</span>
+    </button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 p-1 bg-muted rounded-2xl w-fit">
+    <button type="button" (click)="tab.set('income')"
+      [class]="'flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium transition cursor-pointer ' + (tab() === 'income' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')">
+      <app-icon name="trending_up" [style]="{fontSize:'16px'}" className="text-success" />
+      <span>Receita</span>
+      <span [class]="'text-[11px] font-semibold px-1.5 rounded-full ' + (tab() === 'income' ? 'bg-success/15 text-success' : 'bg-muted-foreground/20 text-muted-foreground')">{{ incomeCount() }}</span>
+    </button>
+    <button type="button" (click)="tab.set('expense')"
+      [class]="'flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-medium transition cursor-pointer ' + (tab() === 'expense' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')">
+      <app-icon name="trending_down" [style]="{fontSize:'16px'}" className="text-error" />
+      <span>Despesa</span>
+      <span [class]="'text-[11px] font-semibold px-1.5 rounded-full ' + (tab() === 'expense' ? 'bg-error/15 text-error' : 'bg-muted-foreground/20 text-muted-foreground')">{{ expenseCount() }}</span>
+    </button>
+  </div>
+
+  <!-- Search -->
+  <app-filter-bar [query]="query()" (queryChange)="query.set($event)" [activeCount]="0" />
+
+  <!-- Table -->
+  @if (filtered().length === 0) {
+    <app-empty-state icon="label" title="Nenhuma categoria encontrada"
+      [description]="query() ? 'Tente outro termo de busca.' : 'Crie a primeira categoria para organizar suas movimentações.'" />
+  } @else {
+    <div class="m3-card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-border text-[12px] text-muted-foreground uppercase tracking-wide">
+              <th class="text-left px-4 py-3 font-medium">Nome</th>
+              <th class="text-left px-4 py-3 font-medium hidden sm:table-cell">Comportamento</th>
+              <th class="text-left px-4 py-3 font-medium hidden md:table-cell">Natureza</th>
+              <th class="text-left px-4 py-3 font-medium">Status</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of filtered(); track c.id) {
+              <tr class="border-b border-border/50 hover:bg-muted/30 transition group">
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2.5">
+                    <div [class]="'h-8 w-8 rounded-xl grid place-items-center shrink-0 ' + (c.type === 'income' ? 'bg-success/10' : 'bg-error/10')">
+                      <app-icon name="label" [style]="{fontSize:'16px'}" [className]="c.type === 'income' ? 'text-success' : 'text-error'" />
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-medium">{{ c.name }}</span>
+                        @if (c.protected) {
+                          <span class="text-muted-foreground" title="Categoria protegida — não pode ser editada ou excluída">
+                            <app-icon name="lock" [style]="{fontSize:'14px'}" />
+                          </span>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-4 py-3 hidden sm:table-cell">
+                  <app-chip [tone]="c.behavior === 'fixed' ? 'ocean' : 'neutral'" [label]="behaviorLabel(c.behavior)" />
+                </td>
+                <td class="px-4 py-3 hidden md:table-cell">
+                  <app-chip [tone]="c.nature === 'operational' ? 'mint' : 'neutral'" [label]="natureLabel(c.nature)" />
+                </td>
+                <td class="px-4 py-3">
+                  <app-toggle [checked]="c.active" (changed)="handleToggle(c, $event)" />
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition">
+                    @if (!c.protected) {
+                      <button (click)="openEdit(c)" class="h-7 w-7 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer" title="Editar">
+                        <app-icon name="edit" [style]="{fontSize:'15px'}" />
+                      </button>
+                    }
+                    <button (click)="details.set(c)" class="h-7 w-7 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer" title="Detalhes">
+                      <app-icon name="info" [style]="{fontSize:'15px'}" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- ─── Category Modal (create / edit) ─── -->
+@if (creating() || editing()) {
+  <app-modal [title]="editing() ? 'Editar categoria' : 'Nova categoria'" (closed)="closeModal()">
+    <div class="space-y-4">
+
+      <!-- Type (create only) -->
+      @if (!editing()) {
+        <div class="grid grid-cols-2 gap-3">
+          <button type="button" (click)="setField('type', 'income')"
+            [class]="'h-11 rounded-xl border font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition ' + (form().type === 'income' ? 'border-success bg-success/10 text-success' : 'border-border hover:bg-muted')">
+            <app-icon name="trending_up" [style]="{fontSize:'17px'}" /><span>Receita</span>
+          </button>
+          <button type="button" (click)="setField('type', 'expense')"
+            [class]="'h-11 rounded-xl border font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition ' + (form().type === 'expense' ? 'border-error bg-error/10 text-error' : 'border-border hover:bg-muted')">
+            <app-icon name="trending_down" [style]="{fontSize:'17px'}" /><span>Despesa</span>
+          </button>
+        </div>
+      }
+
+      <!-- Name -->
+      <label class="block">
+        <span class="text-[13px] font-medium block mb-1.5">Nome</span>
+        <input [value]="form().name" (input)="setField('name', $any($event.target).value)" type="text" placeholder="Ex.: Salário, Aluguel…"
+          [class]="'w-full h-12 rounded-xl border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground ' + (nameError ? 'border-error' : 'border-border')" />
+        @if (nameError) { <p class="text-error text-[12px] mt-1">{{ nameError }}</p> }
+      </label>
+
+      <!-- Behavior -->
+      <div>
+        <div class="text-[13px] font-medium mb-2">Comportamento</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" (click)="setField('behavior', 'variable')"
+            [class]="'h-11 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 cursor-pointer transition ' + (form().behavior === 'variable' ? 'border-mint bg-mint-soft text-ocean' : 'border-border hover:bg-muted')">
+            <app-icon name="trending_flat" [style]="{fontSize:'17px'}" /><span>Variável</span>
+          </button>
+          <button type="button" (click)="setField('behavior', 'fixed')"
+            [class]="'h-11 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 cursor-pointer transition ' + (form().behavior === 'fixed' ? 'border-ocean bg-ocean-soft text-ocean' : 'border-border hover:bg-muted')">
+            <app-icon name="lock_clock" [style]="{fontSize:'17px'}" /><span>Fixo</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Nature -->
+      <div>
+        <div class="text-[13px] font-medium mb-2">Natureza</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" (click)="setField('nature', 'operational')"
+            [class]="'h-11 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 cursor-pointer transition ' + (form().nature === 'operational' ? 'border-mint bg-mint-soft text-ocean' : 'border-border hover:bg-muted')">
+            <app-icon name="settings" [style]="{fontSize:'17px'}" /><span>Operacional</span>
+          </button>
+          <button type="button" (click)="setField('nature', 'non-operational')"
+            [class]="'h-11 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 cursor-pointer transition ' + (form().nature === 'non-operational' ? 'border-ocean bg-ocean-soft text-ocean' : 'border-border hover:bg-muted')">
+            <app-icon name="category" [style]="{fontSize:'17px'}" /><span>Não operacional</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Active (edit only) -->
+      @if (editing()) {
+        <div class="flex items-center justify-between py-3 border-t border-border">
+          <div>
+            <div class="text-[13px] font-medium">Ativa</div>
+            <div class="text-[12px] text-muted-foreground">Categorias inativas não aparecem ao criar movimentações</div>
+          </div>
+          <app-toggle [checked]="form().active" (changed)="setField('active', $event)" />
+        </div>
+      }
+    </div>
+
+    <ng-container ngProjectAs="[slot=footer]">
+      <div class="flex justify-end gap-3">
+        <button type="button" (click)="closeModal()" class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted transition cursor-pointer">Cancelar</button>
+        <button type="button" (click)="save()" [disabled]="saveDisabled" class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 disabled:opacity-50 transition cursor-pointer">
+          {{ editing() ? 'Salvar' : 'Criar categoria' }}
+        </button>
+      </div>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ─── Protected alert modal ─── -->
+@if (protectedAlert()) {
+  <app-modal title="Categoria protegida" subtitle="Esta categoria não pode ser modificada." (closed)="protectedAlert.set(null)">
+    <div class="flex items-start gap-3 p-4 rounded-2xl bg-ocean-soft border border-ocean/20 text-[13px]">
+      <app-icon name="lock" [style]="{fontSize:'20px'}" className="text-ocean shrink-0 mt-0.5" />
+      <p class="text-foreground/90">A categoria <strong>{{ protectedAlert()!.name }}</strong> é uma categoria padrão do sistema e não pode ser editada, renomeada ou desativada manualmente.</p>
+    </div>
+    <ng-container ngProjectAs="[slot=footer]">
+      <button type="button" (click)="protectedAlert.set(null)" class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 cursor-pointer">Entendido</button>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ─── Details modal ─── -->
+@if (details()) {
+  <app-modal title="Detalhes da categoria" [subtitle]="details()!.name" size="lg" (closed)="details.set(null)">
+    <div class="space-y-5 text-[13px]">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block mb-0.5">Tipo</span>
+          <span [class]="'font-semibold ' + (details()!.type === 'income' ? 'text-success' : 'text-error')">{{ details()!.type === 'income' ? 'Receita' : 'Despesa' }}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block mb-0.5">Status</span>
+          <span [class]="'font-medium ' + (details()!.active ? 'text-success' : 'text-muted-foreground')">{{ details()!.active ? 'Ativa' : 'Inativa' }}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block mb-0.5">Comportamento</span>
+          <span class="font-medium">{{ behaviorLabel(details()!.behavior) }}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block mb-0.5">Natureza</span>
+          <span class="font-medium">{{ natureLabel(details()!.nature) }}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block mb-0.5">Criada em</span>
+          <span class="font-medium">{{ fmtDate(details()!.createdAt) }}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-muted/60">
+          <span class="text-muted-foreground block mb-0.5">Atualizada em</span>
+          <span class="font-medium">{{ fmtDate(details()!.updatedAt) }}</span>
+        </div>
+      </div>
+
+      <!-- Audit timeline -->
+      <div>
+        <div class="font-semibold mb-3">Histórico</div>
+        <div class="space-y-2">
+          @for (ev of details()!.history; track ev.id) {
+            <div class="flex gap-3">
+              <div class="h-7 w-7 rounded-xl bg-muted grid place-items-center shrink-0 mt-0.5">
+                <app-icon [name]="ev.icon" [style]="{fontSize:'14px'}" className="text-muted-foreground" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium">{{ ev.action }}</div>
+                @if (ev.detail) { <div class="text-muted-foreground text-[12px]">{{ ev.detail }}</div> }
+                <div class="text-[11px] text-muted-foreground mt-0.5">{{ fmtDate(ev.at) }} · {{ ev.by }}</div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+    <ng-container ngProjectAs="[slot=footer]">
+      <button type="button" (click)="details.set(null)" class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 cursor-pointer">Fechar</button>
+    </ng-container>
+  </app-modal>
+}
