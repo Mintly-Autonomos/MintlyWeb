@@ -1,3 +1,6 @@
+import { Component } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { ToastContainerComponent } from './shared/toast-container.component';
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,6 +14,8 @@ import { NavbarComponent, NavItem } from './navbar/navbar.component';
   selector: 'app-root',
   standalone: true,
   imports: [
+    RouterOutlet, 
+    ToastContainerComponent, 
     CommonModule,
     NavbarComponent,
     PopupComponent,
@@ -19,7 +24,6 @@ import { NavbarComponent, NavItem } from './navbar/navbar.component';
     MatCardModule,
   ],
   templateUrl: './app.html',
-  styleUrls: ['./app.css'],
 })
 export class App {
   protected readonly currentPage = signal<'home' | 'dev-test'>('home');

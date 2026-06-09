@@ -1,3 +1,42 @@
+@import "tailwindcss";
+@source "./app/**/*.html";
+@source "./app/**/*.ts";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-mint: var(--mint);
+  --color-mint-soft: var(--mint-soft);
+  --color-ocean: var(--ocean);
+  --color-ocean-soft: var(--ocean-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 
 :root {
@@ -19,28 +58,67 @@ body {
   background: linear-gradient(180deg, #fbf5ed 0%, #f7ebdd 60%);
 }
 
-.mat-mdc-button.mat-flat-button.mat-primary,
-.mat-flat-button.mat-primary,
-button.mat-flat-button.mat-primary,
-button.mat-raised-button.mat-primary,
-button.mat-stroked-button.mat-primary,
-button.mat-button.mat-primary,
-.mat-mdc-button.mat-primary,
-.mat-primary.mat-mdc-button {
-  background-color: var(--mdc-theme-primary) !important;
-  color: var(--mdc-theme-on-primary) !important;
-  background-image: none !important;
-  border-color: var(--mdc-theme-primary) !important;
+:root {
+  --radius: 0.875rem;
+  --background: oklch(0.985 0.005 220);
+  --foreground: oklch(0.27 0.03 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.27 0.03 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.27 0.03 260);
+  --primary: oklch(0.78 0.2 148);
+  --primary-foreground: oklch(0.22 0.04 160);
+  --secondary: oklch(0.96 0.01 220);
+  --secondary-foreground: oklch(0.27 0.03 260);
+  --muted: oklch(0.965 0.006 220);
+  --muted-foreground: oklch(0.5 0.02 250);
+  --accent: oklch(0.95 0.04 165);
+  --accent-foreground: oklch(0.35 0.08 170);
+  --border: oklch(0.92 0.008 230);
+  --input: oklch(0.92 0.008 230);
+  --ring: oklch(0.78 0.2 148);
+  --mint: oklch(0.78 0.2 148);
+  --mint-soft: oklch(0.95 0.05 160);
+  --ocean: oklch(0.46 0.07 220);
+  --ocean-soft: oklch(0.95 0.02 220);
+  --success: oklch(0.72 0.18 145);
+  --warning: oklch(0.78 0.16 75);
+  --error: oklch(0.65 0.22 27);
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.27 0.03 260);
 }
 
-.mat-mdc-button.mat-stroked-button.mat-primary,
-.mat-stroked-button.mat-primary,
-button.mat-stroked-button.mat-primary {
-  color: var(--mdc-theme-primary) !important;
-  border-color: var(--mdc-theme-primary) !important;
-  background-color: transparent !important;
+.dark {
+  --background: oklch(0.21 0.02 250);
+  --foreground: oklch(0.97 0.005 220);
+  --card: oklch(0.255 0.022 250);
+  --card-foreground: oklch(0.97 0.005 220);
+  --popover: oklch(0.255 0.022 250);
+  --popover-foreground: oklch(0.97 0.005 220);
+  --primary: oklch(0.78 0.2 148);
+  --primary-foreground: oklch(0.18 0.03 160);
+  --secondary: oklch(0.3 0.025 250);
+  --secondary-foreground: oklch(0.97 0.005 220);
+  --muted: oklch(0.3 0.025 250);
+  --muted-foreground: oklch(0.72 0.02 230);
+  --accent: oklch(0.34 0.05 165);
+  --accent-foreground: oklch(0.92 0.07 160);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.78 0.2 148);
+  --mint: oklch(0.78 0.2 148);
+  --mint-soft: oklch(0.34 0.05 165);
+  --ocean: oklch(0.7 0.08 220);
+  --ocean-soft: oklch(0.32 0.04 220);
+  --success: oklch(0.72 0.18 145);
+  --warning: oklch(0.78 0.16 75);
+  --error: oklch(0.65 0.22 27);
+  --sidebar: oklch(0.235 0.022 250);
+  --sidebar-foreground: oklch(0.97 0.005 220);
 }
 
+@layer base {
+  * { border-color: var(--color-border); }
 .mat-mdc-button.mat-flat-button.mat-primary:hover,
 .mat-flat-button.mat-primary:hover,
 button.mat-flat-button.mat-primary:hover,
@@ -49,33 +127,46 @@ button.mat-button.mat-primary:hover {
   background-color: #4ea58e !important;
 }
 
-.mat-mdc-button.mat-stroked-button.mat-primary:hover,
-.mat-stroked-button.mat-primary:hover,
-button.mat-stroked-button.mat-primary:hover {
-  background-color: rgba(107, 192, 167, 0.16) !important;
+  html, body, *, *::before, *::after {
+    transition-property: background-color, border-color, box-shadow;
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+  }
+
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 20px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
 }
 
-.mat-mdc-button.mat-primary .mat-button-focus-overlay,
-button.mat-flat-button.mat-primary .mat-button-focus-overlay,
-button.mat-raised-button.mat-primary .mat-button-focus-overlay,
-button.mat-stroked-button.mat-primary .mat-button-focus-overlay {
-  background-color: rgba(255, 255, 255, 0.12) !important;
-}
-
-.mat-card {
-  background: var(--mdc-theme-surface) !important;
-  color: var(--mdc-theme-on-surface) !important;
-  border-color: rgba(27, 62, 46, 0.12) !important;
-}
-
-.mat-card .mat-mdc-button,
-.mat-card button.mat-mdc-button {
-  color: var(--mdc-theme-primary) !important;
-}
-
+@layer components {
+  .m3-card {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  }
 button.mat-flat-button.color-primary,
 button.mat-flat-button[color='primary'] {
   box-shadow: 0 10px 20px rgba(27, 62, 46, 0.08);
 }
-
-/* You can add global styles to this file, and also import other style files */
