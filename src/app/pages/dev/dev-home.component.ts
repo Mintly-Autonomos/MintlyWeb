@@ -6,6 +6,9 @@ import { environment } from '../../../environments/environment';
 import { PopupComponent, PopupItem } from '../../popup/popup.component';
 import { DevTestComponent } from '../../dev-test/dev-test.component';
 import { NavbarComponent, NavItem } from '../../navbar/navbar.component';
+import { FinanceShowcaseComponent } from './finance-showcase.component';
+
+type DevPage = 'home' | 'dev-test' | 'components';
 
 /**
  * Showcase do design system (navbar/popup/dev-test + Material).
@@ -20,6 +23,7 @@ import { NavbarComponent, NavItem } from '../../navbar/navbar.component';
     NavbarComponent,
     PopupComponent,
     DevTestComponent,
+    FinanceShowcaseComponent,
     MatButtonModule,
     MatCardModule,
   ],
@@ -27,7 +31,7 @@ import { NavbarComponent, NavItem } from '../../navbar/navbar.component';
   styleUrls: ['./dev-home.component.css'],
 })
 export class DevHomeComponent {
-  protected readonly currentPage = signal<'home' | 'dev-test'>('home');
+  protected readonly currentPage = signal<DevPage>('home');
   protected readonly popups = signal<PopupItem[]>([]);
   protected readonly isDev = environment.enableDevTools;
   protected readonly appEnvironment = environment.name;
@@ -37,6 +41,7 @@ export class DevHomeComponent {
     ? [
         { label: 'Home', id: 'home' },
         { label: 'Dev-test', id: 'dev-test' },
+        { label: 'Componentes', id: 'components' },
       ]
     : [{ label: 'Home', id: 'home' }];
 
@@ -63,15 +68,15 @@ export class DevHomeComponent {
     this.popups.set(this.popups().filter((popup) => popup.id !== id));
   }
 
-  protected setPage(page: 'home' | 'dev-test'): void {
-    if (page === 'dev-test' && !this.isDev) {
+  protected setPage(page: DevPage): void {
+    if (page !== 'home' && !this.isDev) {
       return;
     }
     this.currentPage.set(page);
   }
 
   protected handleNav(page: string): void {
-    this.setPage(page as 'home' | 'dev-test');
+    this.setPage(page as DevPage);
   }
 
   protected toggleNavbarPosition(): void {

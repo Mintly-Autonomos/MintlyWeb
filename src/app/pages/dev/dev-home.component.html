@@ -55,6 +55,10 @@
         (toggleNavbar)="toggleNavbarPosition()"
       ></app-dev-test>
     </section>
+
+    <section *ngIf="currentPage() === 'components'" class="components-page">
+      <app-finance-showcase></app-finance-showcase>
+    </section>
   </div>
 
   <app-popup
