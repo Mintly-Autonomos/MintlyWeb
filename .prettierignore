@@ -1,0 +1,8 @@
+# Saída de build
+dist/
+node_modules/
+
+# CI/CD e config de YAML são validados pelo job de yaml-lint (yamllint),
+# não pelo Prettier — evita conflito entre as duas ferramentas.
+.github/
+.yamllint.yml

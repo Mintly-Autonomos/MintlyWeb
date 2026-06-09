@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, signal, effect } from '@angular/core';
+import { Component, Input, Output, EventEmitter, signal } from '@angular/core';
 import { IconComponent } from './icon.component';
 
 export interface FilterOption<T = string> {
@@ -13,8 +13,14 @@ export interface FilterOption<T = string> {
   template: `
     <div class="space-y-2">
       <div class="flex items-center gap-2 flex-wrap">
-        <div class="flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card flex-1 min-w-[200px] focus-within:border-mint focus-within:ring-2 focus-within:ring-mint/20 transition">
-          <app-icon name="search" className="text-muted-foreground" [style]="{fontSize:'16px'}" />
+        <div
+          class="flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card flex-1 min-w-[200px] focus-within:border-mint focus-within:ring-2 focus-within:ring-mint/20 transition"
+        >
+          <app-icon
+            name="search"
+            className="text-muted-foreground"
+            [style]="{ fontSize: '16px' }"
+          />
           <input
             [value]="query"
             (input)="queryChange.emit($any($event.target).value)"
@@ -22,8 +28,13 @@ export interface FilterOption<T = string> {
             class="bg-transparent outline-none text-[13px] flex-1 min-w-0 placeholder:text-muted-foreground"
           />
           @if (query) {
-            <button type="button" (click)="queryChange.emit('')" class="text-muted-foreground hover:text-foreground cursor-pointer" aria-label="Limpar busca">
-              <app-icon name="close" [style]="{fontSize:'14px'}" />
+            <button
+              type="button"
+              (click)="queryChange.emit('')"
+              class="text-muted-foreground hover:text-foreground cursor-pointer"
+              aria-label="Limpar busca"
+            >
+              <app-icon name="close" [style]="{ fontSize: '14px' }" />
             </button>
           }
         </div>
@@ -31,14 +42,29 @@ export interface FilterOption<T = string> {
         <button
           type="button"
           (click)="toggleOpen()"
-          [class]="'inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-[13px] font-medium transition cursor-pointer ' + (filtersOpen() || activeCount > 0 ? 'border-border bg-muted text-foreground' : 'border-border bg-card text-foreground hover:bg-muted')"
+          [class]="
+            'inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-[13px] font-medium transition cursor-pointer ' +
+            (filtersOpen() || activeCount > 0
+              ? 'border-border bg-muted text-foreground'
+              : 'border-border bg-card text-foreground hover:bg-muted')
+          "
         >
-          <app-icon name="tune" [style]="{fontSize:'16px'}" />
+          <app-icon name="tune" [style]="{ fontSize: '16px' }" />
           Filtros
           @if (activeCount > 0) {
-            <span class="inline-flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-mint-soft text-mint text-[10px] font-semibold">{{ activeCount }}</span>
+            <span
+              class="inline-flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-mint-soft text-mint text-[10px] font-semibold"
+              >{{ activeCount }}</span
+            >
           }
-          <app-icon name="expand_more" [style]="{fontSize:'16px', transform: filtersOpen() ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s'}" />
+          <app-icon
+            name="expand_more"
+            [style]="{
+              fontSize: '16px',
+              transform: filtersOpen() ? 'rotate(180deg)' : 'none',
+              transition: 'transform 0.2s',
+            }"
+          />
         </button>
       </div>
 
@@ -52,7 +78,7 @@ export interface FilterOption<T = string> {
                 (click)="clearAll.emit()"
                 class="ml-auto text-[12px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 h-8 rounded-md hover:bg-muted transition cursor-pointer"
               >
-                <app-icon name="close" [style]="{fontSize:'13px'}" />
+                <app-icon name="close" [style]="{ fontSize: '13px' }" />
                 Limpar
               </button>
             }
@@ -71,7 +97,9 @@ export class FilterBarComponent {
 
   protected filtersOpen = signal(false);
 
-  toggleOpen(): void { this.filtersOpen.update(v => !v); }
+  toggleOpen(): void {
+    this.filtersOpen.update((v) => !v);
+  }
 }
 
 @Component({
@@ -83,25 +111,50 @@ export class FilterBarComponent {
       <button
         type="button"
         (click)="open.set(!open())"
-        [class]="'inline-flex items-center gap-1 h-8 pl-2.5 pr-1.5 rounded-md border bg-card text-[13px] transition-colors duration-150 hover:bg-muted/60 cursor-pointer ' + (isDefault ? 'border-border text-muted-foreground' : 'border-mint/40 bg-mint-soft/40 text-foreground') + (open() ? ' ring-2 ring-mint/20 border-mint/60' : '')"
+        [class]="
+          'inline-flex items-center gap-1 h-8 pl-2.5 pr-1.5 rounded-md border bg-card text-[13px] transition-colors duration-150 hover:bg-muted/60 cursor-pointer ' +
+          (isDefault
+            ? 'border-border text-muted-foreground'
+            : 'border-mint/40 bg-mint-soft/40 text-foreground') +
+          (open() ? ' ring-2 ring-mint/20 border-mint/60' : '')
+        "
       >
         <span [class]="isDefault ? '' : 'font-medium'">{{ placeholder }}</span>
         @if (!isDefault) {
           <span class="text-muted-foreground">:</span>
           <span class="font-medium truncate max-w-[160px]">{{ selectedLabel }}</span>
         }
-        <app-icon name="expand_more" [style]="{fontSize:'14px', transform: open() ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease'}" className="text-muted-foreground ml-0.5" />
+        <app-icon
+          name="expand_more"
+          [style]="{
+            fontSize: '14px',
+            transform: open() ? 'rotate(180deg)' : 'none',
+            transition: 'transform 0.18s ease',
+          }"
+          className="text-muted-foreground ml-0.5"
+        />
       </button>
 
       @if (open()) {
-        <div class="absolute left-0 top-full mt-1.5 z-50 min-w-[180px] rounded-xl border border-border/60 bg-popover p-1 shadow-lg">
+        <div
+          class="absolute left-0 top-full mt-1.5 z-50 min-w-[180px] rounded-xl border border-border/60 bg-popover p-1 shadow-lg"
+        >
           @for (opt of options; track opt.value) {
             <button
               type="button"
               (click)="select(opt.value)"
-              [class]="'w-full flex items-center gap-2 h-9 px-2.5 rounded-lg text-[13px] text-left transition-colors duration-100 cursor-pointer ' + (opt.value === value ? 'bg-mint-soft/70 text-mint font-semibold' : 'text-foreground hover:bg-mint-soft/40')"
+              [class]="
+                'w-full flex items-center gap-2 h-9 px-2.5 rounded-lg text-[13px] text-left transition-colors duration-100 cursor-pointer ' +
+                (opt.value === value
+                  ? 'bg-mint-soft/70 text-mint font-semibold'
+                  : 'text-foreground hover:bg-mint-soft/40')
+              "
             >
-              <app-icon name="check" [style]="{fontSize:'14px'}" [className]="opt.value === value ? 'text-mint' : 'opacity-0'" />
+              <app-icon
+                name="check"
+                [style]="{ fontSize: '14px' }"
+                [className]="opt.value === value ? 'text-mint' : 'opacity-0'"
+              />
               <span class="truncate">{{ opt.label }}</span>
             </button>
           }
@@ -118,10 +171,17 @@ export class FilterSelectComponent {
 
   protected open = signal(false);
 
-  get isDefault(): boolean { return !this.value || this.value === this.options[0]?.value; }
-  get selectedLabel(): string { return this.options.find(o => o.value === this.value)?.label ?? ''; }
+  get isDefault(): boolean {
+    return !this.value || this.value === this.options[0]?.value;
+  }
+  get selectedLabel(): string {
+    return this.options.find((o) => o.value === this.value)?.label ?? '';
+  }
 
-  select(v: string): void { this.valueChange.emit(v); this.open.set(false); }
+  select(v: string): void {
+    this.valueChange.emit(v);
+    this.open.set(false);
+  }
 }
 
 @Component({
@@ -129,9 +189,21 @@ export class FilterSelectComponent {
   standalone: true,
   template: `
     <div class="inline-flex items-center gap-1.5 h-8 px-2 rounded-md border border-border bg-card">
-      <input type="date" [value]="from" (change)="fromChange.emit($any($event.target).value)" class="bg-transparent outline-none text-[13px] w-[120px]" aria-label="Data inicial" />
+      <input
+        type="date"
+        [value]="from"
+        (change)="fromChange.emit($any($event.target).value)"
+        class="bg-transparent outline-none text-[13px] w-[120px]"
+        aria-label="Data inicial"
+      />
       <span class="text-[12px] text-muted-foreground">até</span>
-      <input type="date" [value]="to" (change)="toChange.emit($any($event.target).value)" class="bg-transparent outline-none text-[13px] w-[120px]" aria-label="Data final" />
+      <input
+        type="date"
+        [value]="to"
+        (change)="toChange.emit($any($event.target).value)"
+        class="bg-transparent outline-none text-[13px] w-[120px]"
+        aria-label="Data final"
+      />
     </div>
   `,
 })

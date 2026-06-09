@@ -4,12 +4,7 @@ import { Component, Input, Output, EventEmitter } from '@angular/core';
   selector: 'app-button',
   standalone: true,
   template: `
-    <button
-      [type]="type"
-      [disabled]="disabled"
-      [class]="btnClass"
-      (click)="clicked.emit($event)"
-    >
+    <button [type]="type" [disabled]="disabled" [class]="btnClass" (click)="clicked.emit($event)">
       @if (icon) {
         <span class="material-symbols-outlined" style="font-size:18px">{{ icon }}</span>
       }
@@ -26,7 +21,8 @@ export class ButtonComponent {
   @Output() clicked = new EventEmitter<MouseEvent>();
 
   get btnClass(): string {
-    const base = 'inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-sm font-semibold transition cursor-pointer';
+    const base =
+      'inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-sm font-semibold transition cursor-pointer';
     const variants: Record<string, string> = {
       filled: 'bg-mint text-primary-foreground hover:brightness-95 shadow-sm',
       tonal: 'bg-mint-soft text-ocean hover:brightness-95',
