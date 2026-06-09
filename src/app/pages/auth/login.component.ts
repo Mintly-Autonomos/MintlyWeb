@@ -148,7 +148,7 @@ export class LoginComponent {
     }
     this.loading.set(true);
     try {
-      await this.auth.login(this.email, this.password);
+      await this.auth.login(this.email, this.password, this.remember);
       this.router.navigate(['/']);
     } catch {
       this.error.set('Não conseguimos entrar com esses dados. Verifique e tente novamente.');

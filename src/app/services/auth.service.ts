@@ -8,7 +8,15 @@ export interface AuthUser {
   nome: string;
   email: string;
   cpf: string;
+  empresa?: string;
 }
+
+const REMEMBER_KEY = 'mintly-remember';
+const KEYS = {
+  access: 'mintly-access-token',
+  refresh: 'mintly-refresh-token',
+  user: 'mintly-user',
+} as const;
 
 interface LoginResponse {
   accessToken: string;
@@ -27,18 +35,39 @@ export class AuthService {
   private router = inject(Router);
   private readonly API = environment.apiUrl;
 
-  private _accessToken = signal<string | null>(localStorage.getItem('mintly-access-token'));
-  private _refreshToken = signal<string | null>(localStorage.getItem('mintly-refresh-token'));
+  // "Manter conectado" => localStorage (persiste); senão => sessionStorage (só a aba).
+  private remember = localStorage.getItem(REMEMBER_KEY) === '1';
+
+  private _accessToken = signal<string | null>(this.read(KEYS.access));
+  private _refreshToken = signal<string | null>(this.read(KEYS.refresh));
   private _user = signal<AuthUser | null>(this.loadStoredUser());
 
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly currentUser = this._user.asReadonly();
 
+  /** Storage ativo conforme a opção "manter conectado". */
+  private get store(): Storage {
+    return this.remember ? localStorage : sessionStorage;
+  }
+  /** Lê de qualquer um dos storages (o token pode estar em qualquer um). */
+  private read(key: string): string | null {
+    return sessionStorage.getItem(key) ?? localStorage.getItem(key);
+  }
+  private write(key: string, value: string): void {
+    this.store.setItem(key, value);
+  }
+  private remove(key: string): void {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  }
+
   getAccessToken(): string | null {
     return this._accessToken();
   }
 
-  async login(email: string, password: string): Promise<void> {
+  async login(email: string, password: string, remember = true): Promise<void> {
+    this.remember = remember;
+    localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0');
     const response = await firstValueFrom(
       this.http.post<LoginResponse>(`${this.API}/auth/login`, { email, password }),
     );
@@ -53,10 +82,10 @@ export class AuthService {
         this.http.post<RefreshResponse>(`${this.API}/auth/refresh`, { refreshToken: rt }),
       );
       this._accessToken.set(response.accessToken);
-      localStorage.setItem('mintly-access-token', response.accessToken);
+      this.write(KEYS.access, response.accessToken);
       if (response.refreshToken) {
         this._refreshToken.set(response.refreshToken);
-        localStorage.setItem('mintly-refresh-token', response.refreshToken);
+        this.write(KEYS.refresh, response.refreshToken);
       }
       return true;
     } catch {
@@ -82,22 +111,22 @@ export class AuthService {
     this._accessToken.set(data.accessToken);
     this._refreshToken.set(data.refreshToken);
     this._user.set(data.user);
-    localStorage.setItem('mintly-access-token', data.accessToken);
-    if (data.refreshToken) localStorage.setItem('mintly-refresh-token', data.refreshToken);
-    localStorage.setItem('mintly-user', JSON.stringify(data.user));
+    this.write(KEYS.access, data.accessToken);
+    if (data.refreshToken) this.write(KEYS.refresh, data.refreshToken);
+    this.write(KEYS.user, JSON.stringify(data.user));
   }
 
   clearSession(): void {
     this._accessToken.set(null);
     this._refreshToken.set(null);
     this._user.set(null);
-    localStorage.removeItem('mintly-access-token');
-    localStorage.removeItem('mintly-refresh-token');
-    localStorage.removeItem('mintly-user');
+    this.remove(KEYS.access);
+    this.remove(KEYS.refresh);
+    this.remove(KEYS.user);
   }
 
   private loadStoredUser(): AuthUser | null {
-    const raw = localStorage.getItem('mintly-user');
+    const raw = this.read(KEYS.user);
     if (!raw) return null;
     try {
       return JSON.parse(raw);

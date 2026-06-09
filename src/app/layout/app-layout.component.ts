@@ -91,6 +91,7 @@ const NAV = [
               />
               <input
                 placeholder="Buscar movimentação, conta…"
+                aria-label="Buscar movimentação ou conta"
                 class="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground"
               />
               <kbd
@@ -109,6 +110,8 @@ const NAV = [
               />
             </button>
             <button
+              type="button"
+              aria-label="Notificações"
               class="h-10 w-10 rounded-full border border-border grid place-items-center hover:bg-muted transition relative cursor-pointer"
             >
               <app-icon name="notifications" [style]="{ fontSize: '20px' }" />
@@ -155,7 +158,10 @@ export class AppLayoutComponent {
   get userName(): string {
     return this.auth.currentUser()?.nome?.trim() || 'Ana Costa';
   }
-  readonly userBusiness = 'Cantina da Ana';
+  // Dinâmico: vem do usuário autenticado quando disponível; senão, fallback.
+  get userBusiness(): string {
+    return this.auth.currentUser()?.empresa?.trim() || 'Cantina da Ana';
+  }
   get userInitials(): string {
     const parts = this.userName.split(/\s+/).filter(Boolean);
     const initials = (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '');

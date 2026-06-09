@@ -1,5 +1,5 @@
 import { Component, Input, inject } from '@angular/core';
-import { RouterOutlet, RouterLink } from '@angular/router';
+import { RouterOutlet } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
 import { LogoComponent } from '../shared/logo.component';
 import { IconComponent } from '../shared/icon.component';
@@ -7,7 +7,7 @@ import { IconComponent } from '../shared/icon.component';
 @Component({
   selector: 'app-auth-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, LogoComponent, IconComponent],
+  imports: [RouterOutlet, IconComponent],
   template: `
     <div class="min-h-screen w-full bg-background text-foreground">
       <div class="absolute top-4 right-4 z-50">
@@ -34,7 +34,7 @@ export class AuthShellComponent {
 @Component({
   selector: 'app-auth-card',
   standalone: true,
-  imports: [RouterLink, LogoComponent, IconComponent],
+  imports: [LogoComponent, IconComponent],
   template: `
     @if (wide) {
       <main class="min-h-screen grid place-items-center px-4 py-10">

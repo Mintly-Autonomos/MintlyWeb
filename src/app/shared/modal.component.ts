@@ -1,5 +1,15 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  HostListener,
+  OnChanges,
+  OnDestroy,
+} from '@angular/core';
 import { IconComponent } from './icon.component';
+
+let modalSeq = 0;
 
 @Component({
   selector: 'app-modal',
@@ -13,6 +23,9 @@ import { IconComponent } from './icon.component';
         (click)="onBackdrop($event)"
       >
         <div
+          role="dialog"
+          aria-modal="true"
+          [attr.aria-labelledby]="titleId"
           [class]="
             'bg-card rounded-3xl border border-border w-full shadow-2xl overflow-hidden ' +
             (size === 'lg' ? 'max-w-3xl' : 'max-w-xl')
@@ -20,7 +33,7 @@ import { IconComponent } from './icon.component';
         >
           <div class="px-6 pt-6 pb-4 flex items-start justify-between">
             <div>
-              <h3 class="text-[18px] font-bold tracking-tight">{{ title }}</h3>
+              <h3 [id]="titleId" class="text-[18px] font-bold tracking-tight">{{ title }}</h3>
               @if (subtitle) {
                 <p class="text-[13px] text-muted-foreground mt-1">{{ subtitle }}</p>
               }
@@ -49,7 +62,7 @@ import { IconComponent } from './icon.component';
     }
   `,
 })
-export class ModalComponent {
+export class ModalComponent implements OnChanges, OnDestroy {
   @Input() open = true;
   @Input() title = '';
   @Input() subtitle = '';
@@ -57,7 +70,27 @@ export class ModalComponent {
   @Input() hasFooter = true;
   @Output() closed = new EventEmitter<void>();
 
+  protected readonly titleId = `modal-title-${modalSeq++}`;
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.open) this.closed.emit();
+  }
+
+  ngOnChanges(): void {
+    this.lockScroll(this.open);
+  }
+
+  ngOnDestroy(): void {
+    this.lockScroll(false);
+  }
+
   onBackdrop(event: MouseEvent): void {
     if (event.target === event.currentTarget) this.closed.emit();
+  }
+
+  /** Trava o scroll do body enquanto o modal está aberto. */
+  private lockScroll(lock: boolean): void {
+    document.body.style.overflow = lock ? 'hidden' : '';
   }
 }
