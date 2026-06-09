@@ -16,7 +16,10 @@ import { IconComponent } from '../shared/icon.component';
           class="h-10 w-10 rounded-full border border-border grid place-items-center hover:bg-muted bg-card/80 backdrop-blur cursor-pointer"
           [attr.aria-label]="theme.isDark() ? 'Ativar modo claro' : 'Ativar modo escuro'"
         >
-          <app-icon [name]="theme.isDark() ? 'light_mode' : 'dark_mode'" [style]="{fontSize:'20px'}" />
+          <app-icon
+            [name]="theme.isDark() ? 'light_mode' : 'dark_mode'"
+            [style]="{ fontSize: '20px' }"
+          />
         </button>
       </div>
       <router-outlet />
@@ -77,31 +80,44 @@ export class AuthShellComponent {
               }
             </div>
           </div>
-          <div class="pt-8 mt-8 border-t border-border flex items-center gap-2 text-[12px] text-muted-foreground">
-            <app-icon name="lock" [style]="{fontSize:'16px'}" className="text-mint" />
-            <span class="truncate">Conexão segura. Seus dados são protegidos por criptografia.</span>
+          <div
+            class="pt-8 mt-8 border-t border-border flex items-center gap-2 text-[12px] text-muted-foreground"
+          >
+            <app-icon name="lock" [style]="{ fontSize: '16px' }" className="text-mint" />
+            <span class="truncate"
+              >Conexão segura. Seus dados são protegidos por criptografia.</span
+            >
           </div>
         </div>
 
-        <div class="hidden lg:flex flex-col justify-between p-12 xl:p-16 bg-mint-soft border-l border-border overflow-hidden">
+        <div
+          class="hidden lg:flex flex-col justify-between p-12 xl:p-16 bg-mint-soft border-l border-border overflow-hidden"
+        >
           <div>
-            <div class="inline-flex items-center gap-2 px-3 h-7 rounded-full bg-card border border-border text-[12px] font-medium text-ocean">
+            <div
+              class="inline-flex items-center gap-2 px-3 h-7 rounded-full bg-card border border-border text-[12px] font-medium text-ocean"
+            >
               <span class="h-1.5 w-1.5 rounded-full bg-mint"></span>
               Plataforma financeira para food service
             </div>
-            <h2 class="mt-6 text-[28px] xl:text-[34px] font-bold tracking-tight leading-[1.15] text-foreground max-w-[420px]">
+            <h2
+              class="mt-6 text-[28px] xl:text-[34px] font-bold tracking-tight leading-[1.15] text-foreground max-w-[420px]"
+            >
               Tenha o controle financeiro do seu restaurante em minutos.
             </h2>
             <p class="mt-4 text-[14px] text-foreground/70 max-w-[420px] leading-relaxed">
-              Mintly é a forma mais simples de organizar o dinheiro do seu negócio — sem planilhas, sem complicação.
+              Mintly é a forma mais simples de organizar o dinheiro do seu negócio — sem planilhas,
+              sem complicação.
             </p>
           </div>
 
           <ul class="space-y-3 max-w-[420px]">
             @for (it of asideItems; track it.icon) {
               <li class="flex items-start gap-3 p-3.5 rounded-2xl bg-card/70 border border-border">
-                <div class="h-9 w-9 rounded-xl bg-mint-soft grid place-items-center text-ocean shrink-0">
-                  <app-icon [name]="it.icon" [style]="{fontSize:'20px'}" />
+                <div
+                  class="h-9 w-9 rounded-xl bg-mint-soft grid place-items-center text-ocean shrink-0"
+                >
+                  <app-icon [name]="it.icon" [style]="{ fontSize: '20px' }" />
                 </div>
                 <div class="min-w-0">
                   <div class="text-sm font-semibold truncate">{{ it.title }}</div>
@@ -112,7 +128,7 @@ export class AuthShellComponent {
           </ul>
 
           <div class="flex items-center gap-3 text-[12px] text-foreground/60">
-            <app-icon name="verified_user" [style]="{fontSize:'16px'}" className="text-mint" />
+            <app-icon name="verified_user" [style]="{ fontSize: '16px' }" className="text-mint" />
             <span>Criptografia de ponta a ponta · LGPD</span>
           </div>
         </div>
@@ -127,8 +143,20 @@ export class AuthCardComponent {
   @Input() hasFooter = false;
 
   protected asideItems = [
-    { icon: 'account_balance', title: 'Contas centralizadas', text: 'Bancos, caixas e plataformas em um só lugar.' },
-    { icon: 'category', title: 'Categorias inteligentes', text: 'Organize receitas e despesas sem esforço.' },
-    { icon: 'trending_up', title: 'Visão real do caixa', text: 'Acompanhe entradas e saídas com clareza.' },
+    {
+      icon: 'account_balance',
+      title: 'Contas centralizadas',
+      text: 'Bancos, caixas e plataformas em um só lugar.',
+    },
+    {
+      icon: 'category',
+      title: 'Categorias inteligentes',
+      text: 'Organize receitas e despesas sem esforço.',
+    },
+    {
+      icon: 'trending_up',
+      title: 'Visão real do caixa',
+      text: 'Acompanhe entradas e saídas com clareza.',
+    },
   ];
 }

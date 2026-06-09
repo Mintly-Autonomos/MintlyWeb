@@ -7,13 +7,16 @@ import { IconComponent } from './icon.component';
   imports: [IconComponent],
   template: `
     @if (open) {
+      <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
       <div
         class="fixed inset-0 z-50 grid place-items-center p-4 bg-foreground/30 backdrop-blur-sm"
-        (click)="onBackdrop()"
+        (click)="onBackdrop($event)"
       >
         <div
-          (click)="$event.stopPropagation()"
-          [class]="'bg-card rounded-3xl border border-border w-full shadow-2xl overflow-hidden ' + (size === 'lg' ? 'max-w-3xl' : 'max-w-xl')"
+          [class]="
+            'bg-card rounded-3xl border border-border w-full shadow-2xl overflow-hidden ' +
+            (size === 'lg' ? 'max-w-3xl' : 'max-w-xl')
+          "
         >
           <div class="px-6 pt-6 pb-4 flex items-start justify-between">
             <div>
@@ -28,14 +31,16 @@ import { IconComponent } from './icon.component';
               class="h-9 w-9 rounded-full hover:bg-muted grid place-items-center text-muted-foreground cursor-pointer"
               aria-label="Fechar"
             >
-              <app-icon name="close" [style]="{fontSize:'20px'}" />
+              <app-icon name="close" [style]="{ fontSize: '20px' }" />
             </button>
           </div>
           <div class="px-6 pb-6 max-h-[70vh] overflow-y-auto">
             <ng-content />
           </div>
           @if (hasFooter) {
-            <div class="px-6 py-4 border-t border-border bg-muted/40 flex items-center justify-end gap-2">
+            <div
+              class="px-6 py-4 border-t border-border bg-muted/40 flex items-center justify-end gap-2"
+            >
               <ng-content select="[slot=footer]" />
             </div>
           }
@@ -52,5 +57,7 @@ export class ModalComponent {
   @Input() hasFooter = true;
   @Output() closed = new EventEmitter<void>();
 
-  onBackdrop(): void { this.closed.emit(); }
+  onBackdrop(event: MouseEvent): void {
+    if (event.target === event.currentTarget) this.closed.emit();
+  }
 }

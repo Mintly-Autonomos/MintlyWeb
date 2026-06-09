@@ -1,4 +1,4 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -23,6 +23,8 @@ interface RefreshResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private http = inject(HttpClient);
+  private router = inject(Router);
   private readonly API = environment.apiUrl;
 
   private _accessToken = signal<string | null>(localStorage.getItem('mintly-access-token'));
@@ -31,8 +33,6 @@ export class AuthService {
 
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly currentUser = this._user.asReadonly();
-
-  constructor(private http: HttpClient, private router: Router) {}
 
   getAccessToken(): string | null {
     return this._accessToken();
@@ -70,7 +70,9 @@ export class AuthService {
     if (rt) {
       try {
         await firstValueFrom(this.http.post(`${this.API}/auth/logout`, { refreshToken: rt }));
-      } catch { /* best effort */ }
+      } catch {
+        /* best effort */
+      }
     }
     this.clearSession();
     this.router.navigate(['/auth/login']);
@@ -97,6 +99,10 @@ export class AuthService {
   private loadStoredUser(): AuthUser | null {
     const raw = localStorage.getItem('mintly-user');
     if (!raw) return null;
-    try { return JSON.parse(raw); } catch { return null; }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
   }
 }

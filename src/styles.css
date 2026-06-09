@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 @source "./app/**/*.html";
 @source "./app/**/*.ts";
@@ -116,9 +116,15 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
+  * {
+    border-color: var(--color-border);
+  }
 
-  html, body, *, *::before, *::after {
+  html,
+  body,
+  *,
+  *::before,
+  *::after {
     transition-property: background-color, border-color, box-shadow;
     transition-duration: 200ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -146,7 +152,11 @@
     direction: ltr;
     -webkit-font-feature-settings: 'liga';
     -webkit-font-smoothing: antialiased;
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24;
   }
 }
 

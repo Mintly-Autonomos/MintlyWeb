@@ -9,11 +9,22 @@ import { ToastService, ToastTone } from './toast.service';
   template: `
     <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
       @for (t of toastSvc.toasts(); track t.id) {
-        <div class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg border border-border bg-card min-w-[300px] animate-in slide-in-from-bottom-4">
-          <app-icon [name]="toastIcon(t.tone)" [style]="{fontSize:'20px'}" [className]="toastColor(t.tone)" />
+        <div
+          class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg border border-border bg-card min-w-[300px] animate-in slide-in-from-bottom-4"
+        >
+          <app-icon
+            [name]="toastIcon(t.tone)"
+            [style]="{ fontSize: '20px' }"
+            [className]="toastColor(t.tone)"
+          />
           <span class="text-sm flex-1">{{ t.message }}</span>
-          <button type="button" (click)="toastSvc.dismiss(t.id)" class="text-muted-foreground hover:text-foreground cursor-pointer" aria-label="Fechar notificação">
-            <app-icon name="close" [style]="{fontSize:'16px'}" />
+          <button
+            type="button"
+            (click)="toastSvc.dismiss(t.id)"
+            class="text-muted-foreground hover:text-foreground cursor-pointer"
+            aria-label="Fechar notificação"
+          >
+            <app-icon name="close" [style]="{ fontSize: '16px' }" />
           </button>
         </div>
       }

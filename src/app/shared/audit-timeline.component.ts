@@ -21,12 +21,20 @@ export interface AuditEntry {
       @for (ev of events; track ev.id) {
         <div class="flex gap-3 text-[13px]">
           <div class="h-7 w-7 rounded-xl bg-muted grid place-items-center shrink-0 mt-0.5">
-            <app-icon [name]="ev.icon" [style]="{fontSize:'15px'}" className="text-muted-foreground" />
+            <app-icon
+              [name]="ev.icon"
+              [style]="{ fontSize: '15px' }"
+              className="text-muted-foreground"
+            />
           </div>
           <div class="flex-1 min-w-0">
             <div class="font-medium">{{ ev.action }}</div>
-            @if (ev.detail) { <div class="text-muted-foreground text-[12px]">{{ ev.detail }}</div> }
-            <div class="text-[11px] text-muted-foreground mt-0.5">{{ fmtDateTime(ev.at) }} · {{ ev.by }}</div>
+            @if (ev.detail) {
+              <div class="text-muted-foreground text-[12px]">{{ ev.detail }}</div>
+            }
+            <div class="text-[11px] text-muted-foreground mt-0.5">
+              {{ fmtDateTime(ev.at) }} · {{ ev.by }}
+            </div>
           </div>
         </div>
       }
