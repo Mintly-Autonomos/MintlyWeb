@@ -19,6 +19,8 @@ export const routes: Routes = [
       { path: '', redirectTo: 'login', pathMatch: 'full' },
     ],
   },
+  // Dev showcase (navbar/popup/dev-test + Material) — preserva o trabalho anterior da staging
+  { path: 'dev', loadComponent: () => import('./pages/dev/dev-home.component').then(m => m.DevHomeComponent) },
   // App routes (wrapped in AppLayout — protegidas por authGuard)
   {
     path: '',

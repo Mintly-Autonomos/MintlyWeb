@@ -5,7 +5,7 @@ import { MatCardModule } from '@angular/material/card';
 
 type ModalStatus = 'success' | 'error' | 'warning' | 'information';
 @Component({
-  selector: 'app-modal',
+  selector: 'app-dev-modal',
   standalone: true,
   imports: [CommonModule, MatCardModule, MatButtonModule],
   templateUrl: './modal.component.html',
