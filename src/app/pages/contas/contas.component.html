@@ -1,13 +1,3 @@
-<!-- Toast rack -->
-<div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-  @for (t of toasts(); track t.id) {
-    <div class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg border border-border bg-card min-w-[300px] animate-in slide-in-from-bottom-4">
-      <app-icon [name]="toastIcon(t.tone)" [style]="{fontSize:'20px'}" [className]="toastColor(t.tone)" />
-      <span class="text-sm flex-1">{{ t.message }}</span>
-    </div>
-  }
-</div>
-
 <div class="p-6 max-w-7xl mx-auto space-y-6">
 
   <!-- Header -->
@@ -292,20 +282,7 @@
       <!-- Audit timeline -->
       <div>
         <div class="text-[13px] font-semibold mb-3">Histórico</div>
-        <div class="space-y-2">
-          @for (ev of details()!.history; track ev.id) {
-            <div class="flex gap-3 text-[13px]">
-              <div class="h-7 w-7 rounded-xl bg-muted grid place-items-center shrink-0 mt-0.5">
-                <app-icon [name]="ev.icon" [style]="{fontSize:'15px'}" className="text-muted-foreground" />
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="font-medium">{{ ev.action }}</div>
-                @if (ev.detail) { <div class="text-muted-foreground text-[12px]">{{ ev.detail }}</div> }
-                <div class="text-[11px] text-muted-foreground mt-0.5">{{ fmtDate(ev.at) }} · {{ ev.by }}</div>
-              </div>
-            </div>
-          }
-        </div>
+        <app-audit-timeline [events]="details()!.history" />
       </div>
     </div>
     <ng-container ngProjectAs="[slot=footer]">

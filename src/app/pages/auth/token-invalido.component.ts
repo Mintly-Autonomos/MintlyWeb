@@ -10,7 +10,7 @@ import { IconComponent } from '../../shared/icon.component';
   template: `
     <app-auth-card [wide]="true" title="Link inválido ou expirado" subtitle="O link que você usou não é mais válido. Solicite um novo para continuar.">
       <div class="flex items-center justify-center mb-4">
-        <div class="h-16 w-16 rounded-2xl bg-destructive/10 grid place-items-center text-destructive"><app-icon name="link_off" [style]="{fontSize:'32px'}" /></div>
+        <div class="h-16 w-16 rounded-2xl bg-error/10 grid place-items-center text-error"><app-icon name="link_off" [style]="{fontSize:'32px'}" /></div>
       </div>
       <div class="space-y-3">
         <button type="button" (click)="router.navigate(['/auth/esqueci-senha'])" class="w-full h-12 rounded-xl bg-mint text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer">

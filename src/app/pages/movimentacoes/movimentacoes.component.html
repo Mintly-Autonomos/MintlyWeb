@@ -1,13 +1,3 @@
-<!-- Toast rack -->
-<div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-  @for (t of toasts(); track t.id) {
-    <div class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg border border-border bg-card min-w-[300px] animate-in slide-in-from-bottom-4">
-      <app-icon [name]="toastIcon(t.tone)" [style]="{fontSize:'20px'}" [className]="toastColor(t.tone)" />
-      <span class="text-sm flex-1">{{ t.message }}</span>
-    </div>
-  }
-</div>
-
 <div class="p-6 max-w-7xl mx-auto space-y-6">
 
   <!-- Header -->
@@ -116,11 +106,11 @@
       <!-- Type -->
       @if (!editing()) {
         <div class="grid grid-cols-2 gap-3">
-          <button type="button" (click)="setFormField('type', 'income')"
+          <button type="button" (click)="setType('income')"
             [class]="'h-12 rounded-xl border font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition ' + (form().type === 'income' ? 'border-success bg-success/10 text-success' : 'border-border hover:bg-muted')">
             <app-icon name="trending_up" [style]="{fontSize:'18px'}" /><span>Receita</span>
           </button>
-          <button type="button" (click)="setFormField('type', 'expense')"
+          <button type="button" (click)="setType('expense')"
             [class]="'h-12 rounded-xl border font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition ' + (form().type === 'expense' ? 'border-error bg-error/10 text-error' : 'border-border hover:bg-muted')">
             <app-icon name="trending_down" [style]="{fontSize:'18px'}" /><span>Despesa</span>
           </button>

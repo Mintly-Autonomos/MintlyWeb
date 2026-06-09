@@ -9,12 +9,9 @@ import { ToggleComponent } from '../../shared/toggle.component';
 import { ModalComponent } from '../../shared/modal.component';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { FilterBarComponent } from '../../shared/filter-bar.component';
-
-type Toast = { id: number; tone: 'success' | 'error' | 'info'; message: string };
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
+import { AuditTimelineComponent } from '../../shared/audit-timeline.component';
+import { ToastService } from '../../shared/toast.service';
+import { fmtDateTime } from '../../shared/format';
 
 const CURRENT_USER = 'Você (Marina S.)';
 
@@ -23,18 +20,18 @@ interface CatForm { name: string; type: CatType; behavior: Behavior; nature: Nat
 @Component({
   selector: 'app-categorias',
   standalone: true,
-  imports: [FormsModule, IconComponent, ChipComponent, ToggleComponent, ModalComponent, EmptyStateComponent, FilterBarComponent],
+  imports: [FormsModule, IconComponent, ChipComponent, ToggleComponent, ModalComponent, EmptyStateComponent, FilterBarComponent, AuditTimelineComponent],
   templateUrl: './categorias.component.html',
 })
 export class CategoriasComponent {
   private svc = inject(CategoriasService);
+  private toast = inject(ToastService);
 
   protected tab = signal<CatType>('income');
   protected creating = signal(false);
   protected editing = signal<Category | null>(null);
   protected details = signal<Category | null>(null);
   protected protectedAlert = signal<Category | null>(null);
-  protected toasts = signal<Toast[]>([]);
   protected query = signal('');
 
   protected form = signal<CatForm>({
@@ -42,7 +39,7 @@ export class CategoriasComponent {
   });
 
   protected categories = this.svc.categories;
-  protected fmtDate = fmtDate;
+  protected fmtDate = fmtDateTime;
 
   protected filtered = computed(() => {
     const q = this.query().trim().toLowerCase();
@@ -94,7 +91,7 @@ export class CategoriasComponent {
       const updated: Category = { ...e, ...f, name: f.name.trim(), updatedAt: now, updatedBy: CURRENT_USER };
       const withHist = this.appendHistory(updated, evts);
       this.svc.categories.update(all => all.map(c => c.id === e.id ? withHist : c));
-      this.pushToast('success', 'Categoria atualizada.');
+      this.toast.success('Categoria atualizada.');
       this.editing.set(null);
     } else {
       const id = Math.max(0, ...this.categories().map(c => c.id)) + 1;
@@ -105,7 +102,7 @@ export class CategoriasComponent {
         history: [{ id: 1, at: now, by: CURRENT_USER, action: 'Categoria criada', icon: 'add_circle' }],
       };
       this.svc.categories.update(all => [...all, created]);
-      this.pushToast('success', 'Categoria criada com sucesso.');
+      this.toast.success('Categoria criada com sucesso.');
       this.creating.set(false);
     }
   }
@@ -115,7 +112,7 @@ export class CategoriasComponent {
     const now = new Date().toISOString();
     const evt = v ? { action: 'Categoria reativada', icon: 'play_circle' } : { action: 'Categoria inativada', icon: 'pause_circle' };
     this.svc.categories.update(all => all.map(x => x.id === c.id ? this.appendHistory({ ...x, active: v, updatedAt: now, updatedBy: CURRENT_USER }, [evt]) : x));
-    this.pushToast(v ? 'success' : 'info', `${c.name} ${v ? 'reativada' : 'inativada'}.`);
+    this.toast.show(v ? 'success' : 'info', `${c.name} ${v ? 'reativada' : 'inativada'}.`);
   }
 
   private diffEvents(prev: Category, next: CatForm): Omit<AuditEvent, 'id' | 'at' | 'by'>[] {
@@ -134,15 +131,6 @@ export class CategoriasComponent {
     const items = events.map((e, i) => ({ ...e, id: start + i, at: now, by: CURRENT_USER }));
     return { ...c, updatedAt: now, updatedBy: CURRENT_USER, history: [...items, ...c.history] };
   }
-
-  private pushToast(tone: Toast['tone'], message: string): void {
-    const id = Date.now() + Math.random();
-    this.toasts.update(t => [...t, { id, tone, message }]);
-    setTimeout(() => this.toasts.update(t => t.filter(x => x.id !== id)), 4000);
-  }
-
-  toastIcon(tone: string): string { return tone === 'success' ? 'check_circle' : tone === 'error' ? 'error' : 'info'; }
-  toastColor(tone: string): string { return tone === 'success' ? 'text-success' : tone === 'error' ? 'text-error' : 'text-ocean'; }
 
   behaviorLabel(b: Behavior): string { return b === 'fixed' ? 'Fixo' : 'Variável'; }
   natureLabel(n: Nature): string { return n === 'operational' ? 'Operacional' : 'Não operacional'; }
