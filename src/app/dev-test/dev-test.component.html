@@ -3,13 +3,18 @@
     <div class="dev-test-header">
       <div>
         <h1>dev-test</h1>
-        <p>Use esta tela para testar variações de modal e verificar diferentes tamanhos, status e posições de notificação.</p>
+        <p>
+          Use esta tela para testar variações de modal e verificar diferentes tamanhos, status e
+          posições de notificação.
+        </p>
       </div>
       <div class="dev-test-actions">
         <button mat-stroked-button color="primary" type="button" (click)="toggleNavbarType()">
           Alternar navbar
         </button>
-        <button mat-stroked-button color="primary" type="button" (click)="backToHome()">Voltar</button>
+        <button mat-stroked-button color="primary" type="button" (click)="backToHome()">
+          Voltar
+        </button>
       </div>
     </div>
 
@@ -37,7 +42,7 @@
       [status]="example.status"
       [size]="example.size || 'm'"
       [message]="example.message"
-      (close)="closeModal()"
+      (closed)="closeModal()"
     >
       <p>Conteúdo adicional específico desta variação de modal.</p>
     </app-modal>
@@ -46,6 +51,6 @@
   <app-popup
     *ngIf="activePopups().length > 0"
     [popups]="activePopups()"
-    (close)="closePopup($event)"
+    (closed)="closePopup($event)"
   ></app-popup>
 </div>

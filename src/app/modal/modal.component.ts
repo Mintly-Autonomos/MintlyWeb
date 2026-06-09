@@ -1,25 +1,30 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 
-type ModalSize = 's' | 'm' | 'g';
 type ModalStatus = 'success' | 'error' | 'warning' | 'information';
 @Component({
   selector: 'app-modal',
   standalone: true,
   imports: [CommonModule, MatCardModule, MatButtonModule],
   templateUrl: './modal.component.html',
-  styleUrls: ['./modal.component.css']
+  styleUrls: ['./modal.component.css'],
 })
-export class ModalComponent implements OnChanges, OnDestroy {
+export class ModalComponent {
+  private readonly sizeClassMap = {
+    g: 'size-g',
+    m: 'size-m',
+    s: 'size-s',
+  } as const;
+
   @Input() title = '';
   @Input() size = 's';
   @Input() status: ModalStatus = 'information';
   @Input() message = '';
   @Input() hideClose = false;
   @Input() backdropClose = true;
-  @Output() close = new EventEmitter<void>();
+  @Output() closed = new EventEmitter<void>();
 
   get sizeError(): string | null {
     if (this.size == null || this.size.toString().trim().length === 0) {
@@ -38,52 +43,54 @@ export class ModalComponent implements OnChanges, OnDestroy {
     return null;
   }
 
-  get width(): string {
+  protected getSizeClass(): string {
     if (this.sizeError) {
-      return '20%';
+      return 'size-m';
     }
 
     const value = this.size.toLowerCase();
-    return value === 'g' ? '40%' : value === 'm' ? '30%' : '20%';
+    return this.sizeClassMap[value as keyof typeof this.sizeClassMap] ?? 'size-s';
   }
 
   get statusIcon(): string {
-    return {
-      success: '✅',
-      error: '❌',
-      warning: '⚠️',
-      information: '',
-    }[this.status] || '';
+    return (
+      {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        information: '',
+      }[this.status] || ''
+    );
   }
 
   get closeLabel(): string {
-    return {
-      success: 'Entendido',
-      error: 'Fechar',
-      warning: 'Ok',
-      information: 'Entendi',
-    }[this.status] || 'Ok';
-  }
-
-  ngOnChanges(): void {
-    // keep lifecycle compatibility; modal does not auto-close
-  }
-
-  ngOnDestroy(): void {
-    // no auto-close timer required for central modal
-  }
-
-  private clearTimer(): void {
-    // no timer cleanup needed for central modal
+    return (
+      {
+        success: 'Entendido',
+        error: 'Fechar',
+        warning: 'Ok',
+        information: 'Entendi',
+      }[this.status] || 'Ok'
+    );
   }
 
   onClose(): void {
-    this.clearTimer();
-    this.close.emit();
+    this.closed.emit();
   }
 
   onBackdropClick(event: MouseEvent): void {
     if (this.backdropClose && event.target === event.currentTarget) {
+      this.onClose();
+    }
+  }
+
+  onBackdropKeydown(event: KeyboardEvent): void {
+    if (!this.backdropClose || event.target !== event.currentTarget) {
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
       this.onClose();
     }
   }

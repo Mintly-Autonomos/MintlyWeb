@@ -37,6 +37,25 @@
   --color-warning: var(--warning);
   --color-error: var(--error);
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+
+:root {
+  --mdc-theme-primary: #6bc0a7;
+  --mdc-theme-secondary: #4a8fd7;
+  --mdc-theme-surface: #f7ebdd;
+  --mdc-theme-background: #fbf5ed;
+  --mdc-theme-on-primary: #ffffff;
+  --mdc-theme-on-secondary: #ffffff;
+  --mdc-theme-on-surface: #1b3e2e;
+  --mdc-theme-on-background: #1b3e2e;
+  --mdc-theme-error: #f87171;
+  --mdc-theme-surface-variant: #e5d8c6;
+  --mdc-theme-outline: #1f523d;
+  --app-contrast-green: #16402b;
+}
+
+body {
+  background: linear-gradient(180deg, #fbf5ed 0%, #f7ebdd 60%);
 }
 
 :root {
@@ -100,6 +119,13 @@
 
 @layer base {
   * { border-color: var(--color-border); }
+.mat-mdc-button.mat-flat-button.mat-primary:hover,
+.mat-flat-button.mat-primary:hover,
+button.mat-flat-button.mat-primary:hover,
+button.mat-raised-button.mat-primary:hover,
+button.mat-button.mat-primary:hover {
+  background-color: #4ea58e !important;
+}
 
   html, body, *, *::before, *::after {
     transition-property: background-color, border-color, box-shadow;
@@ -140,4 +166,7 @@
     border-radius: 1rem;
     box-shadow: 0 1px 2px 0 rgb(15 23 42 / 0.04);
   }
+button.mat-flat-button.color-primary,
+button.mat-flat-button[color='primary'] {
+  box-shadow: 0 10px 20px rgba(27, 62, 46, 0.08);
 }

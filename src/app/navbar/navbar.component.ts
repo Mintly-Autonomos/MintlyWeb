@@ -24,4 +24,3 @@ export class NavbarComponent {
     this.itemClick.emit(item.id);
   }
 }
-

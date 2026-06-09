@@ -5,12 +5,7 @@
   </div>
 
   <div class="navbar-items">
-    <button
-      mat-button
-      type="button"
-      *ngFor="let item of items"
-      (click)="onItemClick(item)"
-    >
+    <button mat-button type="button" *ngFor="let item of items" (click)="onItemClick(item)">
       {{ item.label }}
     </button>
   </div>
