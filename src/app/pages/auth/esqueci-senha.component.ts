@@ -3,22 +3,19 @@ import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
+import { FormFieldComponent } from '../../shared/form-field.component';
 
 @Component({
   selector: 'app-esqueci-senha',
   standalone: true,
-  imports: [FormsModule, RouterLink, AuthCardComponent, IconComponent],
+  imports: [FormsModule, RouterLink, AuthCardComponent, IconComponent, FormFieldComponent],
   template: `
     <app-auth-card title="Recuperar senha" subtitle="Informe seu e-mail e enviaremos um link para você criar uma nova senha." [hasFooter]="true">
       @if (!sent()) {
         <form (ngSubmit)="onSubmit()" class="space-y-4">
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">E-mail</span>
-            <span class="flex items-center h-12 rounded-xl border bg-card px-3.5 gap-2.5 focus-within:ring-2 focus-within:ring-mint/40 focus-within:border-mint border-border">
-              <app-icon name="mail" [style]="{fontSize:'20px'}" className="text-muted-foreground" />
-              <input type="email" [(ngModel)]="email" name="email" placeholder="voce@restaurante.com" class="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
-            </span>
-          </label>
+          <app-form-field label="E-mail" icon="mail">
+            <input type="email" [(ngModel)]="email" name="email" placeholder="voce@restaurante.com" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
+          </app-form-field>
           <button type="submit" [disabled]="loading()" class="w-full h-12 rounded-xl bg-mint text-primary-foreground font-semibold text-sm hover:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer">
             @if (loading()) { <app-icon name="progress_activity" [style]="{fontSize:'20px'}" className="animate-spin" /><span>Enviando…</span> }
             @else { <span>Enviar link de recuperação</span><app-icon name="send" [style]="{fontSize:'20px'}" /> }

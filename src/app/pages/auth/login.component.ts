@@ -3,42 +3,33 @@ import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
+import { FormFieldComponent } from '../../shared/form-field.component';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, RouterLink, AuthCardComponent, IconComponent],
+  imports: [FormsModule, RouterLink, AuthCardComponent, IconComponent, FormFieldComponent],
   template: `
     <app-auth-card title="Bem-vindo de volta" subtitle="Acesse sua conta para continuar gerenciando as finanças do seu negócio." [hasFooter]="true">
       <form (ngSubmit)="onSubmit()" class="space-y-4">
         @if (error()) {
-          <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-destructive/10 border-destructive/20">
-            <app-icon name="error" [style]="{fontSize:'20px'}" className="text-destructive shrink-0 mt-0.5" />
+          <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20">
+            <app-icon name="error" [style]="{fontSize:'20px'}" className="text-error shrink-0 mt-0.5" />
             <div class="text-[13px] text-foreground/80">{{ error() }}</div>
           </div>
         }
 
-        <label class="block">
-          <span class="flex items-center justify-between mb-1.5">
-            <span class="text-[13px] font-medium text-foreground">E-mail</span>
-          </span>
-          <span class="flex items-center h-12 rounded-xl border bg-card px-3.5 gap-2.5 focus-within:ring-2 focus-within:ring-mint/40 focus-within:border-mint border-border transition">
-            <app-icon name="mail" [style]="{fontSize:'20px'}" className="text-muted-foreground" />
-            <input type="email" [(ngModel)]="email" name="email" placeholder="voce@restaurante.com" autocomplete="email" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
-          </span>
-        </label>
+        <app-form-field label="E-mail" icon="mail">
+          <input type="email" [(ngModel)]="email" name="email" placeholder="voce@restaurante.com" autocomplete="email" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
+        </app-form-field>
 
-        <label class="block">
-          <span class="text-[13px] font-medium text-foreground block mb-1.5">Senha</span>
-          <span class="flex items-center h-12 rounded-xl border bg-card px-3.5 gap-2.5 focus-within:ring-2 focus-within:ring-mint/40 focus-within:border-mint border-border transition">
-            <app-icon name="lock" [style]="{fontSize:'20px'}" className="text-muted-foreground" />
-            <input [type]="showPwd() ? 'text' : 'password'" [(ngModel)]="password" name="password" placeholder="••••••••" autocomplete="current-password" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
-            <button type="button" (click)="showPwd.set(!showPwd())" class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer">
-              <app-icon [name]="showPwd() ? 'visibility_off' : 'visibility'" [style]="{fontSize:'18px'}" />
-            </button>
-          </span>
-        </label>
+        <app-form-field label="Senha" icon="lock">
+          <input [type]="showPwd() ? 'text' : 'password'" [(ngModel)]="password" name="password" placeholder="••••••••" autocomplete="current-password" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
+          <button fieldSuffix type="button" (click)="showPwd.set(!showPwd())" class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer">
+            <app-icon [name]="showPwd() ? 'visibility_off' : 'visibility'" [style]="{fontSize:'18px'}" />
+          </button>
+        </app-form-field>
 
         <div class="flex items-center justify-between pt-1">
           <label class="flex items-center gap-2 cursor-pointer select-none">

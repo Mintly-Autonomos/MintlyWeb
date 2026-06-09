@@ -10,7 +10,7 @@ import { IconComponent } from '../../shared/icon.component';
   template: `
     <app-auth-card [wide]="true" title="Conta bloqueada" subtitle="Sua conta foi temporariamente bloqueada por motivos de segurança. Entre em contato com o suporte para desbloqueá-la.">
       <div class="flex items-center justify-center mb-4">
-        <div class="h-16 w-16 rounded-2xl bg-destructive/10 grid place-items-center text-destructive"><app-icon name="lock_person" [style]="{fontSize:'32px'}" /></div>
+        <div class="h-16 w-16 rounded-2xl bg-error/10 grid place-items-center text-error"><app-icon name="lock_person" [style]="{fontSize:'32px'}" /></div>
       </div>
       <div class="p-4 rounded-2xl border border-ocean/30 bg-ocean-soft text-[13px] text-foreground/90 flex gap-3 mb-4">
         <app-icon name="info" [style]="{fontSize:'20px'}" className="text-ocean shrink-0" />

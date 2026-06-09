@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
+import { FormFieldComponent } from '../../shared/form-field.component';
 
 function passwordRules(p: string) {
   return [
@@ -16,7 +17,7 @@ function passwordRules(p: string) {
 @Component({
   selector: 'app-cadastro',
   standalone: true,
-  imports: [FormsModule, RouterLink, AuthCardComponent, IconComponent],
+  imports: [FormsModule, RouterLink, AuthCardComponent, IconComponent, FormFieldComponent],
   template: `
     <app-auth-card title="Crie sua conta Mintly" subtitle="Comece grátis em menos de 1 minuto. Sem cartão de crédito." [hasFooter]="true">
       <!-- Stepper -->
@@ -35,33 +36,21 @@ function passwordRules(p: string) {
 
       <form (ngSubmit)="onSubmit()" class="space-y-4">
         @if (step() === 0) {
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Seu nome</span>
-            <span class="flex items-center h-12 rounded-xl border bg-card px-3.5 gap-2.5 focus-within:ring-2 focus-within:ring-mint/40 focus-within:border-mint border-border">
-              <app-icon name="person" [style]="{fontSize:'20px'}" className="text-muted-foreground" />
-              <input [(ngModel)]="name" name="name" placeholder="Ex.: Ana Costa" autocomplete="name" class="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
-            </span>
-          </label>
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">E-mail</span>
-            <span class="flex items-center h-12 rounded-xl border bg-card px-3.5 gap-2.5 focus-within:ring-2 focus-within:ring-mint/40 focus-within:border-mint border-border">
-              <app-icon name="mail" [style]="{fontSize:'20px'}" className="text-muted-foreground" />
-              <input type="email" [(ngModel)]="email" name="email" placeholder="voce@restaurante.com" class="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
-            </span>
-          </label>
+          <app-form-field label="Seu nome" icon="person">
+            <input [(ngModel)]="name" name="name" placeholder="Ex.: Ana Costa" autocomplete="name" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
+          </app-form-field>
+          <app-form-field label="E-mail" icon="mail">
+            <input type="email" [(ngModel)]="email" name="email" placeholder="voce@restaurante.com" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
+          </app-form-field>
         }
 
         @if (step() === 1) {
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Senha</span>
-            <span class="flex items-center h-12 rounded-xl border bg-card px-3.5 gap-2.5 focus-within:ring-2 focus-within:ring-mint/40 focus-within:border-mint border-border">
-              <app-icon name="lock" [style]="{fontSize:'20px'}" className="text-muted-foreground" />
-              <input [type]="showPwd() ? 'text' : 'password'" [(ngModel)]="password" name="password" placeholder="Mínimo 8 caracteres" class="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
-              <button type="button" (click)="showPwd.set(!showPwd())" class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer">
-                <app-icon [name]="showPwd() ? 'visibility_off' : 'visibility'" [style]="{fontSize:'18px'}" />
-              </button>
-            </span>
-          </label>
+          <app-form-field label="Senha" icon="lock">
+            <input [type]="showPwd() ? 'text' : 'password'" [(ngModel)]="password" name="password" placeholder="Mínimo 8 caracteres" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
+            <button fieldSuffix type="button" (click)="showPwd.set(!showPwd())" class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer">
+              <app-icon [name]="showPwd() ? 'visibility_off' : 'visibility'" [style]="{fontSize:'18px'}" />
+            </button>
+          </app-form-field>
           <div class="grid grid-cols-2 gap-1.5">
             @for (r of rules(); track r.label) {
               <div [class]="'flex items-center gap-1.5 text-[12px] ' + (r.ok ? 'text-success' : 'text-muted-foreground')">
@@ -70,23 +59,15 @@ function passwordRules(p: string) {
               </div>
             }
           </div>
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Confirmar senha</span>
-            <span class="flex items-center h-12 rounded-xl border bg-card px-3.5 gap-2.5 focus-within:ring-2 focus-within:ring-mint/40 focus-within:border-mint border-border">
-              <app-icon name="lock" [style]="{fontSize:'20px'}" className="text-muted-foreground" />
-              <input type="password" [(ngModel)]="confirm" name="confirm" placeholder="Repita a senha" class="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
-            </span>
-          </label>
+          <app-form-field label="Confirmar senha" icon="lock">
+            <input type="password" [(ngModel)]="confirm" name="confirm" placeholder="Repita a senha" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
+          </app-form-field>
         }
 
         @if (step() === 2) {
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Nome do restaurante</span>
-            <span class="flex items-center h-12 rounded-xl border bg-card px-3.5 gap-2.5 focus-within:ring-2 focus-within:ring-mint/40 focus-within:border-mint border-border">
-              <app-icon name="storefront" [style]="{fontSize:'20px'}" className="text-muted-foreground" />
-              <input [(ngModel)]="restaurant" name="restaurant" placeholder="Ex.: Cantina da Ana" class="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
-            </span>
-          </label>
+          <app-form-field label="Nome do restaurante" icon="storefront">
+            <input [(ngModel)]="restaurant" name="restaurant" placeholder="Ex.: Cantina da Ana" class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground" />
+          </app-form-field>
           <label class="flex items-start gap-2 cursor-pointer">
             <input type="checkbox" [(ngModel)]="terms" name="terms" class="mt-0.5 h-4 w-4 rounded border-border accent-mint" />
             <span class="text-[13px] text-foreground/80">Concordo com os <span class="text-ocean font-medium">Termos de Uso</span> e <span class="text-ocean font-medium">Política de Privacidade</span></span>

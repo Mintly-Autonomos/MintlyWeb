@@ -7,16 +7,9 @@ import { ToggleComponent } from '../../shared/toggle.component';
 import { ModalComponent } from '../../shared/modal.component';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { FilterBarComponent, FilterSelectComponent } from '../../shared/filter-bar.component';
-
-export type Toast = { id: number; tone: 'success' | 'error' | 'info'; message: string };
-
-export function formatBRL(n: number): string {
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-export function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
+import { AuditTimelineComponent } from '../../shared/audit-timeline.component';
+import { ToastService } from '../../shared/toast.service';
+import { formatBRL, fmtDateTime } from '../../shared/format';
 
 function normalize(s: string): string { return s.trim().toLowerCase().replace(/\s+/g, ' '); }
 
@@ -25,11 +18,12 @@ const CURRENT_USER = 'Você (Marina S.)';
 @Component({
   selector: 'app-contas',
   standalone: true,
-  imports: [FormsModule, IconComponent, ChipComponent, ToggleComponent, ModalComponent, EmptyStateComponent, FilterBarComponent, FilterSelectComponent],
+  imports: [FormsModule, IconComponent, ChipComponent, ToggleComponent, ModalComponent, EmptyStateComponent, FilterBarComponent, FilterSelectComponent, AuditTimelineComponent],
   templateUrl: './contas.component.html',
 })
 export class ContasComponent {
   private svc = inject(ContasService);
+  private toast = inject(ToastService);
 
   // State
   protected editing = signal<Account | null>(null);
@@ -38,13 +32,15 @@ export class ContasComponent {
   protected reassign = signal<Account | null>(null);
   protected confirmDefault = signal<{ next: Account; prev: Account | null } | null>(null);
   protected details = signal<Account | null>(null);
-  protected toasts = signal<Toast[]>([]);
   protected query = signal('');
   protected typeFilter = signal<'all' | AccType>('all');
   protected statusFilter = signal<'all' | 'active' | 'inactive'>('all');
 
   // Reassign selection
   protected selectedReassignId = signal<number | null>(null);
+
+  // Deferred apply for the "confirm default swap" modal
+  private pendingApply: (() => void) | null = null;
 
   // Form state for modal
   protected form = signal<{
@@ -79,7 +75,7 @@ export class ContasComponent {
   protected typeMeta = TYPE_META;
   protected accTypes = Object.keys(TYPE_META) as AccType[];
   protected fmtBRL = formatBRL;
-  protected fmtDate = fmtDate;
+  protected fmtDate = fmtDateTime;
 
   protected typeOpts = [
     { value: 'all', label: 'Todos' },
@@ -169,12 +165,12 @@ export class ContasComponent {
           if (f.isDefault && x.isDefault) return this.appendHistory({ ...x, isDefault: false }, [{ action: 'Removida como padrão', icon: 'star_border' }]);
           return x;
         }));
-        this.pushToast('success', 'Conta atualizada.');
+        this.toast.success('Conta atualizada.');
         this.editing.set(null);
       };
       if (becomingDefault && currentDefault) {
         this.confirmDefault.set({ next: { ...e, ...f } as unknown as Account, prev: currentDefault });
-        (window as any).__applyDefault = apply;
+        this.pendingApply = apply;
         return;
       }
       apply();
@@ -195,7 +191,7 @@ export class ContasComponent {
         }
         return next;
       });
-      this.pushToast('success', 'Conta criada com sucesso.');
+      this.toast.success('Conta criada com sucesso.');
       this.creating.set(false);
     }
   }
@@ -203,14 +199,14 @@ export class ContasComponent {
   handleToggle(a: Account, v: boolean): void {
     if (v) {
       this.svc.accounts.update(all => all.map(x => x.id === a.id ? this.appendHistory({ ...x, active: true }, [{ action: 'Conta reativada', icon: 'play_circle' }]) : x));
-      this.pushToast('success', `${a.name} foi reativada.`);
+      this.toast.success(`${a.name} foi reativada.`);
       return;
     }
-    if (this.activeCount() <= 1) { this.pushToast('error', 'Não é possível desativar a única conta ativa do sistema.'); return; }
+    if (this.activeCount() <= 1) { this.toast.error('Não é possível desativar a única conta ativa do sistema.'); return; }
     if (a.balance !== 0 || a.predictedBalance !== 0) { this.blocked.set(a); return; }
     if (a.isDefault) { this.reassign.set(a); this.selectedReassignId.set(null); return; }
     this.svc.accounts.update(all => all.map(x => x.id === a.id ? this.appendHistory({ ...x, active: false }, [{ action: 'Conta inativada', icon: 'pause_circle' }]) : x));
-    this.pushToast('info', `${a.name} foi desativada.`);
+    this.toast.info(`${a.name} foi desativada.`);
   }
 
   confirmReassign(): void {
@@ -221,14 +217,13 @@ export class ContasComponent {
       if (x.id === newId) return this.appendHistory({ ...x, isDefault: true }, [{ action: 'Definida como padrão', icon: 'star' }]);
       return x;
     }));
-    this.pushToast('info', `${target.name} desativada. Nova conta padrão definida.`);
+    this.toast.info(`${target.name} desativada. Nova conta padrão definida.`);
     this.reassign.set(null);
   }
 
   applyDefault(): void {
-    const fn = (window as any).__applyDefault;
-    fn?.();
-    delete (window as any).__applyDefault;
+    this.pendingApply?.();
+    this.pendingApply = null;
     this.confirmDefault.set(null);
   }
 
@@ -268,12 +263,4 @@ export class ContasComponent {
     return { ...a, updatedAt: now, updatedBy: CURRENT_USER, history: [...items, ...a.history] };
   }
 
-  private pushToast(tone: Toast['tone'], message: string): void {
-    const id = Date.now() + Math.random();
-    this.toasts.update(t => [...t, { id, tone, message }]);
-    setTimeout(() => this.toasts.update(t => t.filter(x => x.id !== id)), 4000);
-  }
-
-  toastIcon(tone: string): string { return tone === 'success' ? 'check_circle' : tone === 'error' ? 'error' : 'info'; }
-  toastColor(tone: string): string { return tone === 'success' ? 'text-success' : tone === 'error' ? 'text-error' : 'text-ocean'; }
 }

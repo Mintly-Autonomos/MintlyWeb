@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
+import { AuthService } from '../services/auth.service';
 import { LogoComponent } from '../shared/logo.component';
 import { IconComponent } from '../shared/icon.component';
 
@@ -86,10 +87,10 @@ const NAV = [
               title="Sair da conta"
               class="flex items-center gap-2.5 pl-2 pr-3 h-10 rounded-full bg-card border border-border hover:bg-muted transition no-underline"
             >
-              <div class="h-7 w-7 rounded-full bg-ocean text-white grid place-items-center text-xs font-semibold">AC</div>
+              <div class="h-7 w-7 rounded-full bg-ocean text-white grid place-items-center text-xs font-semibold">{{ userInitials }}</div>
               <div class="hidden md:block leading-tight">
-                <div class="text-xs font-semibold">Ana Costa</div>
-                <div class="text-[10px] text-muted-foreground">Cantina da Ana</div>
+                <div class="text-xs font-semibold">{{ userName }}</div>
+                <div class="text-[10px] text-muted-foreground">{{ userBusiness }}</div>
               </div>
               <app-icon name="logout" [style]="{fontSize:'18px'}" className="text-muted-foreground ml-1" />
             </a>
@@ -105,7 +106,17 @@ const NAV = [
 })
 export class AppLayoutComponent {
   protected theme = inject(ThemeService);
+  private auth = inject(AuthService);
   protected navItems = NAV;
+
+  // Usa o usuário autenticado; mantém "Ana Costa" como fallback enquanto não há dados.
+  get userName(): string { return this.auth.currentUser()?.nome?.trim() || 'Ana Costa'; }
+  get userBusiness(): string { return 'Cantina da Ana'; }
+  get userInitials(): string {
+    const parts = this.userName.split(/\s+/).filter(Boolean);
+    const initials = (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '');
+    return initials.toUpperCase() || 'AC';
+  }
 
   private readonly titles: Record<string, { title: string; sub: string }> = {
     '/': { title: 'Contas Financeiras', sub: 'Gerencie onde o dinheiro do seu negócio entra e sai.' },

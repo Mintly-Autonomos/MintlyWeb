@@ -10,21 +10,13 @@ import { ModalComponent } from '../../shared/modal.component';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { FilterBarComponent, FilterSelectComponent, FilterDateRangeComponent } from '../../shared/filter-bar.component';
 import { ContasService } from '../../services/contas.service';
+import { ToastService } from '../../shared/toast.service';
+import { formatBRL, fmtDateTime, fmtShortDate } from '../../shared/format';
 
-function formatBRL(n: number): string {
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-function fmtShort(iso: string): string {
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
 function isoToday(): string { return new Date().toISOString().slice(0, 10); }
 function isoAgo(days: number): string { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); }
 
 type Period = 'all' | 'today' | '7d' | '30d' | 'custom';
-type Toast = { id: number; tone: 'success' | 'error' | 'info'; message: string };
 
 const CURRENT_USER = 'Você (Marina S.)';
 const FEE_RATES: Record<string, number> = { iFood: 12, Rappi: 15 };
@@ -44,6 +36,7 @@ interface MovForm {
 export class MovimentacoesComponent {
   private svc = inject(MovimentacoesService);
   private contasSvc = inject(ContasService);
+  private toast = inject(ToastService);
 
   // ── UI state ──────────────────────────────────────────────────────────
   protected creating = signal(false);
@@ -51,7 +44,6 @@ export class MovimentacoesComponent {
   protected details = signal<Movement | null>(null);
   protected duplicate = signal<Movement | null>(null);
   protected pendingForm = signal<MovForm | null>(null);
-  protected toasts = signal<Toast[]>([]);
 
   // ── Filters ───────────────────────────────────────────────────────────
   protected query = signal('');
@@ -74,8 +66,8 @@ export class MovimentacoesComponent {
   protected paymentMethods = PAYMENT_METHODS;
   protected statusMeta = STATUS_META;
   protected fmtBRL = formatBRL;
-  protected fmtDate = fmtDate;
-  protected fmtShort = fmtShort;
+  protected fmtDate = fmtDateTime;
+  protected fmtShort = fmtShortDate;
   readonly parseFloat = parseFloat;
 
   // ── Options ───────────────────────────────────────────────────────────
@@ -180,6 +172,16 @@ export class MovimentacoesComponent {
     this.form.update(f => ({ ...f, [k]: v }));
   }
 
+  /** Switches the movement type, keeping the status valid for the new type. */
+  setType(type: MovType): void {
+    this.form.update(f => {
+      const valid: MovStatus[] = type === 'income'
+        ? ['received', 'pending', 'cancelled']
+        : ['paid', 'pending', 'cancelled'];
+      return { ...f, type, status: valid.includes(f.status) ? f.status : 'pending' };
+    });
+  }
+
   // ── CRUD ──────────────────────────────────────────────────────────────
   openCreate(): void {
     this.form.set({ type: 'income', title: '', value: '', date: isoToday(), categoryId: null, accountId: null, paymentMethod: '', status: 'pending', notes: '' });
@@ -213,13 +215,13 @@ export class MovimentacoesComponent {
     if (e) {
       const updated: Movement = { ...e, ...f, value: parseFloat(f.value) || 0, paymentMethod: f.paymentMethod || null, notes: f.notes || null, updatedAt: now, updatedBy: CURRENT_USER };
       this.svc.movements.update(all => all.map(x => x.id === e.id ? updated : x));
-      this.pushToast('success', 'Movimentação atualizada.');
+      this.toast.success('Movimentação atualizada.');
       this.editing.set(null);
     } else {
       const id = Math.max(0, ...this.movements().map(m => m.id)) + 1;
       const created: Movement = { id, ...f, value: parseFloat(f.value) || 0, paymentMethod: f.paymentMethod || null, notes: f.notes || null, createdAt: now, updatedAt: now, createdBy: CURRENT_USER, updatedBy: CURRENT_USER };
       this.svc.movements.update(all => [created, ...all]);
-      this.pushToast('success', 'Movimentação criada com sucesso.');
+      this.toast.success('Movimentação criada com sucesso.');
       this.creating.set(false);
     }
     this.duplicate.set(null); this.pendingForm.set(null);
@@ -231,7 +233,7 @@ export class MovimentacoesComponent {
     const now = new Date().toISOString();
     this.svc.movements.update(all => all.map(x => x.id === m.id ? { ...x, status, updatedAt: now, updatedBy: CURRENT_USER } : x));
     if (this.details()?.id === m.id) this.details.update(d => d ? { ...d, status } : d);
-    this.pushToast('info', `Status alterado para "${STATUS_META[status].label}".`);
+    this.toast.info(`Status alterado para "${STATUS_META[status].label}".`);
   }
 
   statusActions(m: Movement): { label: string; status: MovStatus; icon: string }[] {
@@ -247,12 +249,4 @@ export class MovimentacoesComponent {
     ).filter(s => s !== m.status).map(s => all[s]);
   }
 
-  private pushToast(tone: Toast['tone'], message: string): void {
-    const id = Date.now() + Math.random();
-    this.toasts.update(t => [...t, { id, tone, message }]);
-    setTimeout(() => this.toasts.update(t => t.filter(x => x.id !== id)), 4000);
-  }
-
-  toastIcon(tone: string): string { return tone === 'success' ? 'check_circle' : tone === 'error' ? 'error' : 'info'; }
-  toastColor(tone: string): string { return tone === 'success' ? 'text-success' : tone === 'error' ? 'text-error' : 'text-ocean'; }
 }
