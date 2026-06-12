@@ -156,11 +156,11 @@ export class AppLayoutComponent {
 
   // Usa o usuário autenticado; mantém "Ana Costa" como fallback enquanto não há dados.
   get userName(): string {
-    return this.auth.currentUser()?.nome?.trim() || 'Ana Costa';
+    return this.auth.currentUser()?.name?.trim() || 'Ana Costa';
   }
   // Dinâmico: vem do usuário autenticado quando disponível; senão, fallback.
   get userBusiness(): string {
-    return this.auth.currentUser()?.empresa?.trim() || 'Cantina da Ana';
+    return 'Cantina da Ana'; // TODO: buscar nome do restaurante do contexto do usuário
   }
   get userInitials(): string {
     const parts = this.userName.split(/\s+/).filter(Boolean);

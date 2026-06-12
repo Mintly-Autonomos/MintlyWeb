@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-esqueci-senha',
@@ -77,17 +78,20 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 })
 export class EsqueciSenhaComponent {
   protected router = inject(Router);
+  private auth = inject(AuthService);
   protected email = '';
   protected loading = signal(false);
   protected sent = signal(false);
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
     if (!this.email) return;
     this.loading.set(true);
-    // TODO: POST /api/auth/forgot-password { email }
-    setTimeout(() => {
+    try {
+      await this.auth.forgotPassword(this.email);
+    } catch { /* A API sempre retorna 202 mesmo sem e-mail cadastrado — silenciar erro */ }
+    finally {
       this.loading.set(false);
       this.sent.set(true);
-    }, 800);
+    }
   }
 }

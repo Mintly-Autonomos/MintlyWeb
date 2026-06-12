@@ -4,11 +4,35 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 
+// Formato que a API devolve (envelope ResponseBuilder)
+interface ApiResponse<T> { payload: T }
+
+// Sub-documento person retornado pelo API
+interface PersonRef { _id?: string; name: string }
+
+/** Visão pública do usuário que persiste em storage */
 export interface AuthUser {
-  nome: string;
+  name: string;       // user.person.name
   email: string;
-  cpf: string;
-  empresa?: string;
+  role: string;
+  restaurantId: string;
+}
+
+interface RawAuthTokens {
+  accessToken: string;
+  refreshToken: string | null;
+  user: {
+    person: PersonRef;
+    email: string;
+    role: string;
+    restaurantId: string;
+    [key: string]: unknown;
+  };
+}
+
+interface RawRefreshTokens {
+  accessToken: string;
+  refreshToken: string | null;
 }
 
 const REMEMBER_KEY = 'mintly-remember';
@@ -17,17 +41,6 @@ const KEYS = {
   refresh: 'mintly-refresh-token',
   user: 'mintly-user',
 } as const;
-
-interface LoginResponse {
-  accessToken: string;
-  refreshToken: string | null;
-  user: AuthUser;
-}
-
-interface RefreshResponse {
-  accessToken: string;
-  refreshToken: string | null;
-}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -45,11 +58,9 @@ export class AuthService {
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly currentUser = this._user.asReadonly();
 
-  /** Storage ativo conforme a opção "manter conectado". */
   private get store(): Storage {
     return this.remember ? localStorage : sessionStorage;
   }
-  /** Lê de qualquer um dos storages (o token pode estar em qualquer um). */
   private read(key: string): string | null {
     return sessionStorage.getItem(key) ?? localStorage.getItem(key);
   }
@@ -65,27 +76,50 @@ export class AuthService {
     return this._accessToken();
   }
 
+  // POST /auth/login
   async login(email: string, password: string, remember = true): Promise<void> {
     this.remember = remember;
     localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0');
-    const response = await firstValueFrom(
-      this.http.post<LoginResponse>(`${this.API}/auth/login`, { email, password }),
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<RawAuthTokens>>(`${this.API}/auth/login`, { email, password }),
     );
-    this.persistTokens(response);
+    this.persistSession(res.payload);
   }
 
+  // POST /auth/signup
+  async signup(data: {
+    name: string;
+    phone: string;
+    email: string;
+    password: string;
+    restaurantName: string;
+    termsAccepted: boolean;
+  }): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<RawAuthTokens>>(`${this.API}/auth/signup`, {
+        person: { name: data.name, phone: data.phone },
+        email: data.email,
+        password: data.password,
+        restaurantName: data.restaurantName,
+        termsAccepted: data.termsAccepted,
+      }),
+    );
+    this.persistSession(res.payload);
+  }
+
+  // POST /auth/refresh — retorna true se conseguiu renovar
   async refresh(): Promise<boolean> {
     const rt = this._refreshToken();
     if (!rt) return false;
     try {
-      const response = await firstValueFrom(
-        this.http.post<RefreshResponse>(`${this.API}/auth/refresh`, { refreshToken: rt }),
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<RawRefreshTokens>>(`${this.API}/auth/refresh`, { refreshToken: rt }),
       );
-      this._accessToken.set(response.accessToken);
-      this.write(KEYS.access, response.accessToken);
-      if (response.refreshToken) {
-        this._refreshToken.set(response.refreshToken);
-        this.write(KEYS.refresh, response.refreshToken);
+      this._accessToken.set(res.payload.accessToken);
+      this.write(KEYS.access, res.payload.accessToken);
+      if (res.payload.refreshToken) {
+        this._refreshToken.set(res.payload.refreshToken);
+        this.write(KEYS.refresh, res.payload.refreshToken);
       }
       return true;
     } catch {
@@ -94,26 +128,30 @@ export class AuthService {
     }
   }
 
+  // POST /auth/logout
   async logout(): Promise<void> {
     const rt = this._refreshToken();
     if (rt) {
       try {
         await firstValueFrom(this.http.post(`${this.API}/auth/logout`, { refreshToken: rt }));
-      } catch {
-        /* best effort */
-      }
+      } catch { /* best effort */ }
     }
     this.clearSession();
     this.router.navigate(['/auth/login']);
   }
 
-  private persistTokens(data: LoginResponse): void {
-    this._accessToken.set(data.accessToken);
-    this._refreshToken.set(data.refreshToken);
-    this._user.set(data.user);
-    this.write(KEYS.access, data.accessToken);
-    if (data.refreshToken) this.write(KEYS.refresh, data.refreshToken);
-    this.write(KEYS.user, JSON.stringify(data.user));
+  // POST /auth/forgot-password — envia e-mail de recuperação
+  async forgotPassword(email: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${this.API}/auth/forgot-password`, { email }),
+    );
+  }
+
+  // POST /auth/reset-password — redefine senha com o token do e-mail
+  async resetPassword(token: string, newPassword: string, confirmNewPassword: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${this.API}/auth/reset-password`, { token, newPassword, confirmNewPassword }),
+    );
   }
 
   clearSession(): void {
@@ -125,13 +163,24 @@ export class AuthService {
     this.remove(KEYS.user);
   }
 
+  private persistSession(raw: RawAuthTokens): void {
+    const user: AuthUser = {
+      name: raw.user.person?.name ?? raw.user.email,
+      email: raw.user.email,
+      role: raw.user.role,
+      restaurantId: raw.user.restaurantId,
+    };
+    this._accessToken.set(raw.accessToken);
+    this._refreshToken.set(raw.refreshToken);
+    this._user.set(user);
+    this.write(KEYS.access, raw.accessToken);
+    if (raw.refreshToken) this.write(KEYS.refresh, raw.refreshToken);
+    this.write(KEYS.user, JSON.stringify(user));
+  }
+
   private loadStoredUser(): AuthUser | null {
     const raw = this.read(KEYS.user);
     if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(raw); } catch { return null; }
   }
 }

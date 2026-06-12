@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { AuthService } from '../../services/auth.service';
 
 function passwordRules(p: string) {
   return [
@@ -66,6 +67,16 @@ function passwordRules(p: string) {
               name="name"
               placeholder="Ex.: Ana Costa"
               autocomplete="name"
+              class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+            />
+          </app-form-field>
+          <app-form-field label="Telefone" icon="phone">
+            <input
+              type="tel"
+              [(ngModel)]="phone"
+              name="phone"
+              placeholder="(11) 9 9999-9999"
+              autocomplete="tel"
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
           </app-form-field>
@@ -169,6 +180,13 @@ function passwordRules(p: string) {
           }
         </button>
 
+        @if (error()) {
+          <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20">
+            <app-icon name="error" [style]="{ fontSize: '20px' }" className="text-error shrink-0 mt-0.5" />
+            <div class="text-[13px] text-foreground/80">{{ error() }}</div>
+          </div>
+        }
+
         @if (step() > 0) {
           <button
             type="button"
@@ -190,9 +208,12 @@ function passwordRules(p: string) {
 })
 export class CadastroComponent {
   protected router = inject(Router);
+  private auth = inject(AuthService);
+
   protected steps = ['Seus dados', 'Acesso', 'Negócio'];
   protected step = signal(0);
   protected name = '';
+  protected phone = '';
   protected email = '';
   protected password = '';
   protected confirm = '';
@@ -200,22 +221,35 @@ export class CadastroComponent {
   protected terms = false;
   protected showPwd = signal(false);
   protected loading = signal(false);
+  protected error = signal<string | null>(null);
   protected rules = computed(() => passwordRules(this.password));
 
   protected canNext = computed(() => {
     const s = this.step();
-    if (s === 0) return this.name.trim().length > 1 && /.+@.+\..+/.test(this.email);
+    if (s === 0) return this.name.trim().length > 1 && this.phone.trim().length > 5 && /.+@.+\..+/.test(this.email);
     if (s === 1) return this.rules().every((r) => r.ok) && this.confirm === this.password;
     return this.restaurant.trim().length > 1 && this.terms;
   });
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
+    this.error.set(null);
     if (!this.canNext()) return;
-    if (this.step() < 2) {
-      this.step.update((s) => s + 1);
-      return;
-    }
+    if (this.step() < 2) { this.step.update((s) => s + 1); return; }
     this.loading.set(true);
-    setTimeout(() => this.router.navigate(['/auth/onboarding']), 700);
+    try {
+      await this.auth.signup({
+        name: this.name,
+        phone: this.phone,
+        email: this.email,
+        password: this.password,
+        restaurantName: this.restaurant,
+        termsAccepted: this.terms,
+      });
+      this.router.navigate(['/auth/onboarding']);
+    } catch {
+      this.error.set('Não foi possível criar a conta. Verifique os dados e tente novamente.');
+    } finally {
+      this.loading.set(false);
+    }
   }
 }
