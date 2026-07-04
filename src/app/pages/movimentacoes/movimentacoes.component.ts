@@ -43,7 +43,7 @@ interface MovForm {
   value: string;
   date: string;
   categoryId: number | null;
-  accountId: number | null;
+  accountId: string | null;
   paymentMethod: PaymentMethod | '';
   status: MovStatus;
   notes: string;
@@ -211,7 +211,7 @@ export class MovimentacoesComponent {
   categoryName(id: number | null): string {
     return MOV_CATEGORIES.find((c) => c.id === id)?.name ?? '—';
   }
-  accountName(id: number | null): string {
+  accountName(id: string | null): string {
     return this.contasSvc.accounts().find((a) => a.id === id)?.name ?? '—';
   }
 
