@@ -87,12 +87,12 @@ function toAccount(raw: FinancialAccount): Account {
     createdBy?: string;
     updatedBy?: string;
   };
-  const rawHistory = (raw.history ?? []) as Array<{
+  const rawHistory = (raw.history ?? []) as {
     at: unknown;
     by: string;
     action: string;
     detail?: string;
-  }>;
+  }[];
   return {
     id: (raw._id ?? raw.id) as string,
     name: raw.name,
