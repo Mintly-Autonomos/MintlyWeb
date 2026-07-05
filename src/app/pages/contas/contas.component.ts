@@ -272,7 +272,14 @@ export class ContasComponent implements OnInit {
   /** Aplica edições de campo, e então (se preciso) inativação/definição de padrão. */
   private async applyEdit(
     e: Account,
-    f: { name: string; type: AccType; active: boolean; isDefault: boolean; taxPct: string; settlementDays: string },
+    f: {
+      name: string;
+      type: AccType;
+      active: boolean;
+      isDefault: boolean;
+      taxPct: string;
+      settlementDays: string;
+    },
   ): Promise<void> {
     const patch: UpdateAccountInput = {
       name: f.name.trim(),

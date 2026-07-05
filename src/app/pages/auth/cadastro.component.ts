@@ -1,18 +1,11 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
-
-function passwordRules(p: string) {
-  return [
-    { label: 'Mínimo 8 caracteres', ok: p.length >= 8 },
-    { label: 'Letra maiúscula', ok: /[A-Z]/.test(p) },
-    { label: 'Letra minúscula', ok: /[a-z]/.test(p) },
-    { label: 'Número ou símbolo', ok: /[\d\W]/.test(p) },
-  ];
-}
+import { AuthService } from '../../services/auth.service';
+import { passwordRules } from '../../shared/password-rules';
 
 @Component({
   selector: 'app-cadastro',
@@ -59,6 +52,17 @@ function passwordRules(p: string) {
       </div>
 
       <form (ngSubmit)="onSubmit()" class="space-y-4">
+        @if (error()) {
+          <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20">
+            <app-icon
+              name="error"
+              [style]="{ fontSize: '20px' }"
+              className="text-error shrink-0 mt-0.5"
+            />
+            <div class="text-[13px] text-foreground/80">{{ error() }}</div>
+          </div>
+        }
+
         @if (step() === 0) {
           <app-form-field label="Seu nome" icon="person">
             <input
@@ -66,6 +70,15 @@ function passwordRules(p: string) {
               name="name"
               placeholder="Ex.: Ana Costa"
               autocomplete="name"
+              class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+            />
+          </app-form-field>
+          <app-form-field label="Telefone" icon="phone">
+            <input
+              [(ngModel)]="phone"
+              name="phone"
+              placeholder="Ex.: 11999999999"
+              autocomplete="tel"
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
           </app-form-field>
@@ -190,9 +203,11 @@ function passwordRules(p: string) {
 })
 export class CadastroComponent {
   protected router = inject(Router);
+  private auth = inject(AuthService);
   protected steps = ['Seus dados', 'Acesso', 'Negócio'];
   protected step = signal(0);
   protected name = '';
+  protected phone = '';
   protected email = '';
   protected password = '';
   protected confirm = '';
@@ -200,22 +215,58 @@ export class CadastroComponent {
   protected terms = false;
   protected showPwd = signal(false);
   protected loading = signal(false);
-  protected rules = computed(() => passwordRules(this.password));
+  protected error = signal<string | null>(null);
 
-  protected canNext = computed(() => {
+  // Métodos (não computed()): name/phone/email/password/... são campos simples
+  // (ngModel), não signals — um computed() aqui só reagiria à leitura de `step()`
+  // e ficaria com cache travado a cada tecla digitada nos outros campos.
+  protected rules() {
+    return passwordRules(this.password);
+  }
+
+  protected canNext(): boolean {
     const s = this.step();
-    if (s === 0) return this.name.trim().length > 1 && /.+@.+\..+/.test(this.email);
+    if (s === 0)
+      return this.name.trim().length > 1 && this.phoneValid() && /.+@.+\..+/.test(this.email);
     if (s === 1) return this.rules().every((r) => r.ok) && this.confirm === this.password;
     return this.restaurant.trim().length > 1 && this.terms;
-  });
+  }
 
-  onSubmit(): void {
+  /** Telefone BR: aceita só os dígitos e exige 10 (fixo) ou 11 (celular c/ 9). */
+  protected phoneValid(): boolean {
+    const digits = this.phone.replace(/\D/g, '');
+    return digits.length === 10 || digits.length === 11;
+  }
+
+  async onSubmit(): Promise<void> {
     if (!this.canNext()) return;
+    this.error.set(null);
     if (this.step() < 2) {
       this.step.update((s) => s + 1);
       return;
     }
     this.loading.set(true);
-    setTimeout(() => this.router.navigate(['/auth/onboarding']), 700);
+    try {
+      await this.auth.signup({
+        name: this.name.trim(),
+        phone: this.phone.trim(),
+        email: this.email.trim(),
+        password: this.password,
+        restaurantName: this.restaurant.trim(),
+        termsAccepted: this.terms,
+      });
+      this.router.navigate(['/auth/onboarding']);
+    } catch (err) {
+      this.error.set(this.errMsg(err));
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  private errMsg(err: unknown): string {
+    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
+    return (
+      data?.message ?? 'Não conseguimos criar sua conta. Verifique os dados e tente novamente.'
+    );
   }
 }
