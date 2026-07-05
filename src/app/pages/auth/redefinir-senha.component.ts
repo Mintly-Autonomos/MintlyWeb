@@ -5,6 +5,7 @@ import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { AuthService } from '../../services/auth.service';
+import { passwordRules } from '../../shared/password-rules';
 
 @Component({
   selector: 'app-redefinir-senha',
@@ -46,6 +47,22 @@ import { AuthService } from '../../services/auth.service';
             />
           </button>
         </app-form-field>
+        <div class="grid grid-cols-2 gap-1.5">
+          @for (r of rules(); track r.label) {
+            <div
+              [class]="
+                'flex items-center gap-1.5 text-[12px] ' +
+                (r.ok ? 'text-success' : 'text-muted-foreground')
+              "
+            >
+              <app-icon
+                [name]="r.ok ? 'check_circle' : 'radio_button_unchecked'"
+                [style]="{ fontSize: '14px' }"
+              />
+              {{ r.label }}
+            </div>
+          }
+        </div>
         <app-form-field label="Confirmar senha" icon="lock">
           <input
             type="password"
@@ -57,7 +74,7 @@ import { AuthService } from '../../services/auth.service';
         </app-form-field>
         <button
           type="submit"
-          [disabled]="loading() || password.length < 8 || password !== confirm"
+          [disabled]="loading() || !canSubmit()"
           class="w-full h-12 rounded-xl bg-mint text-primary-foreground font-semibold text-sm hover:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
         >
           @if (loading()) {
@@ -84,8 +101,18 @@ export class RedefinirSenhaComponent {
   protected loading = signal(false);
   protected error = signal<string | null>(null);
 
+  // Método (não computed()): password/confirm são campos ngModel, não signals.
+  protected rules() {
+    return passwordRules(this.password);
+  }
+
+  /** Habilita o submit só quando a senha cumpre a política e a confirmação bate. */
+  protected canSubmit(): boolean {
+    return this.rules().every((r) => r.ok) && this.password === this.confirm;
+  }
+
   async onSubmit(): Promise<void> {
-    if (this.password.length < 8 || this.password !== this.confirm) return;
+    if (!this.canSubmit()) return;
     const token = this.route.snapshot.queryParamMap.get('token');
     if (!token) {
       this.error.set('Link inválido ou expirado. Solicite uma nova recuperação de senha.');

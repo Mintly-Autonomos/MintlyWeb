@@ -5,15 +5,7 @@ import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { AuthService } from '../../services/auth.service';
-
-function passwordRules(p: string) {
-  return [
-    { label: 'Mínimo 8 caracteres', ok: p.length >= 8 },
-    { label: 'Letra maiúscula', ok: /[A-Z]/.test(p) },
-    { label: 'Letra minúscula', ok: /[a-z]/.test(p) },
-    { label: 'Número ou símbolo', ok: /[\d\W]/.test(p) },
-  ];
-}
+import { passwordRules } from '../../shared/password-rules';
 
 @Component({
   selector: 'app-cadastro',
@@ -235,13 +227,15 @@ export class CadastroComponent {
   protected canNext(): boolean {
     const s = this.step();
     if (s === 0)
-      return (
-        this.name.trim().length > 1 &&
-        this.phone.trim().length > 7 &&
-        /.+@.+\..+/.test(this.email)
-      );
+      return this.name.trim().length > 1 && this.phoneValid() && /.+@.+\..+/.test(this.email);
     if (s === 1) return this.rules().every((r) => r.ok) && this.confirm === this.password;
     return this.restaurant.trim().length > 1 && this.terms;
+  }
+
+  /** Telefone BR: aceita só os dígitos e exige 10 (fixo) ou 11 (celular c/ 9). */
+  protected phoneValid(): boolean {
+    const digits = this.phone.replace(/\D/g, '');
+    return digits.length === 10 || digits.length === 11;
   }
 
   async onSubmit(): Promise<void> {
