@@ -72,6 +72,55 @@ export class AuthService {
     });
   }
 
+  /** Cadastro inicial (usuário + restaurante). Já autentica com os tokens retornados. */
+  async signup(input: {
+    name: string;
+    phone: string;
+    email: string;
+    password: string;
+    restaurantName: string;
+    termsAccepted: boolean;
+  }): Promise<void> {
+    this.remember = true;
+    localStorage.setItem(REMEMBER_KEY, '1');
+    const response = await this.authClient.signup(
+      {
+        person: { name: input.name, phone: input.phone },
+        email: input.email,
+        password: input.password,
+        restaurantName: input.restaurantName,
+        termsAccepted: input.termsAccepted,
+      },
+      this.headers,
+    );
+    const result = response.payload;
+    if (!result) throw new Error('Resposta de cadastro sem payload.');
+    this.persistTokens(result.accessToken, result.refreshToken, {
+      nome: result.user.person.name,
+      email: result.user.email,
+      empresa: result.restaurant.name,
+      restaurantId: result.user.restaurantId,
+    });
+  }
+
+  /** Dispara o e-mail de recuperação. Resposta é sempre genérica (não revela se o e-mail existe). */
+  async forgotPassword(email: string): Promise<string> {
+    const response = await this.authClient.forgotPassword(email, this.headers);
+    return (
+      response.payload?.message ??
+      'Se o e-mail estiver cadastrado, você receberá as instruções em breve.'
+    );
+  }
+
+  /** Redefine a senha a partir do token recebido por e-mail. */
+  async resetPassword(token: string, newPassword: string, confirmNewPassword: string): Promise<string> {
+    const response = await this.authClient.resetPassword(
+      { token, newPassword, confirmNewPassword },
+      this.headers,
+    );
+    return response.payload?.message ?? 'Senha redefinida com sucesso.';
+  }
+
   async refresh(): Promise<boolean> {
     const rt = this._refreshToken();
     if (!rt) return false;

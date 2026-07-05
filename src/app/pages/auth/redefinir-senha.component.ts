@@ -1,9 +1,10 @@
 import { Component, signal, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-redefinir-senha',
@@ -15,6 +16,16 @@ import { FormFieldComponent } from '../../shared/form-field.component';
       subtitle="Escolha uma senha forte para proteger sua conta."
     >
       <form (ngSubmit)="onSubmit()" class="space-y-4">
+        @if (error()) {
+          <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20">
+            <app-icon
+              name="error"
+              [style]="{ fontSize: '20px' }"
+              className="text-error shrink-0 mt-0.5"
+            />
+            <div class="text-[13px] text-foreground/80">{{ error() }}</div>
+          </div>
+        }
         <app-form-field label="Nova senha" icon="lock">
           <input
             [type]="show() ? 'text' : 'password'"
@@ -65,14 +76,35 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 })
 export class RedefinirSenhaComponent {
   protected router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private auth = inject(AuthService);
   protected password = '';
   protected confirm = '';
   protected show = signal(false);
   protected loading = signal(false);
-  onSubmit(): void {
+  protected error = signal<string | null>(null);
+
+  async onSubmit(): Promise<void> {
     if (this.password.length < 8 || this.password !== this.confirm) return;
+    const token = this.route.snapshot.queryParamMap.get('token');
+    if (!token) {
+      this.error.set('Link inválido ou expirado. Solicite uma nova recuperação de senha.');
+      return;
+    }
+    this.error.set(null);
     this.loading.set(true);
-    // TODO: POST /api/auth/reset-password { token, password }
-    setTimeout(() => this.router.navigate(['/auth/login'], { queryParams: { reset: 'ok' } }), 800);
+    try {
+      await this.auth.resetPassword(token, this.password, this.confirm);
+      this.router.navigate(['/auth/login'], { queryParams: { reset: 'ok' } });
+    } catch (err) {
+      this.error.set(this.errMsg(err));
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  private errMsg(err: unknown): string {
+    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
+    return data?.message ?? 'Não foi possível redefinir a senha. O link pode ter expirado.';
   }
 }

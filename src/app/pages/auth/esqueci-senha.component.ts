@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-esqueci-senha',
@@ -17,6 +18,16 @@ import { FormFieldComponent } from '../../shared/form-field.component';
     >
       @if (!sent()) {
         <form (ngSubmit)="onSubmit()" class="space-y-4">
+          @if (error()) {
+            <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20">
+              <app-icon
+                name="error"
+                [style]="{ fontSize: '20px' }"
+                className="text-error shrink-0 mt-0.5"
+              />
+              <div class="text-[13px] text-foreground/80">{{ error() }}</div>
+            </div>
+          }
           <app-form-field label="E-mail" icon="mail">
             <input
               type="email"
@@ -77,17 +88,23 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 })
 export class EsqueciSenhaComponent {
   protected router = inject(Router);
+  private auth = inject(AuthService);
   protected email = '';
   protected loading = signal(false);
   protected sent = signal(false);
+  protected error = signal<string | null>(null);
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
     if (!this.email) return;
+    this.error.set(null);
     this.loading.set(true);
-    // TODO: POST /api/auth/forgot-password { email }
-    setTimeout(() => {
-      this.loading.set(false);
+    try {
+      await this.auth.forgotPassword(this.email.trim());
       this.sent.set(true);
-    }, 800);
+    } catch {
+      this.error.set('Não foi possível enviar o e-mail agora. Tente novamente em instantes.');
+    } finally {
+      this.loading.set(false);
+    }
   }
 }
