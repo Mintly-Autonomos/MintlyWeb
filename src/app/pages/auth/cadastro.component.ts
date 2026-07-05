@@ -265,6 +265,8 @@ export class CadastroComponent {
 
   private errMsg(err: unknown): string {
     const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
-    return data?.message ?? 'Não conseguimos criar sua conta. Verifique os dados e tente novamente.';
+    return (
+      data?.message ?? 'Não conseguimos criar sua conta. Verifique os dados e tente novamente.'
+    );
   }
 }

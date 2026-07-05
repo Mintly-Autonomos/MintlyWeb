@@ -113,7 +113,11 @@ export class AuthService {
   }
 
   /** Redefine a senha a partir do token recebido por e-mail. */
-  async resetPassword(token: string, newPassword: string, confirmNewPassword: string): Promise<string> {
+  async resetPassword(
+    token: string,
+    newPassword: string,
+    confirmNewPassword: string,
+  ): Promise<string> {
     const response = await this.authClient.resetPassword(
       { token, newPassword, confirmNewPassword },
       this.headers,
