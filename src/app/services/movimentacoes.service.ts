@@ -19,7 +19,7 @@ export interface Movement {
   date: string; // YYYY-MM-DD
   value: number;
   categoryId: number | null;
-  accountId: number | null;
+  accountId: string | null;
   paymentMethod: PaymentMethod | null;
   notes: string | null;
   createdBy: string;
@@ -104,7 +104,7 @@ const INITIAL: Movement[] = [
     date: todayISO(),
     value: 1240.5,
     categoryId: 1,
-    accountId: 2,
+    accountId: null,
     paymentMethod: 'Dinheiro',
     notes: null,
     createdBy: 'Você',
@@ -120,7 +120,7 @@ const INITIAL: Movement[] = [
     date: todayISO(),
     value: 870.0,
     categoryId: 2,
-    accountId: 4,
+    accountId: null,
     paymentMethod: 'Crédito',
     notes: null,
     createdBy: 'Você',
@@ -136,7 +136,7 @@ const INITIAL: Movement[] = [
     date: addDays(todayISO(), -1),
     value: 320.9,
     categoryId: 10,
-    accountId: 1,
+    accountId: null,
     paymentMethod: 'PIX',
     notes: null,
     createdBy: 'Você',
@@ -152,7 +152,7 @@ const INITIAL: Movement[] = [
     date: addDays(todayISO(), -2),
     value: 2200.0,
     categoryId: 21,
-    accountId: 1,
+    accountId: null,
     paymentMethod: 'Boleto',
     notes: null,
     createdBy: 'Você',

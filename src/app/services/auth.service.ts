@@ -1,14 +1,15 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
+import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
+import { MintlyClientService } from './mintly-client.service';
 
 export interface AuthUser {
   nome: string;
   email: string;
-  cpf: string;
   empresa?: string;
+  /** Necessário para montar payloads de criação (a API reforça o valor real no servidor). */
+  restaurantId?: string;
 }
 
 const REMEMBER_KEY = 'mintly-remember';
@@ -18,22 +19,10 @@ const KEYS = {
   user: 'mintly-user',
 } as const;
 
-interface LoginResponse {
-  accessToken: string;
-  refreshToken: string | null;
-  user: AuthUser;
-}
-
-interface RefreshResponse {
-  accessToken: string;
-  refreshToken: string | null;
-}
-
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private http = inject(HttpClient);
   private router = inject(Router);
-  private readonly API = environment.apiUrl;
+  private authClient = inject(MintlyClientService).client.authClient;
 
   // "Manter conectado" => localStorage (persiste); senão => sessionStorage (só a aba).
   private remember = localStorage.getItem(REMEMBER_KEY) === '1';
@@ -61,6 +50,11 @@ export class AuthService {
     sessionStorage.removeItem(key);
   }
 
+  /** Header de contexto exigido pelos clients da mintly-lib. */
+  private get headers(): Headers {
+    return { env: environment.mintlyEnv };
+  }
+
   getAccessToken(): string | null {
     return this._accessToken();
   }
@@ -68,24 +62,28 @@ export class AuthService {
   async login(email: string, password: string, remember = true): Promise<void> {
     this.remember = remember;
     localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0');
-    const response = await firstValueFrom(
-      this.http.post<LoginResponse>(`${this.API}/auth/login`, { email, password }),
-    );
-    this.persistTokens(response);
+    const response = await this.authClient.login({ email, password }, this.headers);
+    const result = response.payload;
+    if (!result) throw new Error('Resposta de login sem payload.');
+    this.persistTokens(result.accessToken, result.refreshToken, {
+      nome: result.user.person.name,
+      email: result.user.email,
+      restaurantId: result.user.restaurantId,
+    });
   }
 
   async refresh(): Promise<boolean> {
     const rt = this._refreshToken();
     if (!rt) return false;
     try {
-      const response = await firstValueFrom(
-        this.http.post<RefreshResponse>(`${this.API}/auth/refresh`, { refreshToken: rt }),
-      );
-      this._accessToken.set(response.accessToken);
-      this.write(KEYS.access, response.accessToken);
-      if (response.refreshToken) {
-        this._refreshToken.set(response.refreshToken);
-        this.write(KEYS.refresh, response.refreshToken);
+      const response = await this.authClient.refresh(rt, this.headers);
+      const result = response.payload;
+      if (!result) throw new Error('Resposta de refresh sem payload.');
+      this._accessToken.set(result.accessToken);
+      this.write(KEYS.access, result.accessToken);
+      if (result.refreshToken) {
+        this._refreshToken.set(result.refreshToken);
+        this.write(KEYS.refresh, result.refreshToken);
       }
       return true;
     } catch {
@@ -96,9 +94,10 @@ export class AuthService {
 
   async logout(): Promise<void> {
     const rt = this._refreshToken();
-    if (rt) {
+    const at = this._accessToken();
+    if (rt && at) {
       try {
-        await firstValueFrom(this.http.post(`${this.API}/auth/logout`, { refreshToken: rt }));
+        await this.authClient.logout(rt, { ...this.headers, authorization: `Bearer ${at}` });
       } catch {
         /* best effort */
       }
@@ -107,13 +106,13 @@ export class AuthService {
     this.router.navigate(['/auth/login']);
   }
 
-  private persistTokens(data: LoginResponse): void {
-    this._accessToken.set(data.accessToken);
-    this._refreshToken.set(data.refreshToken);
-    this._user.set(data.user);
-    this.write(KEYS.access, data.accessToken);
-    if (data.refreshToken) this.write(KEYS.refresh, data.refreshToken);
-    this.write(KEYS.user, JSON.stringify(data.user));
+  private persistTokens(accessToken: string, refreshToken: string | null, user: AuthUser): void {
+    this._accessToken.set(accessToken);
+    this._refreshToken.set(refreshToken);
+    this._user.set(user);
+    this.write(KEYS.access, accessToken);
+    if (refreshToken) this.write(KEYS.refresh, refreshToken);
+    this.write(KEYS.user, JSON.stringify(user));
   }
 
   clearSession(): void {

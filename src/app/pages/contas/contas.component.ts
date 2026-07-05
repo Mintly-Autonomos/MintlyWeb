@@ -1,11 +1,11 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   ContasService,
   Account,
   AccType,
   TYPE_META,
-  AuditEvent,
+  UpdateAccountInput,
 } from '../../services/contas.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -20,8 +20,6 @@ import { formatBRL, fmtDateTime } from '../../shared/format';
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ');
 }
-
-const CURRENT_USER = 'Você (Marina S.)';
 
 @Component({
   selector: 'app-contas',
@@ -39,7 +37,7 @@ const CURRENT_USER = 'Você (Marina S.)';
   ],
   templateUrl: './contas.component.html',
 })
-export class ContasComponent {
+export class ContasComponent implements OnInit {
   private svc = inject(ContasService);
   private toast = inject(ToastService);
 
@@ -55,10 +53,10 @@ export class ContasComponent {
   protected statusFilter = signal<'all' | 'active' | 'inactive'>('all');
 
   // Reassign selection
-  protected selectedReassignId = signal<number | null>(null);
+  protected selectedReassignId = signal<string | null>(null);
 
   // Deferred apply for the "confirm default swap" modal
-  private pendingApply: (() => void) | null = null;
+  private pendingApply: (() => Promise<void>) | null = null;
 
   // Form state for modal
   protected form = signal<{
@@ -72,6 +70,7 @@ export class ContasComponent {
 
   // Computed
   protected accounts = this.svc.accounts;
+  protected loading = this.svc.loading;
 
   protected activeCount = computed(() => this.accounts().filter((a) => a.active).length);
   protected total = computed(() =>
@@ -123,6 +122,10 @@ export class ContasComponent {
     { value: 'active', label: 'Ativas' },
     { value: 'inactive', label: 'Inativas' },
   ];
+
+  ngOnInit(): void {
+    this.svc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
+  }
 
   // Open create/edit modal
   openCreate(): void {
@@ -219,38 +222,26 @@ export class ContasComponent {
     this.form.update((f) => ({ ...f, settlementDays: v }));
   }
 
-  save(): void {
+  private errMsg(err: unknown): string {
+    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
+    return data?.message ?? 'Não foi possível concluir a operação. Tente novamente.';
+  }
+
+  async save(): Promise<void> {
     if (this.saveDisabled) return;
     const f = this.form();
-    const now = new Date().toISOString();
     const e = this.editing();
     if (e) {
       const becomingDefault = !e.isDefault && f.isDefault;
       const currentDefault = this.accounts().find((a) => a.isDefault && a.id !== e.id) ?? null;
-      const apply = () => {
-        const events = this.diffEvents(e, f);
-        const updated: Account = {
-          ...e,
-          ...f,
-          name: f.name.trim(),
-          taxPct: this.isPlatform ? Number(f.taxPct) || 0 : undefined,
-          settlementDays: this.isPlatform ? Number(f.settlementDays) || 0 : undefined,
-          updatedAt: now,
-          updatedBy: CURRENT_USER,
-        };
-        const withHist = this.appendHistory(updated, events);
-        this.svc.accounts.update((all) =>
-          all.map((x) => {
-            if (x.id === e.id) return withHist;
-            if (f.isDefault && x.isDefault)
-              return this.appendHistory({ ...x, isDefault: false }, [
-                { action: 'Removida como padrão', icon: 'star_border' },
-              ]);
-            return x;
-          }),
-        );
-        this.toast.success('Conta atualizada.');
-        this.editing.set(null);
+      const apply = async () => {
+        try {
+          await this.applyEdit(e, f);
+          this.toast.success('Conta atualizada.');
+          this.editing.set(null);
+        } catch (err) {
+          this.toast.error(this.errMsg(err));
+        }
       };
       if (becomingDefault && currentDefault) {
         this.confirmDefault.set({
@@ -260,66 +251,51 @@ export class ContasComponent {
         this.pendingApply = apply;
         return;
       }
-      apply();
+      await apply();
     } else {
-      const id = Math.max(0, ...this.accounts().map((a) => a.id)) + 1;
-      const created: Account = {
-        id,
-        name: f.name.trim(),
-        type: f.type,
-        active: f.active,
-        isDefault: f.isDefault,
-        balance: 0,
-        predictedBalance: 0,
-        taxPct: this.isPlatform ? Number(f.taxPct) || 0 : undefined,
-        settlementDays: this.isPlatform ? Number(f.settlementDays) || 0 : undefined,
-        createdBy: CURRENT_USER,
-        createdAt: now,
-        updatedBy: CURRENT_USER,
-        updatedAt: now,
-        history: [
-          {
-            id: 1,
-            at: now,
-            by: CURRENT_USER,
-            action: 'Conta criada',
-            detail: `Tipo: ${TYPE_META[f.type].label}`,
-            icon: 'add_circle',
-          },
-        ],
-      };
-      this.svc.accounts.update((all) => {
-        const next = [...all, created];
-        if (f.isDefault) {
-          return next.map((x) =>
-            x.id === id
-              ? x
-              : x.isDefault
-                ? this.appendHistory({ ...x, isDefault: false }, [
-                    { action: 'Removida como padrão', icon: 'star_border' },
-                  ])
-                : x,
-          );
-        }
-        return next;
-      });
-      this.toast.success('Conta criada com sucesso.');
-      this.creating.set(false);
+      try {
+        await this.svc.create({
+          name: f.name.trim(),
+          type: f.type,
+          isDefault: f.isDefault,
+          taxPct: this.isPlatform ? Number(f.taxPct) || 0 : undefined,
+          settlementDays: this.isPlatform ? Number(f.settlementDays) || 0 : undefined,
+        });
+        this.toast.success('Conta criada com sucesso.');
+        this.creating.set(false);
+      } catch (err) {
+        this.toast.error(this.errMsg(err));
+      }
     }
   }
 
-  handleToggle(a: Account, v: boolean): void {
+  /** Aplica edições de campo, e então (se preciso) inativação/definição de padrão. */
+  private async applyEdit(
+    e: Account,
+    f: { name: string; type: AccType; active: boolean; isDefault: boolean; taxPct: string; settlementDays: string },
+  ): Promise<void> {
+    const patch: UpdateAccountInput = {
+      name: f.name.trim(),
+      type: f.type,
+      taxPct: this.isPlatform ? Number(f.taxPct) || 0 : undefined,
+      settlementDays: this.isPlatform ? Number(f.settlementDays) || 0 : undefined,
+    };
+    // Reativação (false -> true) não tem rota própria: viaja junto do update genérico.
+    if (!e.active && f.active) patch.active = true;
+    await this.svc.update(e.id, patch);
+    // Desativação (true -> false) usa a rota de inativação (guards no servidor).
+    if (e.active && !f.active) await this.svc.inactivate(e.id);
+    if (!e.isDefault && f.isDefault) await this.svc.setDefault(e.id);
+  }
+
+  async handleToggle(a: Account, v: boolean): Promise<void> {
     if (v) {
-      this.svc.accounts.update((all) =>
-        all.map((x) =>
-          x.id === a.id
-            ? this.appendHistory({ ...x, active: true }, [
-                { action: 'Conta reativada', icon: 'play_circle' },
-              ])
-            : x,
-        ),
-      );
-      this.toast.success(`${a.name} foi reativada.`);
+      try {
+        await this.svc.update(a.id, { active: true });
+        this.toast.success(`${a.name} foi reativada.`);
+      } catch (err) {
+        this.toast.error(this.errMsg(err));
+      }
       return;
     }
     if (this.activeCount() <= 1) {
@@ -335,44 +311,32 @@ export class ContasComponent {
       this.selectedReassignId.set(null);
       return;
     }
-    this.svc.accounts.update((all) =>
-      all.map((x) =>
-        x.id === a.id
-          ? this.appendHistory({ ...x, active: false }, [
-              { action: 'Conta inativada', icon: 'pause_circle' },
-            ])
-          : x,
-      ),
-    );
-    this.toast.info(`${a.name} foi desativada.`);
+    try {
+      await this.svc.inactivate(a.id);
+      this.toast.info(`${a.name} foi desativada.`);
+    } catch (err) {
+      this.toast.error(this.errMsg(err));
+    }
   }
 
-  confirmReassign(): void {
+  async confirmReassign(): Promise<void> {
     const target = this.reassign();
     const newId = this.selectedReassignId();
     if (!target || !newId) return;
-    this.svc.accounts.update((all) =>
-      all.map((x) => {
-        if (x.id === target.id)
-          return this.appendHistory({ ...x, isDefault: false, active: false }, [
-            { action: 'Removida como padrão', icon: 'star_border' },
-            { action: 'Conta inativada', icon: 'pause_circle' },
-          ]);
-        if (x.id === newId)
-          return this.appendHistory({ ...x, isDefault: true }, [
-            { action: 'Definida como padrão', icon: 'star' },
-          ]);
-        return x;
-      }),
-    );
-    this.toast.info(`${target.name} desativada. Nova conta padrão definida.`);
-    this.reassign.set(null);
+    try {
+      await this.svc.inactivate(target.id, newId);
+      this.toast.info(`${target.name} desativada. Nova conta padrão definida.`);
+      this.reassign.set(null);
+    } catch (err) {
+      this.toast.error(this.errMsg(err));
+    }
   }
 
-  applyDefault(): void {
-    this.pendingApply?.();
+  async applyDefault(): Promise<void> {
+    const fn = this.pendingApply;
     this.pendingApply = null;
     this.confirmDefault.set(null);
+    await fn?.();
   }
 
   toggleDisabled(a: Account): boolean {
@@ -399,57 +363,5 @@ export class ContasComponent {
 
   reassignCandidates(): Account[] {
     return this.accounts().filter((a) => a.active && !a.isDefault);
-  }
-
-  private diffEvents(
-    prev: Account,
-    next: {
-      name: string;
-      active: boolean;
-      isDefault: boolean;
-      taxPct: string;
-      settlementDays: string;
-    },
-  ): Omit<AuditEvent, 'id' | 'at' | 'by'>[] {
-    const evts: Omit<AuditEvent, 'id' | 'at' | 'by'>[] = [];
-    if (prev.name !== next.name.trim())
-      evts.push({
-        action: 'Nome alterado',
-        detail: `${prev.name} → ${next.name.trim()}`,
-        icon: 'edit',
-      });
-    if (prev.active !== next.active)
-      evts.push({
-        action: next.active ? 'Conta reativada' : 'Conta inativada',
-        icon: next.active ? 'play_circle' : 'pause_circle',
-      });
-    if (prev.isDefault !== next.isDefault)
-      evts.push({
-        action: next.isDefault ? 'Definida como padrão' : 'Removida como padrão',
-        icon: 'star',
-      });
-    const newTax = Number(next.taxPct) || 0;
-    if ((prev.taxPct ?? 0) !== newTax)
-      evts.push({
-        action: 'Taxa alterada',
-        detail: `${prev.taxPct ?? 0}% → ${newTax}%`,
-        icon: 'percent',
-      });
-    const newDays = Number(next.settlementDays) || 0;
-    if ((prev.settlementDays ?? 0) !== newDays)
-      evts.push({
-        action: 'Prazo de repasse alterado',
-        detail: `${prev.settlementDays ?? 0} dias → ${newDays} dias`,
-        icon: 'schedule',
-      });
-    return evts;
-  }
-
-  private appendHistory(a: Account, events: Omit<AuditEvent, 'id' | 'at' | 'by'>[]): Account {
-    if (!events.length) return a;
-    const now = new Date().toISOString();
-    const start = Math.max(0, ...a.history.map((h) => h.id)) + 1;
-    const items = events.map((e, i) => ({ ...e, id: start + i, at: now, by: CURRENT_USER }));
-    return { ...a, updatedAt: now, updatedBy: CURRENT_USER, history: [...items, ...a.history] };
   }
 }
