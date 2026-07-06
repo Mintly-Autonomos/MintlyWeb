@@ -56,6 +56,9 @@ jobs:
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      # URL real da API (não-sensível — vars, não secrets). Sem isso, o build usa
+      # o valor commitado no environment.*.ts (apiUrl) como fallback.
+      API_URL: ${{ vars.API_URL }}
 
     steps:
       - name: Checkout
@@ -81,6 +84,19 @@ jobs:
 
       - name: Unit tests
         run: npm run test:ci
+
+      - name: Configure API URL for this environment
+        run: |
+          FILE="src/environments/environment.production.ts"
+          if [ "${{ inputs.environment }}" != "production" ]; then
+            FILE="src/environments/environment.development.ts"
+          fi
+          if [ -n "$API_URL" ]; then
+            sed -i "s|apiUrl: '[^']*'|apiUrl: '$API_URL'|" "$FILE"
+            echo "apiUrl definida via vars.API_URL: $API_URL"
+          else
+            echo "vars.API_URL não setada — mantendo o valor commitado em $FILE"
+          fi
 
       - name: Application build
         run: |
@@ -129,6 +145,9 @@ jobs:
       S3_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
       CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
       DIST_PATH: dist/mintly-front-end/browser
+      # URL real da API (não-sensível — vars, não secrets). Sem isso, o build usa
+      # o valor commitado no environment.*.ts (apiUrl) como fallback.
+      API_URL: ${{ vars.API_URL }}
 
     steps:
       - name: Checkout
@@ -154,6 +173,19 @@ jobs:
 
       - name: Unit tests
         run: npm run test:ci
+
+      - name: Configure API URL for this environment
+        run: |
+          FILE="src/environments/environment.production.ts"
+          if [ "${{ inputs.environment }}" != "production" ]; then
+            FILE="src/environments/environment.development.ts"
+          fi
+          if [ -n "$API_URL" ]; then
+            sed -i "s|apiUrl: '[^']*'|apiUrl: '$API_URL'|" "$FILE"
+            echo "apiUrl definida via vars.API_URL: $API_URL"
+          else
+            echo "vars.API_URL não setada — mantendo o valor commitado em $FILE"
+          fi
 
       - name: Application build
         run: |
