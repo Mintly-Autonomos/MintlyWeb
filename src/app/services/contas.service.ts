@@ -87,11 +87,16 @@ function toISO(value: unknown): string {
  */
 function actionIcon(action: string): string {
   const a = action.toLowerCase();
-  if (a === 'set-default' || a.includes('padrão') || (a.includes('default') && !a.includes('unset')))
+  if (
+    a === 'set-default' ||
+    a.includes('padrão') ||
+    (a.includes('default') && !a.includes('unset'))
+  )
     return 'star';
   if (a === 'unset-default' || a.includes('removida como padrão')) return 'star_border';
   if (a.includes('inactivate') || a.includes('inativa')) return 'pause_circle';
-  if (a.includes('reactivate') || a.includes('reativa') || a.includes('activate')) return 'play_circle';
+  if (a.includes('reactivate') || a.includes('reativa') || a.includes('activate'))
+    return 'play_circle';
   if (a.includes('fee') || a.includes('taxa') || a.includes('percent')) return 'percent';
   if (a.includes('settlement') || a.includes('prazo')) return 'schedule';
   if (a.includes('name') || a.includes('nome')) return 'edit';
