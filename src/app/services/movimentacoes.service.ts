@@ -1,4 +1,10 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { MovementDirection, MovementStatus, PaymentMethod as LibPaymentMethod } from 'mintly-lib';
+import type { FinancialMovement, Headers } from 'mintly-lib';
+import { environment } from '../../environments/environment';
+import { AuthService } from './auth.service';
+import { MintlyClientService } from './mintly-client.service';
 
 export type MovType = 'income' | 'expense';
 export type MovStatus = 'received' | 'paid' | 'pending' | 'cancelled';
@@ -12,13 +18,13 @@ export type PaymentMethod =
   | 'Carteira Digital';
 
 export interface Movement {
-  id: number;
+  id: string;
   title: string;
   type: MovType;
   status: MovStatus;
   date: string; // YYYY-MM-DD
   value: number;
-  categoryId: number | null;
+  categoryId: string | null;
   accountId: string | null;
   paymentMethod: PaymentMethod | null;
   notes: string | null;
@@ -27,36 +33,6 @@ export interface Movement {
   updatedBy: string;
   updatedAt: string;
 }
-
-export interface AccountLite {
-  id: number;
-  name: string;
-  type: string;
-  taxPct?: number;
-  settlementDays?: number;
-}
-export interface CategoryLite {
-  id: number;
-  name: string;
-  type: MovType;
-}
-
-export const MOV_ACCOUNTS: AccountLite[] = [
-  { id: 1, name: 'Itaú PJ — Conta principal', type: 'Bank' },
-  { id: 2, name: 'Caixa Loja', type: 'Cash Register' },
-  { id: 3, name: 'Carteira PIX', type: 'Digital Wallet' },
-  { id: 4, name: 'iFood', type: 'Financial Platform', taxPct: 12, settlementDays: 14 },
-];
-
-export const MOV_CATEGORIES: CategoryLite[] = [
-  { id: 1, name: 'Venda Balcão', type: 'income' },
-  { id: 2, name: 'Venda Delivery', type: 'income' },
-  { id: 3, name: 'Receita Financeira', type: 'income' },
-  { id: 10, name: 'CMV / Insumos', type: 'expense' },
-  { id: 20, name: 'Salários', type: 'expense' },
-  { id: 21, name: 'Aluguel', type: 'expense' },
-  { id: 22, name: 'Impostos', type: 'expense' },
-];
 
 export const PAYMENT_METHODS: PaymentMethod[] = [
   'Dinheiro',
@@ -82,102 +58,199 @@ export const STATUS_META: Record<
   cancelled: { label: 'Cancelado', tone: 'neutral', icon: 'cancel' },
 };
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+const DIRECTION_TO_LIB: Record<MovType, MovementDirection> = {
+  income: MovementDirection.In,
+  expense: MovementDirection.Out,
+};
+const DIRECTION_FROM_LIB: Record<MovementDirection, MovType> = {
+  [MovementDirection.In]: 'income',
+  [MovementDirection.Out]: 'expense',
+};
+
+const PAYMENT_TO_LIB: Record<PaymentMethod, LibPaymentMethod> = {
+  Dinheiro: LibPaymentMethod.Cash,
+  PIX: LibPaymentMethod.Pix,
+  Débito: LibPaymentMethod.Debit,
+  Crédito: LibPaymentMethod.Credit,
+  Transferência: LibPaymentMethod.Transfer,
+  Boleto: LibPaymentMethod.Boleto,
+  'Carteira Digital': LibPaymentMethod.DigitalWallet,
+};
+const PAYMENT_FROM_LIB: Record<LibPaymentMethod, PaymentMethod> = {
+  [LibPaymentMethod.Cash]: 'Dinheiro',
+  [LibPaymentMethod.Pix]: 'PIX',
+  [LibPaymentMethod.Debit]: 'Débito',
+  [LibPaymentMethod.Credit]: 'Crédito',
+  [LibPaymentMethod.Transfer]: 'Transferência',
+  [LibPaymentMethod.Boleto]: 'Boleto',
+  [LibPaymentMethod.DigitalWallet]: 'Carteira Digital',
+};
+
+/** 'received'/'paid' são o mesmo MovementStatus.Settled — a direção decide o rótulo. */
+function toMovStatus(direction: MovementDirection, status: MovementStatus): MovStatus {
+  if (status === MovementStatus.Pending) return 'pending';
+  if (status === MovementStatus.Cancelled) return 'cancelled';
+  return direction === MovementDirection.In ? 'received' : 'paid';
 }
-function addDays(iso: string, n: number): string {
-  const d = new Date(iso);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-function now(): string {
-  return new Date().toISOString();
+function fromMovStatus(status: MovStatus): MovementStatus {
+  if (status === 'pending') return MovementStatus.Pending;
+  if (status === 'cancelled') return MovementStatus.Cancelled;
+  return MovementStatus.Settled;
 }
 
-const t = now();
-const INITIAL: Movement[] = [
-  {
-    id: 1,
-    title: 'Venda almoço',
-    type: 'income',
-    status: 'received',
-    date: todayISO(),
-    value: 1240.5,
-    categoryId: 1,
-    accountId: null,
-    paymentMethod: 'Dinheiro',
-    notes: null,
-    createdBy: 'Você',
-    createdAt: t,
-    updatedBy: 'Você',
-    updatedAt: t,
-  },
-  {
-    id: 2,
-    title: 'Pedidos iFood — sábado',
-    type: 'income',
-    status: 'pending',
-    date: todayISO(),
-    value: 870.0,
-    categoryId: 2,
-    accountId: null,
-    paymentMethod: 'Crédito',
-    notes: null,
-    createdBy: 'Você',
-    createdAt: t,
-    updatedBy: 'Você',
-    updatedAt: t,
-  },
-  {
-    id: 3,
-    title: 'Compra de hortifruti',
-    type: 'expense',
-    status: 'paid',
-    date: addDays(todayISO(), -1),
-    value: 320.9,
-    categoryId: 10,
-    accountId: null,
-    paymentMethod: 'PIX',
-    notes: null,
-    createdBy: 'Você',
-    createdAt: t,
-    updatedBy: 'Você',
-    updatedAt: t,
-  },
-  {
-    id: 4,
-    title: 'Aluguel — junho',
-    type: 'expense',
-    status: 'pending',
-    date: addDays(todayISO(), -2),
-    value: 2200.0,
-    categoryId: 21,
-    accountId: null,
-    paymentMethod: 'Boleto',
-    notes: null,
-    createdBy: 'Você',
-    createdAt: t,
-    updatedBy: 'Você',
-    updatedAt: t,
-  },
-];
+function toISODate(value: unknown): string {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  const d = value instanceof Date ? value : new Date(value as string);
+  return isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
+}
+function toISO(value: unknown): string {
+  if (!value) return new Date().toISOString();
+  const d = value instanceof Date ? value : new Date(value as string);
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
+/** Converte a entity da lib (FinancialMovement, com account/category como Extended Reference) pro shape da tela. */
+function toMovement(raw: FinancialMovement): Movement {
+  const r = raw as unknown as {
+    _id?: string;
+    id?: string;
+    title: string;
+    direction: MovementDirection;
+    status: MovementStatus;
+    date: unknown;
+    grossValue: number;
+    account?: { _id: string };
+    category?: { _id: string };
+    paymentMethod: LibPaymentMethod;
+    description?: string;
+    audit?: { createdAt?: unknown; updatedAt?: unknown; createdBy?: string; updatedBy?: string };
+  };
+  return {
+    id: (r._id ?? r.id) as string,
+    title: r.title,
+    type: DIRECTION_FROM_LIB[r.direction],
+    status: toMovStatus(r.direction, r.status),
+    date: toISODate(r.date),
+    value: r.grossValue,
+    categoryId: r.category?._id ?? null,
+    accountId: r.account?._id ?? null,
+    paymentMethod: PAYMENT_FROM_LIB[r.paymentMethod] ?? null,
+    notes: r.description ?? null,
+    createdBy: r.audit?.createdBy ?? '—',
+    createdAt: toISO(r.audit?.createdAt),
+    updatedBy: r.audit?.updatedBy ?? '—',
+    updatedAt: toISO(r.audit?.updatedAt),
+  };
+}
+
+export interface MovementInput {
+  type: MovType;
+  title: string;
+  value: number;
+  date: string;
+  categoryId: string;
+  accountId: string;
+  paymentMethod: PaymentMethod;
+  status: MovStatus;
+  notes: string | null;
+}
+
+/** Erro específico de duplicidade (409) — a UI decide se reenvia com confirmDuplicate. */
+export class DuplicateMovementError extends Error {}
 
 @Injectable({ providedIn: 'root' })
 export class MovimentacoesService {
-  // TODO: replace with HttpClient calls
-  // GET /api/movimentacoes
-  readonly movements = signal<Movement[]>(INITIAL);
+  private auth = inject(AuthService);
+  private router = inject(Router);
+  private movementClient = inject(MintlyClientService).client.financialMovementClient;
 
-  // TODO: POST /api/movimentacoes
-  create(m: Omit<Movement, 'id'>): void {
-    this.movements.update((all) => [
-      { ...m, id: Math.max(0, ...all.map((x) => x.id)) + 1 },
-      ...all,
-    ]);
+  readonly movements = signal<Movement[]>([]);
+  readonly loading = signal(false);
+
+  private get headers(): Headers {
+    return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
   }
 
-  // TODO: PUT /api/movimentacoes/:id
-  update(m: Movement): void {
-    this.movements.update((all) => all.map((x) => (x.id === m.id ? m : x)));
+  /** Executa uma chamada autenticada; em 401 tenta 1x refresh + retry antes de desistir. */
+  private async call<T>(fn: (headers: Headers) => Promise<T>): Promise<T> {
+    try {
+      return await fn(this.headers);
+    } catch (err) {
+      if (this.isUnauthorized(err)) {
+        const refreshed = await this.auth.refresh();
+        if (refreshed) return await fn(this.headers);
+        this.router.navigate(['/auth/sessao-expirada']);
+      }
+      throw err;
+    }
+  }
+
+  private isUnauthorized(err: unknown): boolean {
+    return this.statusOf(err) === 401;
+  }
+
+  private statusOf(err: unknown): number | undefined {
+    return (err as { response?: { status?: number } })?.response?.status;
+  }
+
+  async refresh(): Promise<void> {
+    this.loading.set(true);
+    try {
+      const response = await this.call((headers) =>
+        this.movementClient.list({ page: 1, size: 500 }, headers),
+      );
+      this.movements.set((response.payload ?? []).map(toMovement));
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  /**
+   * Registra a movimentação. Se o servidor detectar uma possível duplicata
+   * (<2min, mesma conta/título/valor/data) e `confirmDuplicate` não tiver sido
+   * passado, lança DuplicateMovementError — a UI decide se reenvia confirmando.
+   */
+  async register(input: MovementInput, confirmDuplicate = false): Promise<void> {
+    const body = {
+      direction: DIRECTION_TO_LIB[input.type],
+      title: input.title,
+      grossValue: input.value,
+      date: input.date,
+      accountId: input.accountId,
+      categoryId: input.categoryId,
+      paymentMethod: PAYMENT_TO_LIB[input.paymentMethod],
+      status: fromMovStatus(input.status),
+      ...(input.notes ? { description: input.notes } : {}),
+      ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
+    };
+    try {
+      await this.call((headers) => this.movementClient.register(body, headers));
+    } catch (err) {
+      if (this.statusOf(err) === 409) throw new DuplicateMovementError();
+      throw err;
+    }
+    await this.refresh();
+  }
+
+  /** direction é imutável — não faz parte do corpo de update. */
+  async update(id: string, input: Omit<MovementInput, 'type' | 'status'>): Promise<void> {
+    const body = {
+      title: input.title,
+      grossValue: input.value,
+      date: input.date,
+      accountId: input.accountId,
+      categoryId: input.categoryId,
+      paymentMethod: PAYMENT_TO_LIB[input.paymentMethod],
+      description: input.notes ?? undefined,
+    };
+    await this.call((headers) => this.movementClient.updateMovement(id, body, headers));
+    await this.refresh();
+  }
+
+  async changeStatus(id: string, status: MovStatus): Promise<void> {
+    await this.call((headers) =>
+      this.movementClient.changeStatus(id, fromMovStatus(status), headers),
+    );
+    await this.refresh();
   }
 }

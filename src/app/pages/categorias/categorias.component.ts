@@ -1,4 +1,4 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   CategoriasService,
@@ -6,7 +6,6 @@ import {
   CatType,
   Behavior,
   Nature,
-  AuditEvent,
 } from '../../services/categorias.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -17,8 +16,6 @@ import { FilterBarComponent } from '../../shared/filter-bar.component';
 import { AuditTimelineComponent } from '../../shared/audit-timeline.component';
 import { ToastService } from '../../shared/toast.service';
 import { fmtDateTime } from '../../shared/format';
-
-const CURRENT_USER = 'Você (Marina S.)';
 
 interface CatForm {
   name: string;
@@ -43,7 +40,7 @@ interface CatForm {
   ],
   templateUrl: './categorias.component.html',
 })
-export class CategoriasComponent {
+export class CategoriasComponent implements OnInit {
   private svc = inject(CategoriasService);
   private toast = inject(ToastService);
 
@@ -63,6 +60,7 @@ export class CategoriasComponent {
   });
 
   protected categories = this.svc.categories;
+  protected loading = this.svc.loading;
   protected fmtDate = fmtDateTime;
 
   protected filtered = computed(() => {
@@ -81,6 +79,10 @@ export class CategoriasComponent {
   protected expenseCount = computed(
     () => this.categories().filter((c) => c.type === 'expense' && c.active).length,
   );
+
+  ngOnInit(): void {
+    this.svc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
+  }
 
   get nameError(): string {
     const trimmed = this.form().name.trim();
@@ -137,101 +139,62 @@ export class CategoriasComponent {
     this.form.update((f) => ({ ...f, [k]: v }));
   }
 
-  save(): void {
+  private errMsg(err: unknown): string {
+    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
+    return data?.message ?? 'Não foi possível concluir a operação. Tente novamente.';
+  }
+
+  async save(): Promise<void> {
     if (this.saveDisabled) return;
     const f = this.form();
-    const now = new Date().toISOString();
     const e = this.editing();
     if (e) {
-      const evts = this.diffEvents(e, f);
-      const updated: Category = {
-        ...e,
-        ...f,
-        name: f.name.trim(),
-        updatedAt: now,
-        updatedBy: CURRENT_USER,
-      };
-      const withHist = this.appendHistory(updated, evts);
-      this.svc.categories.update((all) => all.map((c) => (c.id === e.id ? withHist : c)));
-      this.toast.success('Categoria atualizada.');
-      this.editing.set(null);
+      try {
+        await this.svc.update(e.id, {
+          name: f.name.trim(),
+          type: f.type,
+          behavior: f.behavior,
+          nature: f.nature,
+        });
+        // Ativação/desativação usa as rotas dedicadas (auditadas no servidor).
+        if (e.active && !f.active) await this.svc.inactivate(e.id);
+        if (!e.active && f.active) await this.svc.reactivate(e.id);
+        this.toast.success('Categoria atualizada.');
+        this.editing.set(null);
+      } catch (err) {
+        this.toast.error(this.errMsg(err));
+      }
     } else {
-      const id = Math.max(0, ...this.categories().map((c) => c.id)) + 1;
-      const created: Category = {
-        id,
-        name: f.name.trim(),
-        type: f.type,
-        behavior: f.behavior,
-        nature: f.nature,
-        active: f.active,
-        protected: false,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: CURRENT_USER,
-        updatedBy: CURRENT_USER,
-        history: [
-          { id: 1, at: now, by: CURRENT_USER, action: 'Categoria criada', icon: 'add_circle' },
-        ],
-      };
-      this.svc.categories.update((all) => [...all, created]);
-      this.toast.success('Categoria criada com sucesso.');
-      this.creating.set(false);
+      try {
+        await this.svc.create({
+          name: f.name.trim(),
+          type: f.type,
+          behavior: f.behavior,
+          nature: f.nature,
+        });
+        this.toast.success('Categoria criada com sucesso.');
+        this.creating.set(false);
+      } catch (err) {
+        this.toast.error(this.errMsg(err));
+      }
     }
   }
 
-  handleToggle(c: Category, v: boolean): void {
+  async handleToggle(c: Category, v: boolean): Promise<void> {
     if (c.protected) {
       this.protectedAlert.set(c);
       return;
     }
-    const now = new Date().toISOString();
-    const evt = v
-      ? { action: 'Categoria reativada', icon: 'play_circle' }
-      : { action: 'Categoria inativada', icon: 'pause_circle' };
-    this.svc.categories.update((all) =>
-      all.map((x) =>
-        x.id === c.id
-          ? this.appendHistory({ ...x, active: v, updatedAt: now, updatedBy: CURRENT_USER }, [evt])
-          : x,
-      ),
-    );
-    this.toast.show(v ? 'success' : 'info', `${c.name} ${v ? 'reativada' : 'inativada'}.`);
-  }
-
-  private diffEvents(prev: Category, next: CatForm): Omit<AuditEvent, 'id' | 'at' | 'by'>[] {
-    const evts: Omit<AuditEvent, 'id' | 'at' | 'by'>[] = [];
-    if (prev.name !== next.name.trim())
-      evts.push({
-        action: 'Nome alterado',
-        detail: `${prev.name} → ${next.name.trim()}`,
-        icon: 'edit',
-      });
-    if (prev.behavior !== next.behavior)
-      evts.push({
-        action: 'Comportamento alterado',
-        detail: `${prev.behavior} → ${next.behavior}`,
-        icon: 'swap_horiz',
-      });
-    if (prev.nature !== next.nature)
-      evts.push({
-        action: 'Natureza alterada',
-        detail: `${prev.nature} → ${next.nature}`,
-        icon: 'swap_horiz',
-      });
-    if (prev.active !== next.active)
-      evts.push({
-        action: next.active ? 'Categoria reativada' : 'Categoria inativada',
-        icon: next.active ? 'play_circle' : 'pause_circle',
-      });
-    return evts;
-  }
-
-  private appendHistory(c: Category, events: Omit<AuditEvent, 'id' | 'at' | 'by'>[]): Category {
-    if (!events.length) return c;
-    const now = new Date().toISOString();
-    const start = Math.max(0, ...c.history.map((h) => h.id)) + 1;
-    const items = events.map((e, i) => ({ ...e, id: start + i, at: now, by: CURRENT_USER }));
-    return { ...c, updatedAt: now, updatedBy: CURRENT_USER, history: [...items, ...c.history] };
+    try {
+      if (v) {
+        await this.svc.reactivate(c.id);
+      } else {
+        await this.svc.inactivate(c.id);
+      }
+      this.toast.show(v ? 'success' : 'info', `${c.name} ${v ? 'reativada' : 'inativada'}.`);
+    } catch (err) {
+      this.toast.error(this.errMsg(err));
+    }
   }
 
   behaviorLabel(b: Behavior): string {

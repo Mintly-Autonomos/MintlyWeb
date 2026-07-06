@@ -1,4 +1,4 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   MovimentacoesService,
@@ -6,9 +6,9 @@ import {
   MovType,
   MovStatus,
   PaymentMethod,
-  MOV_CATEGORIES,
   PAYMENT_METHODS,
   STATUS_META,
+  DuplicateMovementError,
 } from '../../services/movimentacoes.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -20,6 +20,7 @@ import {
   FilterDateRangeComponent,
 } from '../../shared/filter-bar.component';
 import { ContasService } from '../../services/contas.service';
+import { CategoriasService } from '../../services/categorias.service';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtDateTime, fmtShortDate } from '../../shared/format';
 
@@ -34,7 +35,6 @@ function isoAgo(days: number): string {
 
 type Period = 'all' | 'today' | '7d' | '30d' | 'custom';
 
-const CURRENT_USER = 'Você (Marina S.)';
 const FEE_RATES: Record<string, number> = { iFood: 12, Rappi: 15 };
 
 interface MovForm {
@@ -42,7 +42,7 @@ interface MovForm {
   title: string;
   value: string;
   date: string;
-  categoryId: number | null;
+  categoryId: string | null;
   accountId: string | null;
   paymentMethod: PaymentMethod | '';
   status: MovStatus;
@@ -64,16 +64,17 @@ interface MovForm {
   ],
   templateUrl: './movimentacoes.component.html',
 })
-export class MovimentacoesComponent {
+export class MovimentacoesComponent implements OnInit {
   private svc = inject(MovimentacoesService);
   private contasSvc = inject(ContasService);
+  private categoriasSvc = inject(CategoriasService);
   private toast = inject(ToastService);
 
   // ── UI state ──────────────────────────────────────────────────────────
   protected creating = signal(false);
   protected editing = signal<Movement | null>(null);
   protected details = signal<Movement | null>(null);
-  protected duplicate = signal<Movement | null>(null);
+  protected duplicate = signal<boolean>(false);
   protected pendingForm = signal<MovForm | null>(null);
 
   // ── Filters ───────────────────────────────────────────────────────────
@@ -99,8 +100,15 @@ export class MovimentacoesComponent {
 
   // ── Data ──────────────────────────────────────────────────────────────
   protected movements = this.svc.movements;
+  protected loading = this.svc.loading;
   protected accounts = computed(() => this.contasSvc.accounts().filter((a) => a.active));
-  protected categories = MOV_CATEGORIES;
+  // Só categorias ativas do mesmo tipo (receita/despesa) da movimentação — o
+  // servidor rejeita a combinação direction×category.type divergente.
+  protected categories = computed(() =>
+    this.categoriasSvc
+      .categories()
+      .filter((c) => c.active && c.type === this.form().type),
+  );
   protected paymentMethods = PAYMENT_METHODS;
   protected statusMeta = STATUS_META;
   protected fmtBRL = formatBRL;
@@ -169,6 +177,14 @@ export class MovimentacoesComponent {
       .reduce((s, m) => s + (m.type === 'income' ? m.value : -m.value), 0),
   );
 
+  ngOnInit(): void {
+    this.svc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
+    this.categoriasSvc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
+    // Contas não é injetada só pra leitura aqui — sem isso, abrir Movimentações
+    // direto (sem passar por Contas antes) deixa o dropdown de conta vazio.
+    this.contasSvc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
+  }
+
   private resolvedFrom(): string {
     if (this.period() === 'today') return isoToday();
     if (this.period() === '7d') return isoAgo(7);
@@ -205,11 +221,18 @@ export class MovimentacoesComponent {
 
   get formValid(): boolean {
     const f = this.form();
-    return !!f.title.trim() && (parseFloat(f.value) || 0) > 0 && !!f.date && !!f.accountId;
+    return (
+      !!f.title.trim() &&
+      (parseFloat(f.value) || 0) > 0 &&
+      !!f.date &&
+      !!f.accountId &&
+      !!f.categoryId &&
+      !!f.paymentMethod
+    );
   }
 
-  categoryName(id: number | null): string {
-    return MOV_CATEGORIES.find((c) => c.id === id)?.name ?? '—';
+  categoryName(id: string | null): string {
+    return this.categoriasSvc.categories().find((c) => c.id === id)?.name ?? '—';
   }
   accountName(id: string | null): string {
     return this.contasSvc.accounts().find((a) => a.id === id)?.name ?? '—';
@@ -224,8 +247,19 @@ export class MovimentacoesComponent {
     this.form.update((f) => {
       const valid: MovStatus[] =
         type === 'income' ? ['received', 'pending', 'cancelled'] : ['paid', 'pending', 'cancelled'];
-      return { ...f, type, status: valid.includes(f.status) ? f.status : 'pending' };
+      return {
+        ...f,
+        type,
+        status: valid.includes(f.status) ? f.status : 'pending',
+        // categoria trocou de universo (receita/despesa) — evita mandar um id incompatível.
+        categoryId: null,
+      };
     });
+  }
+
+  private errMsg(err: unknown): string {
+    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
+    return data?.message ?? 'Não foi possível concluir a operação. Tente novamente.';
   }
 
   // ── CRUD ──────────────────────────────────────────────────────────────
@@ -262,84 +296,70 @@ export class MovimentacoesComponent {
   closeModal(): void {
     this.creating.set(false);
     this.editing.set(null);
-    this.duplicate.set(null);
+    this.duplicate.set(false);
     this.pendingForm.set(null);
   }
 
-  checkDuplicate(f: MovForm): Movement | null {
-    const val = parseFloat(f.value) || 0;
-    return (
-      this.movements().find(
-        (m) =>
-          m.date === f.date &&
-          Math.abs(m.value - val) < 0.01 &&
-          m.title.trim().toLowerCase() === f.title.trim().toLowerCase(),
-      ) ?? null
-    );
-  }
-
-  save(force = false): void {
+  async save(force = false): Promise<void> {
     if (!this.formValid) return;
     const f = this.form();
-    const now = new Date().toISOString();
     const e = this.editing();
 
-    if (!e && !force) {
-      const dup = this.checkDuplicate(f);
-      if (dup) {
-        this.duplicate.set(dup);
+    try {
+      if (e) {
+        await this.svc.update(e.id, {
+          title: f.title.trim(),
+          value: parseFloat(f.value) || 0,
+          date: f.date,
+          categoryId: f.categoryId!,
+          accountId: f.accountId!,
+          paymentMethod: f.paymentMethod as PaymentMethod,
+          notes: f.notes || null,
+        });
+        this.toast.success('Movimentação atualizada.');
+        this.editing.set(null);
+      } else {
+        await this.svc.register(
+          {
+            type: f.type,
+            title: f.title.trim(),
+            value: parseFloat(f.value) || 0,
+            date: f.date,
+            categoryId: f.categoryId!,
+            accountId: f.accountId!,
+            paymentMethod: f.paymentMethod as PaymentMethod,
+            status: f.status,
+            notes: f.notes || null,
+          },
+          force,
+        );
+        this.toast.success('Movimentação criada com sucesso.');
+        this.creating.set(false);
+      }
+      this.duplicate.set(false);
+      this.pendingForm.set(null);
+    } catch (err) {
+      if (err instanceof DuplicateMovementError) {
+        this.duplicate.set(true);
         this.pendingForm.set(f);
         return;
       }
+      this.toast.error(this.errMsg(err));
     }
-
-    if (e) {
-      const updated: Movement = {
-        ...e,
-        ...f,
-        value: parseFloat(f.value) || 0,
-        paymentMethod: f.paymentMethod || null,
-        notes: f.notes || null,
-        updatedAt: now,
-        updatedBy: CURRENT_USER,
-      };
-      this.svc.movements.update((all) => all.map((x) => (x.id === e.id ? updated : x)));
-      this.toast.success('Movimentação atualizada.');
-      this.editing.set(null);
-    } else {
-      const id = Math.max(0, ...this.movements().map((m) => m.id)) + 1;
-      const created: Movement = {
-        id,
-        ...f,
-        value: parseFloat(f.value) || 0,
-        paymentMethod: f.paymentMethod || null,
-        notes: f.notes || null,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: CURRENT_USER,
-        updatedBy: CURRENT_USER,
-      };
-      this.svc.movements.update((all) => [created, ...all]);
-      this.toast.success('Movimentação criada com sucesso.');
-      this.creating.set(false);
-    }
-    this.duplicate.set(null);
-    this.pendingForm.set(null);
   }
 
-  saveForced(): void {
-    this.save(true);
+  async saveForced(): Promise<void> {
+    await this.save(true);
   }
 
-  changeStatus(m: Movement, status: MovStatus): void {
-    const now = new Date().toISOString();
-    this.svc.movements.update((all) =>
-      all.map((x) =>
-        x.id === m.id ? { ...x, status, updatedAt: now, updatedBy: CURRENT_USER } : x,
-      ),
-    );
-    if (this.details()?.id === m.id) this.details.update((d) => (d ? { ...d, status } : d));
-    this.toast.info(`Status alterado para "${STATUS_META[status].label}".`);
+  async changeStatus(m: Movement, status: MovStatus): Promise<void> {
+    try {
+      await this.svc.changeStatus(m.id, status);
+      if (this.details()?.id === m.id) this.details.update((d) => (d ? { ...d, status } : d));
+      this.toast.info(`Status alterado para "${STATUS_META[status].label}".`);
+    } catch (err) {
+      this.toast.error(this.errMsg(err));
+    }
   }
 
   statusActions(m: Movement): { label: string; status: MovStatus; icon: string }[] {
