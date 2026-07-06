@@ -79,6 +79,26 @@ function toISO(value: unknown): string {
   return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
+/**
+ * Ícone por ação de histórico. As ações reais gravadas pelo servidor (use cases
+ * de setDefault/inactivate) são tokens em kebab-case ('set-default',
+ * 'unset-default', 'inactivate') — não os rótulos em PT do mock antigo. Mapeia
+ * por palavra-chave pra também cobrir eventuais ações futuras/rótulos em PT.
+ */
+function actionIcon(action: string): string {
+  const a = action.toLowerCase();
+  if (a === 'set-default' || a.includes('padrão') || (a.includes('default') && !a.includes('unset')))
+    return 'star';
+  if (a === 'unset-default' || a.includes('removida como padrão')) return 'star_border';
+  if (a.includes('inactivate') || a.includes('inativa')) return 'pause_circle';
+  if (a.includes('reactivate') || a.includes('reativa') || a.includes('activate')) return 'play_circle';
+  if (a.includes('fee') || a.includes('taxa') || a.includes('percent')) return 'percent';
+  if (a.includes('settlement') || a.includes('prazo')) return 'schedule';
+  if (a.includes('name') || a.includes('nome')) return 'edit';
+  if (a.includes('create') || a.includes('criada')) return 'add_circle';
+  return 'history';
+}
+
 /** Converte a entity da lib (FinancialAccount) para o shape que a tela usa. */
 function toAccount(raw: FinancialAccount): Account {
   const audit = raw.audit as unknown as {
@@ -117,7 +137,7 @@ function toAccount(raw: FinancialAccount): Account {
         by: h.by,
         action: h.action,
         detail: h.detail,
-        icon: 'history',
+        icon: actionIcon(h.action),
       })),
   };
 }
@@ -125,7 +145,6 @@ function toAccount(raw: FinancialAccount): Account {
 export interface CreateAccountInput {
   name: string;
   type: AccType;
-  isDefault: boolean;
   taxPct?: number;
   settlementDays?: number;
 }
@@ -185,7 +204,13 @@ export class ContasService {
     }
   }
 
-  async create(input: CreateAccountInput): Promise<void> {
+  /**
+   * Cria a conta sempre como não-padrão: isDefault só pode mudar via setDefault
+   * (rota transacional, índice único parcial {restaurantId} where isDefault:true).
+   * Quem chama decide se promove a conta recém-criada a padrão (via setDefault),
+   * usando o id retornado aqui.
+   */
+  async create(input: CreateAccountInput): Promise<string> {
     const now = new Date();
     const isPlatform = input.type === 'Financial Platform';
     const body = {
@@ -195,16 +220,22 @@ export class ContasService {
       name: input.name,
       type: TYPE_TO_LIB[input.type],
       status: RecordStatus.Active,
-      isDefault: input.isDefault,
-      availableBalance: 0,
-      predictedBalance: 0,
+      isDefault: false,
+      // availableBalance/predictedBalance ficam de fora: o repositório já default
+      // pra 0 no insert quando ausentes.
       ...(isPlatform
         ? { feePercent: input.taxPct ?? 0, settlementDays: input.settlementDays ?? 0 }
         : {}),
+      // audit ainda é obrigatório na validação atual do insert (financialAccountSchema
+      // completo, sem schema dedicado de criação) — testado ao vivo: sem isso dá
+      // VALIDATION_ERROR. PENDÊNCIA: mover esse fill pro servidor quando a API
+      // ganhar um schema de insert que não exija audit do client.
       audit: { createdAt: now, updatedAt: now },
     } as unknown as FinancialAccount;
-    await this.call((headers) => this.accountClient.insert(body, headers));
+    const response = await this.call((headers) => this.accountClient.insert(body, headers));
+    const id = (response.payload?._id ?? response.payload?.id) as string;
     await this.refresh();
+    return id;
   }
 
   async update(id: string, input: UpdateAccountInput): Promise<void> {
