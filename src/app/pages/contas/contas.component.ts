@@ -254,19 +254,43 @@ export class ContasComponent implements OnInit {
       await apply();
     } else {
       try {
-        await this.svc.create({
+        const id = await this.svc.create({
           name: f.name.trim(),
           type: f.type,
-          isDefault: f.isDefault,
           taxPct: this.isPlatform ? Number(f.taxPct) || 0 : undefined,
           settlementDays: this.isPlatform ? Number(f.settlementDays) || 0 : undefined,
         });
         this.toast.success('Conta criada com sucesso.');
         this.creating.set(false);
+        // isDefault nunca vai no insert (índice único parcial); se o usuário marcou
+        // "Conta padrão", promovemos a conta recém-criada num 2º passo, com a mesma
+        // confirmação de troca usada na edição quando já existe uma padrão.
+        if (f.isDefault) {
+          await this.promoteToDefault(id, f.name.trim());
+        }
       } catch (err) {
         this.toast.error(this.errMsg(err));
       }
     }
+  }
+
+  private async promoteToDefault(id: string, name: string): Promise<void> {
+    const created = this.accounts().find((a) => a.id === id);
+    const currentDefault = this.accounts().find((a) => a.isDefault && a.id !== id) ?? null;
+    const promote = async () => {
+      try {
+        await this.svc.setDefault(id);
+        this.toast.info(`${name} agora é a conta padrão.`);
+      } catch (err) {
+        this.toast.error(this.errMsg(err));
+      }
+    };
+    if (currentDefault && created) {
+      this.confirmDefault.set({ next: created, prev: currentDefault });
+      this.pendingApply = promote;
+      return;
+    }
+    await promote();
   }
 
   /** Aplica edições de campo, e então (se preciso) inativação/definição de padrão. */
