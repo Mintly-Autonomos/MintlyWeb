@@ -61,7 +61,7 @@ import { AuthService } from '../../services/auth.service';
           </button>
         </app-form-field>
 
-        <div class="flex items-center justify-between pt-1">
+        <div class="flex items-center justify-between">
           <label class="flex items-center gap-2 cursor-pointer select-none">
             <input
               type="checkbox"
