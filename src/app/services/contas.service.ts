@@ -215,27 +215,20 @@ export class ContasService {
    * Quem chama decide se promove a conta recém-criada a padrão (via setDefault),
    * usando o id retornado aqui.
    */
+  /**
+   * restaurantId/isDefault/availableBalance/predictedBalance/audit ficam de fora:
+   * o financialAccountInsertSchema (mintly-lib 2.7.0-preview) os tornou opcionais
+   * — o servidor preenche audit e força restaurantId/isDefault/saldos.
+   */
   async create(input: CreateAccountInput): Promise<string> {
-    const now = new Date();
     const isPlatform = input.type === 'Financial Platform';
     const body = {
-      // restaurantId é reforçado pelo servidor a partir do token; enviamos o valor
-      // conhecido localmente só para satisfazer a validação do schema.
-      restaurantId: this.auth.currentUser()?.restaurantId ?? '',
       name: input.name,
       type: TYPE_TO_LIB[input.type],
       status: RecordStatus.Active,
-      isDefault: false,
-      // availableBalance/predictedBalance ficam de fora: o repositório já default
-      // pra 0 no insert quando ausentes.
       ...(isPlatform
         ? { feePercent: input.taxPct ?? 0, settlementDays: input.settlementDays ?? 0 }
         : {}),
-      // audit ainda é obrigatório na validação atual do insert (financialAccountSchema
-      // completo, sem schema dedicado de criação) — testado ao vivo: sem isso dá
-      // VALIDATION_ERROR. PENDÊNCIA: mover esse fill pro servidor quando a API
-      // ganhar um schema de insert que não exija audit do client.
-      audit: { createdAt: now, updatedAt: now },
     } as unknown as FinancialAccount;
     const response = await this.call((headers) => this.accountClient.insert(body, headers));
     const id = (response.payload?._id ?? response.payload?.id) as string;

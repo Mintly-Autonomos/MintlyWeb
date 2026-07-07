@@ -27,7 +27,7 @@
     "@angular/material": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
-    "mintly-lib": "^2.6.0-preview",
+    "mintly-lib": "^2.7.0-preview",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

@@ -295,13 +295,13 @@
             (change)="
               setFormField(
                 'categoryId',
-                $any($event.target).value ? +$any($event.target).value : null
+                $any($event.target).value ? $any($event.target).value : null
               )
             "
             class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition cursor-pointer"
           >
-            <option value="">Sem categoria</option>
-            @for (c of categories; track c.id) {
+            <option value="">Selecione…</option>
+            @for (c of categories(); track c.id) {
               <option [value]="c.id">{{ c.name }}</option>
             }
           </select>
@@ -316,7 +316,7 @@
           (change)="setFormField('paymentMethod', $any($event.target).value)"
           class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition cursor-pointer"
         >
-          <option value="">Não informado</option>
+          <option value="">Selecione…</option>
           @for (pm of paymentMethods; track pm) {
             <option [value]="pm">{{ pm }}</option>
           }
@@ -381,17 +381,17 @@
 }
 
 <!-- ─── Duplicate warning modal ─── -->
-@if (duplicate()) {
+@if (duplicate() && pendingForm(); as pf) {
   <app-modal
     title="Possível duplicata detectada"
-    subtitle="Existe uma movimentação com dados semelhantes."
+    subtitle="Já existe uma movimentação parecida nos últimos 2 minutos (mesma conta, título, valor e data)."
     (closed)="closeModal()"
   >
     <div class="space-y-4 text-[13px]">
       <div class="p-4 rounded-xl border border-warning/40 bg-warning/10 space-y-1">
-        <div class="font-semibold">{{ duplicate()!.title }}</div>
+        <div class="font-semibold">{{ pf.title }}</div>
         <div class="text-muted-foreground">
-          {{ fmtShort(duplicate()!.date) }} · {{ fmtBRL(duplicate()!.value) }}
+          {{ fmtShort(pf.date) }} · {{ fmtBRL(parseFloat(pf.value) || 0) }}
         </div>
       </div>
       <p class="text-muted-foreground">Deseja registrar mesmo assim ou cancelar?</p>
