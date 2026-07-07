@@ -14,6 +14,7 @@ import { IconComponent } from './icon.component';
 @Component({
   selector: 'app-form-field',
   standalone: true,
+  host: { class: 'block' },
   imports: [IconComponent],
   template: `
     <!-- eslint-disable-next-line @angular-eslint/template/label-has-associated-control -->
