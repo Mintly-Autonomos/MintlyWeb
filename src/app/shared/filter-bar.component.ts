@@ -9,6 +9,7 @@ export interface FilterOption<T = string> {
 @Component({
   selector: 'app-filter-bar',
   standalone: true,
+  host: { class: 'block' },
   imports: [IconComponent],
   template: `
     <div class="space-y-2">
