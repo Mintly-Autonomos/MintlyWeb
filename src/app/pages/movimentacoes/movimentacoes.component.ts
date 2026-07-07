@@ -105,9 +105,7 @@ export class MovimentacoesComponent implements OnInit {
   // Só categorias ativas do mesmo tipo (receita/despesa) da movimentação — o
   // servidor rejeita a combinação direction×category.type divergente.
   protected categories = computed(() =>
-    this.categoriasSvc
-      .categories()
-      .filter((c) => c.active && c.type === this.form().type),
+    this.categoriasSvc.categories().filter((c) => c.active && c.type === this.form().type),
   );
   protected paymentMethods = PAYMENT_METHODS;
   protected statusMeta = STATUS_META;

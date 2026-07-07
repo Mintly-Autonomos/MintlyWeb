@@ -199,9 +199,7 @@ export class CategoriasService {
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.type !== undefined ? { type: TYPE_TO_LIB[input.type] } : {}),
       ...(input.behavior !== undefined ? { behavior: BEHAVIOR_TO_LIB[input.behavior] } : {}),
-      ...(input.nature !== undefined
-        ? { operationalNature: NATURE_TO_LIB[input.nature] }
-        : {}),
+      ...(input.nature !== undefined ? { operationalNature: NATURE_TO_LIB[input.nature] } : {}),
     };
     await this.call((headers) => this.categoryClient.update(id, patch, headers));
     await this.refresh();
