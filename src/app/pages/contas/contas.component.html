@@ -186,6 +186,28 @@
     (closed)="closeModal()"
   >
     <div class="space-y-5">
+      <!-- Name -->
+      <label class="block">
+        <span class="text-[13px] font-medium block mb-1.5">Nome da conta</span>
+        <input
+          [value]="form().name"
+          (input)="setFormName($any($event.target).value)"
+          type="text"
+          placeholder="Ex.: Itaú PJ — Principal"
+          [class]="
+            'w-full h-12 rounded-xl border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground ' +
+            (nameError ? 'border-error' : 'border-border')
+          "
+        />
+        @if (nameError) {
+          <p class="text-error text-[12px] mt-1">{{ nameError }}</p>
+        } @else {
+          <p class="text-[12px] text-muted-foreground mt-1">
+            Como você quer chamar essa conta no seu dia a dia.
+          </p>
+        }
+      </label>
+
       <!-- Type selector -->
       @if (!editing()) {
         <div>
@@ -215,32 +237,17 @@
               </button>
             }
           </div>
+          <p class="text-[12px] text-muted-foreground mt-2">
+            A Mintly ajusta os campos conforme o tipo escolhido.
+          </p>
         </div>
       }
-
-      <!-- Name -->
-      <label class="block">
-        <span class="text-[13px] font-medium block mb-1.5">Nome da conta</span>
-        <input
-          [value]="form().name"
-          (input)="setFormName($any($event.target).value)"
-          type="text"
-          placeholder="Ex.: Itaú PJ, Caixa Principal…"
-          [class]="
-            'w-full h-12 rounded-xl border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground ' +
-            (nameError ? 'border-error' : 'border-border')
-          "
-        />
-        @if (nameError) {
-          <p class="text-error text-[12px] mt-1">{{ nameError }}</p>
-        }
-      </label>
 
       <!-- Platform fields -->
       @if (isPlatform) {
         <div class="grid grid-cols-2 gap-3">
           <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Taxa (%)</span>
+            <span class="text-[13px] font-medium block mb-1.5">Taxa cobrada (%)</span>
             <input
               [value]="form().taxPct"
               (input)="setFormTaxPct($any($event.target).value)"
@@ -251,6 +258,9 @@
               placeholder="Ex.: 12.5"
               class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
             />
+            <p class="text-[12px] text-muted-foreground mt-1">
+              Quanto a plataforma cobra por venda.
+            </p>
           </label>
           <label class="block">
             <span class="text-[13px] font-medium block mb-1.5">Prazo de repasse (dias)</span>
@@ -263,6 +273,9 @@
               placeholder="Ex.: 2"
               class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
             />
+            <p class="text-[12px] text-muted-foreground mt-1">
+              Em quantos dias o valor cai na conta.
+            </p>
           </label>
         </div>
       }
@@ -273,7 +286,7 @@
           <div>
             <div class="text-[13px] font-medium">Conta padrão</div>
             <div class="text-[12px] text-muted-foreground">
-              Usada automaticamente em novas movimentações
+              Pré-selecionada ao registrar entradas e saídas.
             </div>
           </div>
           <app-toggle
@@ -282,25 +295,23 @@
             (changed)="setFormDefault($event)"
           />
         </div>
-        @if (editing()?.active) {
-          <div class="flex items-center justify-between py-3 border-t border-border">
-            <div>
-              <div class="text-[13px] font-medium">Conta ativa</div>
-              @if (deactivateReason) {
-                <div class="text-[12px] text-error">{{ deactivateReason }}</div>
-              } @else {
-                <div class="text-[12px] text-muted-foreground">
-                  Desative para ocultar em novas movimentações
-                </div>
-              }
-            </div>
-            <app-toggle
-              [checked]="form().active"
-              [disabled]="!!deactivateReason"
-              (changed)="setFormActive($event)"
-            />
+        <div class="flex items-center justify-between py-3 border-t border-border">
+          <div>
+            <div class="text-[13px] font-medium">Conta ativa</div>
+            @if (deactivateReason) {
+              <div class="text-[12px] text-error">{{ deactivateReason }}</div>
+            } @else {
+              <div class="text-[12px] text-muted-foreground">
+                Contas inativas aparecem no fundo da lista, com menos destaque.
+              </div>
+            }
           </div>
-        }
+          <app-toggle
+            [checked]="form().active"
+            [disabled]="!!deactivateReason"
+            (changed)="setFormActive($event)"
+          />
+        </div>
       </div>
     </div>
 
@@ -424,19 +435,82 @@
 <!-- ─── Confirm default swap modal ─── -->
 @if (confirmDefault()) {
   <app-modal
-    title="Alterar conta padrão"
-    subtitle="Confirme a troca da conta padrão do sistema."
+    title="Trocar conta padrão?"
+    subtitle="A conta padrão é pré-selecionada ao registrar entradas e saídas."
     (closed)="confirmDefault.set(null)"
   >
-    <div class="space-y-3 text-[13px]">
-      <p>
-        A conta <strong>{{ confirmDefault()!.prev?.name }}</strong> deixará de ser padrão e a conta
-        <strong>{{ confirmDefault()!.next.name }}</strong> passará a ser a padrão para novas
-        movimentações.
-      </p>
-      <div class="p-3 rounded-xl bg-ocean-soft border border-ocean/20 text-muted-foreground">
-        Esta alteração afeta somente novas movimentações. Movimentações existentes não são
-        alteradas.
+    <div class="space-y-4 text-[13px]">
+      <div class="flex items-start gap-2.5 p-3 rounded-xl bg-ocean-soft border border-ocean/20">
+        <app-icon
+          name="info"
+          [style]="{ fontSize: '18px' }"
+          className="text-ocean shrink-0 mt-0.5"
+        />
+        <p class="text-muted-foreground">
+          @if (confirmDefault()!.prev) {
+            Ao confirmar, <strong class="text-foreground">{{ confirmDefault()!.next.name }}</strong>
+            passará a ser a nova conta padrão e
+            <strong class="text-foreground">{{ confirmDefault()!.prev!.name }}</strong> perderá
+            automaticamente esse status.
+          } @else {
+            Ao confirmar, <strong class="text-foreground">{{ confirmDefault()!.next.name }}</strong>
+            passará a ser a conta padrão do sistema.
+          }
+        </p>
+      </div>
+
+      <div [class]="confirmDefault()!.prev ? 'grid grid-cols-2 gap-3' : ''">
+        @if (confirmDefault()!.prev; as prev) {
+          <div>
+            <div
+              class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5"
+            >
+              Perde o status
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-xl border border-border bg-card">
+              <div
+                [class]="
+                  'h-9 w-9 rounded-xl grid place-items-center shrink-0 ' + typeMeta[prev.type].bg
+                "
+              >
+                <app-icon
+                  [name]="typeMeta[prev.type].icon"
+                  [style]="{ fontSize: '18px' }"
+                  [className]="typeMeta[prev.type].color"
+                />
+              </div>
+              <div class="min-w-0">
+                <div class="text-[13px] font-medium truncate">{{ prev.name }}</div>
+                <div class="text-[12px] text-muted-foreground">{{ typeMeta[prev.type].label }}</div>
+              </div>
+            </div>
+          </div>
+        }
+        <div>
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-mint mb-1.5">
+            Nova padrão
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-xl border border-mint bg-mint-soft">
+            <div
+              [class]="
+                'h-9 w-9 rounded-xl grid place-items-center shrink-0 ' +
+                typeMeta[confirmDefault()!.next.type].bg
+              "
+            >
+              <app-icon
+                [name]="typeMeta[confirmDefault()!.next.type].icon"
+                [style]="{ fontSize: '18px' }"
+                [className]="typeMeta[confirmDefault()!.next.type].color"
+              />
+            </div>
+            <div class="min-w-0">
+              <div class="text-[13px] font-medium truncate">{{ confirmDefault()!.next.name }}</div>
+              <div class="text-[12px] text-muted-foreground">
+                {{ typeMeta[confirmDefault()!.next.type].label }}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <ng-container ngProjectAs="[slot=footer]">
@@ -451,9 +525,10 @@
         <button
           type="button"
           (click)="applyDefault()"
-          class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 cursor-pointer"
+          class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 transition flex items-center gap-2 cursor-pointer"
         >
-          Confirmar troca
+          <app-icon name="check" [style]="{ fontSize: '18px' }" />
+          <span>Confirmar troca</span>
         </button>
       </div>
     </ng-container>
