@@ -244,6 +244,10 @@ export class ContasComponent implements OnInit {
         }
       };
       if (becomingDefault && currentDefault) {
+        // Fecha o modal de edição antes de abrir a confirmação de troca — os dois
+        // não devem ficar abertos ao mesmo tempo (mesmo padrão do fluxo de criação,
+        // que já fecha "Nova conta" antes de mostrar "Trocar conta padrão?").
+        this.editing.set(null);
         this.confirmDefault.set({
           next: { ...e, ...f } as unknown as Account,
           prev: currentDefault,
