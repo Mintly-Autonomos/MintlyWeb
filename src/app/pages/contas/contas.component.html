@@ -178,9 +178,9 @@
 <!-- ─── Account Modal (create / edit) ─── -->
 @if (creating() || editing()) {
   <app-modal
-    [title]="editing() ? 'Editar conta' : 'Nova conta'"
+    [title]="editing() ? 'Editar conta' : 'Nova conta financeira'"
     [subtitle]="
-      editing() ? 'Atualize os dados da conta.' : 'Preencha os dados para criar uma nova conta.'
+      editing() ? 'Atualize os dados da conta.' : 'Onde o dinheiro da sua conta entra ou sai.'
     "
     size="lg"
     (closed)="closeModal()"
