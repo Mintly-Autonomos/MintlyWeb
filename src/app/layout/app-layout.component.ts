@@ -81,24 +81,6 @@ const NAV = [
             <p class="text-[13px] text-muted-foreground truncate">{{ pageSub }}</p>
           </div>
           <div class="ml-auto flex items-center gap-2">
-            <div
-              class="hidden lg:flex items-center gap-2 h-10 px-3 rounded-full border border-border bg-card w-[280px]"
-            >
-              <app-icon
-                name="search"
-                className="text-muted-foreground"
-                [style]="{ fontSize: '18px' }"
-              />
-              <input
-                placeholder="Buscar movimentação, conta…"
-                aria-label="Buscar movimentação ou conta"
-                class="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground"
-              />
-              <kbd
-                class="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5"
-                >⌘K</kbd
-              >
-            </div>
             <button
               (click)="theme.toggleTheme()"
               class="h-10 w-10 rounded-full border border-border grid place-items-center hover:bg-muted cursor-pointer"
