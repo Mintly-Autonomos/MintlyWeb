@@ -183,6 +183,14 @@ export class MovimentacoesComponent implements OnInit {
     this.contasSvc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
   }
 
+  clearFilters(): void {
+    this.typeFilter.set('all');
+    this.statusFilter.set('all');
+    this.period.set('all');
+    this.dateFrom.set('');
+    this.dateTo.set('');
+  }
+
   private resolvedFrom(): string {
     if (this.period() === 'today') return isoToday();
     if (this.period() === '7d') return isoAgo(7);
