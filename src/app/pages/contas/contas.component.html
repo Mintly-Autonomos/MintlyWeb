@@ -48,6 +48,7 @@
     [query]="query()"
     (queryChange)="query.set($event)"
     [activeCount]="activeFilters()"
+    (clearAll)="clearFilters()"
   >
     <app-filter-select
       label="Tipo"

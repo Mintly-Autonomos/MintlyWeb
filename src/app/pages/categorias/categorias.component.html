@@ -63,8 +63,32 @@
     </button>
   </div>
 
-  <!-- Search -->
-  <app-filter-bar [query]="query()" (queryChange)="query.set($event)" [activeCount]="0" />
+  <!-- Filter bar -->
+  <app-filter-bar
+    [query]="query()"
+    (queryChange)="query.set($event)"
+    [activeCount]="activeFilters()"
+    (clearAll)="clearFilters()"
+  >
+    <app-filter-select
+      label="Comportamento"
+      [value]="behaviorFilter()"
+      [options]="behaviorOpts"
+      (valueChange)="behaviorFilter.set($any($event))"
+    />
+    <app-filter-select
+      label="Natureza"
+      [value]="natureFilter()"
+      [options]="natureOpts"
+      (valueChange)="natureFilter.set($any($event))"
+    />
+    <app-filter-select
+      label="Status"
+      [value]="statusFilter()"
+      [options]="statusOpts"
+      (valueChange)="statusFilter.set($any($event))"
+    />
+  </app-filter-bar>
 
   <!-- Table -->
   @if (filtered().length === 0) {
