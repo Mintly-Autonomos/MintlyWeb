@@ -10,6 +10,8 @@ export interface AuthUser {
   empresa?: string;
   /** Necessário para montar payloads de criação (a API reforça o valor real no servidor). */
   restaurantId?: string;
+  /** Ver TODO(débito técnico) em `saveAvatar` — hoje é só um cache local, não vem do servidor. */
+  avatarDataUrl?: string;
 }
 
 const REMEMBER_KEY = 'mintly-remember';
@@ -18,6 +20,7 @@ const KEYS = {
   refresh: 'mintly-refresh-token',
   user: 'mintly-user',
 } as const;
+const AVATAR_KEY_PREFIX = 'mintly-avatar:';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -162,10 +165,46 @@ export class AuthService {
   private persistTokens(accessToken: string, refreshToken: string | null, user: AuthUser): void {
     this._accessToken.set(accessToken);
     this._refreshToken.set(refreshToken);
-    this._user.set(user);
+    const avatarDataUrl = this.getAvatar(user.email) ?? undefined;
+    const fullUser: AuthUser = avatarDataUrl ? { ...user, avatarDataUrl } : user;
+    this._user.set(fullUser);
     this.write(KEYS.access, accessToken);
     if (refreshToken) this.write(KEYS.refresh, refreshToken);
-    this.write(KEYS.user, JSON.stringify(user));
+    this.write(KEYS.user, JSON.stringify(fullUser));
+  }
+
+  /**
+   * TODO(débito técnico) — avatar de perfil:
+   * Não existe suporte a foto de perfil no back nem na modelagem (Person, no Mongo) ainda. Falta:
+   *   1) Campo pra guardar a imagem no Person (Mongo aceita base64 direto no documento pra
+   *      imagens pequenas — o front já limita a 1MB — ou um bucket/GridFS se preferir separar
+   *      do documento principal);
+   *   2) Endpoint de upload (recebe a imagem no cadastro e, futuramente, em outras telas);
+   *   3) Endpoint pra buscar a imagem do usuário pelo username/e-mail (algo como
+   *      GET /pessoas/:username/avatar);
+   *   4) A resposta de LOGIN passar a devolver essa imagem junto — hoje `AuthUser` não recebe
+   *      nada do servidor pra isso, e sem isso o front precisaria de uma chamada extra só
+   *      pra popular o ícone.
+   * Por ora: o front captura, valida (≤1MB, tipo imagem) e guarda em cache local por e-mail —
+   * só pra provar o fluxo de ponta a ponta. Troca este método por uma chamada real de upload
+   * (item 2) assim que o endpoint existir, e `getAvatar` por uma leitura do servidor (item 3).
+   */
+  saveAvatar(email: string, dataUrl: string): void {
+    const key = AVATAR_KEY_PREFIX + email.trim().toLowerCase();
+    try {
+      localStorage.setItem(key, dataUrl);
+    } catch {
+      // Cache best-effort (ex.: localStorage cheio) — não deve travar o cadastro por isso.
+    }
+    this._user.update((u) => (u && u.email === email ? { ...u, avatarDataUrl: dataUrl } : u));
+  }
+
+  private getAvatar(email: string): string | null {
+    try {
+      return localStorage.getItem(AVATAR_KEY_PREFIX + email.trim().toLowerCase());
+    } catch {
+      return null;
+    }
   }
 
   clearSession(): void {
