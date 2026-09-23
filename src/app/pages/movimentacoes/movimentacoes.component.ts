@@ -1,5 +1,6 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Workbook } from 'exceljs';
 import {
   MovimentacoesService,
   Movement,
@@ -9,6 +10,8 @@ import {
   PAYMENT_METHODS,
   STATUS_META,
   DuplicateMovementError,
+  ImportMovementItem,
+  ImportMovementsResult,
 } from '../../services/movimentacoes.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -36,6 +39,24 @@ function isoAgo(days: number): string {
 type Period = 'all' | 'today' | '7d' | '30d' | 'custom';
 
 const FEE_RATES: Record<string, number> = { iFood: 12, Rappi: 15 };
+
+/** Linha da prévia de importação, editável na tela antes de confirmar. */
+interface EditableImportRow {
+  row: number;
+  type: MovType;
+  title: string;
+  value: number;
+  date: string;
+  categoryName: string;
+  accountName: string;
+  paymentMethod: PaymentMethod | null;
+  status: MovStatus;
+  notes: string | null;
+  /** Se vai ser gravada ao confirmar — só pode ser true quando `valid` também é. */
+  included: boolean;
+  valid: boolean;
+  error: string | null;
+}
 
 interface MovForm {
   type: MovType;
@@ -76,6 +97,42 @@ export class MovimentacoesComponent implements OnInit {
   protected details = signal<Movement | null>(null);
   protected duplicate = signal<boolean>(false);
   protected pendingForm = signal<MovForm | null>(null);
+
+  // ── Importação em massa ──────────────────────────────────────────────
+  protected importMode = signal(false);
+  protected importFile = signal<File | null>(null);
+  protected importDragOver = signal(false);
+  protected importing = signal(false);
+  protected importPreviewOpen = signal(false);
+  protected importFileName = signal('');
+  protected importRows = signal<EditableImportRow[]>([]);
+  protected importConfirmWarningOpen = signal(false);
+  protected confirmingImport = signal(false);
+  protected importResult = signal<ImportMovementsResult | null>(null);
+
+  protected importTypeOpts: { value: MovType; label: string }[] = [
+    { value: 'income', label: 'Receita' },
+    { value: 'expense', label: 'Despesa' },
+  ];
+  protected importStatusOpts: { value: MovStatus; label: string }[] = [
+    { value: 'received', label: 'Recebido' },
+    { value: 'paid', label: 'Pago' },
+    { value: 'pending', label: 'Pendente' },
+    { value: 'cancelled', label: 'Cancelado' },
+  ];
+
+  protected allActiveCategories = computed(() =>
+    this.categoriasSvc.categories().filter((c) => c.active),
+  );
+
+  protected importValidCount = computed(() => this.importRows().filter((r) => r.valid).length);
+  protected importIncludedCount = computed(
+    () => this.importRows().filter((r) => r.included && r.valid).length,
+  );
+  protected importExcludedRows = computed(() =>
+    this.importRows().filter((r) => !r.included || !r.valid),
+  );
+  protected importExcludedCount = computed(() => this.importExcludedRows().length);
 
   // ── Filters ───────────────────────────────────────────────────────────
   protected query = signal('');
@@ -273,6 +330,8 @@ export class MovimentacoesComponent implements OnInit {
       status: 'pending',
       notes: '',
     });
+    this.importMode.set(false);
+    this.importFile.set(null);
     this.creating.set(true);
   }
 
@@ -296,6 +355,355 @@ export class MovimentacoesComponent implements OnInit {
     this.editing.set(null);
     this.duplicate.set(false);
     this.pendingForm.set(null);
+    this.importMode.set(false);
+    this.importFile.set(null);
+    this.importDragOver.set(false);
+  }
+
+  // ── Importação em massa ──────────────────────────────────────────────
+
+  toggleImportMode(): void {
+    this.importMode.update((v) => !v);
+    this.importFile.set(null);
+  }
+
+  /**
+   * Gera e baixa um .xlsx real (com dropdowns nas colunas de seleção) a partir das contas,
+   * categorias e formas de pagamento que o restaurante já tem cadastradas — por isso é montado
+   * aqui no front: só o cliente tem essas listas carregadas na hora do download.
+   */
+  async downloadTemplate(): Promise<void> {
+    try {
+      const contas = this.contasSvc
+        .accounts()
+        .filter((a) => a.active)
+        .map((a) => a.name);
+      const incomeCategorias = this.categoriasSvc
+        .categories()
+        .filter((c) => c.active && c.type === 'income')
+        .map((c) => c.name);
+      const expenseCategorias = this.categoriasSvc
+        .categories()
+        .filter((c) => c.active && c.type === 'expense')
+        .map((c) => c.name);
+      const categorias = [...incomeCategorias, ...expenseCategorias];
+      const tipos = ['receita', 'despesa'];
+      const statusOpts = ['Recebido', 'Pago', 'Pendente', 'Cancelado'];
+      const formas = [...this.paymentMethods];
+
+      const workbook = new Workbook();
+
+      // Aba oculta só com as listas — serve de fonte pros dropdowns da aba principal.
+      const listsSheet = workbook.addWorksheet('Listas');
+      listsSheet.state = 'veryHidden';
+      const lists: { col: string; values: string[] }[] = [
+        { col: 'A', values: tipos },
+        { col: 'B', values: statusOpts },
+        { col: 'C', values: contas.length ? contas : ['(cadastre uma conta primeiro)'] },
+        {
+          col: 'D',
+          values: categorias.length ? categorias : ['(cadastre uma categoria primeiro)'],
+        },
+        { col: 'E', values: formas },
+      ];
+      for (const { col, values } of lists) {
+        values.forEach((v, i) => {
+          listsSheet.getCell(`${col}${i + 1}`).value = v;
+        });
+      }
+
+      const sheet = workbook.addWorksheet('Movimentações');
+      sheet.columns = [
+        { header: 'Tipo', key: 'tipo', width: 14 },
+        { header: 'Título', key: 'titulo', width: 28 },
+        { header: 'Valor', key: 'valor', width: 12 },
+        { header: 'Data (AAAA-MM-DD)', key: 'data', width: 18 },
+        { header: 'Categoria', key: 'categoria', width: 22 },
+        { header: 'Conta', key: 'conta', width: 22 },
+        { header: 'Forma de pagamento', key: 'formaPagamento', width: 20 },
+        { header: 'Status', key: 'status', width: 14 },
+        { header: 'Observações', key: 'observacoes', width: 30 },
+      ];
+      sheet.getRow(1).font = { bold: true };
+      sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9F7EF' } };
+
+      // Linhas de exemplo já preenchidas (com dados reais, quando existem) — dá pra
+      // baixar e reenviar direto pra testar a importação sem digitar nada.
+      const cycle = (arr: string[], i: number, fallback: string) =>
+        arr.length ? arr[i % arr.length] : fallback;
+      const exampleRows: {
+        tipo: string;
+        titulo: string;
+        valor: number;
+        categoria: string;
+        conta: string;
+        formaPagamento: string;
+        status: string;
+        observacoes: string;
+      }[] = [
+        {
+          tipo: 'receita',
+          titulo: 'Venda balcão',
+          valor: 184.5,
+          categoria: cycle(incomeCategorias, 0, '(cadastre uma categoria de receita)'),
+          conta: cycle(contas, 0, '(cadastre uma conta)'),
+          formaPagamento: cycle(formas, 0, ''),
+          status: 'Recebido',
+          observacoes: '',
+        },
+        {
+          tipo: 'receita',
+          titulo: 'Repasse iFood',
+          valor: 342.8,
+          categoria: cycle(incomeCategorias, 1, '(cadastre uma categoria de receita)'),
+          conta: cycle(contas, 1, '(cadastre uma conta)'),
+          formaPagamento: cycle(formas, 1, ''),
+          status: 'Pendente',
+          observacoes: '',
+        },
+        {
+          tipo: 'despesa',
+          titulo: 'Compra de insumos',
+          valor: 620,
+          categoria: cycle(expenseCategorias, 0, '(cadastre uma categoria de despesa)'),
+          conta: cycle(contas, 0, '(cadastre uma conta)'),
+          formaPagamento: cycle(formas, 2, ''),
+          status: 'Pago',
+          observacoes: 'Fornecedor de hortifruti',
+        },
+        {
+          tipo: 'despesa',
+          titulo: 'Conta de energia',
+          valor: 245.9,
+          categoria: cycle(expenseCategorias, 1, '(cadastre uma categoria de despesa)'),
+          conta: cycle(contas, 1, '(cadastre uma conta)'),
+          formaPagamento: cycle(formas, 3, ''),
+          status: 'Pendente',
+          observacoes: '',
+        },
+      ];
+      exampleRows.forEach((r, i) => {
+        sheet.addRow({
+          tipo: r.tipo,
+          titulo: r.titulo,
+          valor: r.valor,
+          data: isoAgo(i),
+          categoria: r.categoria,
+          conta: r.conta,
+          formaPagamento: r.formaPagamento,
+          status: r.status,
+          observacoes: r.observacoes,
+        });
+      });
+
+      const validations: { column: string; col: string; count: number }[] = [
+        { column: 'A', col: 'A', count: tipos.length },
+        { column: 'H', col: 'B', count: statusOpts.length },
+        { column: 'F', col: 'C', count: Math.max(contas.length, 1) },
+        { column: 'E', col: 'D', count: Math.max(categorias.length, 1) },
+        { column: 'G', col: 'E', count: formas.length },
+      ];
+      const lastRow = 200;
+      for (const v of validations) {
+        for (let r = 2; r <= lastRow; r++) {
+          sheet.getCell(`${v.column}${r}`).dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: [`Listas!$${v.col}$1:$${v.col}$${v.count}`],
+          };
+        }
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'modelo-movimentacoes.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      this.toast.error('Não foi possível gerar o modelo. Tente novamente.');
+    }
+  }
+
+  onImportDragOver(ev: DragEvent): void {
+    ev.preventDefault();
+    this.importDragOver.set(true);
+  }
+
+  onImportDragLeave(): void {
+    this.importDragOver.set(false);
+  }
+
+  onImportDrop(ev: DragEvent): void {
+    ev.preventDefault();
+    this.importDragOver.set(false);
+    const file = ev.dataTransfer?.files?.[0];
+    if (file) this.importFile.set(file);
+  }
+
+  onImportFilePicked(ev: Event): void {
+    const file = (ev.target as HTMLInputElement).files?.[0] ?? null;
+    this.importFile.set(file);
+  }
+
+  removeImportFile(): void {
+    this.importFile.set(null);
+  }
+
+  async submitImport(): Promise<void> {
+    const file = this.importFile();
+    if (!file) return;
+    this.importing.set(true);
+    try {
+      const preview = await this.svc.previewImport(file);
+      this.creating.set(false);
+      this.importFileName.set(preview.fileName);
+      this.importRows.set(
+        preview.items.map((item) => {
+          // Revalida de cara contra categorias/contas reais — o parse só garante formato de célula.
+          const revalidated = this.revalidateRow({
+            row: item.row,
+            type: item.type,
+            title: item.title,
+            value: item.value,
+            date: item.date,
+            categoryName: item.categoryName,
+            accountName: item.accountName,
+            paymentMethod: item.paymentMethod,
+            status: item.status,
+            notes: item.notes,
+            included: item.valid,
+            valid: item.valid,
+            error: item.error,
+          });
+          // Problema de formato que o parse pegou (ex.: tipo/status não reconhecido) e que a
+          // revalidação não teria como recalcular sozinha (o campo já veio normalizado) — mantém.
+          if (!item.valid && revalidated.valid) {
+            return { ...revalidated, valid: false, included: false, error: item.error };
+          }
+          return revalidated;
+        }),
+      );
+      this.importPreviewOpen.set(true);
+    } catch (err) {
+      this.toast.error(this.errMsg(err));
+    } finally {
+      this.importing.set(false);
+    }
+  }
+
+  closeImportPreview(): void {
+    this.importPreviewOpen.set(false);
+    this.importConfirmWarningOpen.set(false);
+    this.importRows.set([]);
+  }
+
+  /** Reavalia uma linha editada — recalcula erro/validade e ajusta `included`. */
+  private revalidateRow(row: EditableImportRow): EditableImportRow {
+    const errors: string[] = [];
+    if (!row.title.trim()) errors.push('título vazio');
+    if (!(row.value > 0)) errors.push('valor deve ser maior que zero');
+    if (!row.date) errors.push('data vazia');
+    const categoryOk = this.allActiveCategories().some(
+      (c) => c.name.trim().toLowerCase() === row.categoryName.trim().toLowerCase(),
+    );
+    if (!categoryOk) errors.push(`categoria "${row.categoryName}" não encontrada`);
+    const accountOk = this.accounts().some(
+      (a) => a.name.trim().toLowerCase() === row.accountName.trim().toLowerCase(),
+    );
+    if (!accountOk) errors.push(`conta "${row.accountName}" não encontrada`);
+
+    const valid = errors.length === 0;
+    return {
+      ...row,
+      valid,
+      error: valid ? null : errors.join('; '),
+      // Corrigiu a linha agora? marca pra incluir automaticamente. Continuava inválida? não dá pra incluir.
+      included: valid ? (row.valid ? row.included : true) : false,
+    };
+  }
+
+  updateRowField<K extends keyof EditableImportRow>(
+    index: number,
+    field: K,
+    value: EditableImportRow[K],
+  ): void {
+    this.importRows.update((rows) =>
+      rows.map((r, i) => (i === index ? this.revalidateRow({ ...r, [field]: value }) : r)),
+    );
+  }
+
+  toggleRowIncluded(index: number, included: boolean): void {
+    this.importRows.update((rows) =>
+      rows.map((r, i) => (i === index ? { ...r, included: r.valid ? included : false } : r)),
+    );
+  }
+
+  categoryMatches(name: string): boolean {
+    return this.allActiveCategories().some(
+      (c) => c.name.trim().toLowerCase() === name.trim().toLowerCase(),
+    );
+  }
+
+  accountMatches(name: string): boolean {
+    return this.accounts().some((a) => a.name.trim().toLowerCase() === name.trim().toLowerCase());
+  }
+
+  /** Se alguma linha ficar de fora, confirma com o usuário antes de gravar. */
+  confirmImportPreview(): void {
+    if (this.importExcludedCount() > 0) {
+      this.importConfirmWarningOpen.set(true);
+      return;
+    }
+    this.doConfirmImport();
+  }
+
+  cancelConfirmWarning(): void {
+    this.importConfirmWarningOpen.set(false);
+  }
+
+  async confirmDespiteExclusions(): Promise<void> {
+    this.importConfirmWarningOpen.set(false);
+    await this.doConfirmImport();
+  }
+
+  private async doConfirmImport(): Promise<void> {
+    const items: ImportMovementItem[] = this.importRows()
+      .filter((r) => r.included && r.valid)
+      .map((r) => ({
+        row: r.row,
+        type: r.type,
+        title: r.title,
+        value: r.value,
+        date: r.date,
+        categoryName: r.categoryName,
+        accountName: r.accountName,
+        paymentMethod: r.paymentMethod,
+        status: r.status,
+        notes: r.notes,
+        valid: r.valid,
+        error: r.error,
+      }));
+    if (items.length === 0) return;
+    this.confirmingImport.set(true);
+    try {
+      const result = await this.svc.confirmImport(items);
+      this.closeImportPreview();
+      this.importResult.set(result);
+      this.closeModal();
+    } catch (err) {
+      this.toast.error(this.errMsg(err));
+    } finally {
+      this.confirmingImport.set(false);
+    }
+  }
+
+  closeImportResult(): void {
+    this.importResult.set(null);
   }
 
   async save(force = false): Promise<void> {

@@ -1,0 +1,365 @@
+<div class="space-y-6">
+  <!-- 1 — Período -->
+  <div class="flex flex-wrap items-center gap-2">
+    <div
+      class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
+    >
+      @for (p of periods; track p) {
+        <button
+          type="button"
+          (click)="setPeriod(p)"
+          [attr.aria-pressed]="period() === p"
+          [class]="
+            'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
+            (period() === p
+              ? 'bg-mint-soft text-ocean'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+          "
+        >
+          {{ p }}
+        </button>
+      }
+    </div>
+    @if (period() === 'Personalizado') {
+      <div
+        class="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-border bg-card"
+      >
+        <input
+          type="date"
+          [value]="customFrom()"
+          (change)="setCustomFrom($any($event.target).value)"
+          aria-label="Data inicial"
+          class="bg-transparent outline-none text-[12.5px]"
+        />
+        <span class="text-[12px] text-muted-foreground">até</span>
+        <input
+          type="date"
+          [value]="customTo()"
+          (change)="setCustomTo($any($event.target).value)"
+          aria-label="Data final"
+          class="bg-transparent outline-none text-[12.5px]"
+        />
+      </div>
+    }
+    @if (data(); as d) {
+      <div class="ml-auto text-[12px] text-muted-foreground">Referência: {{ d.refLabel }}</div>
+    }
+  </div>
+
+  @if (data(); as d) {
+    <!-- 2 — KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+      <app-stat-card
+        label="Receita bruta"
+        [value]="fmtBRL(d.receitaBruta)"
+        [delta]="{
+          value: d.deltas.receitaBruta,
+          up: d.deltasUp.receitaBruta,
+          note: d.comparacaoLabel,
+        }"
+        icon="payments"
+        status="positive"
+        [spark]="d.sparks.receitaBruta"
+      />
+      <app-stat-card
+        label="Receita líquida"
+        [value]="fmtBRL(d.receitaLiquida)"
+        [delta]="{
+          value: d.deltas.receitaLiquida,
+          up: d.deltasUp.receitaLiquida,
+          note: d.comparacaoLabel,
+        }"
+        icon="account_balance"
+        status="neutral"
+        [spark]="d.sparks.receitaLiquida"
+      >
+        <app-hint slot="hint" text="O que sobra da receita após impostos sobre venda." />
+      </app-stat-card>
+      <app-stat-card
+        label="Ticket médio"
+        [value]="fmtBRL(d.ticketMedio)"
+        [delta]="{
+          value: d.deltas.ticketMedio,
+          up: d.deltasUp.ticketMedio,
+          note: d.comparacaoLabel,
+        }"
+        icon="receipt_long"
+        status="neutral"
+        [spark]="d.sparks.ticketMedio"
+      />
+      <app-stat-card
+        [label]="d.pedidosLabel"
+        [value]="d.pedidos.toLocaleString('pt-BR')"
+        [delta]="{ value: d.deltas.pedidos, up: d.deltasUp.pedidos, note: d.comparacaoLabel }"
+        icon="restaurant"
+        status="neutral"
+        [spark]="d.sparks.pedidos"
+      />
+    </div>
+
+    <!-- 3 — Insight de canal -->
+    <app-insight-card
+      severity="oportunidade"
+      title="O salão rende mais que o delivery"
+      [description]="
+        'No delivery, as taxas do iFood reduzem o que sobra de cada venda: dos ' +
+        fmtBRL(d.canais[1].receita) +
+        ' vendidos, restam cerca de ' +
+        fmtBRL(d.canais[1].liquida) +
+        '. Priorize ações que tragam clientes ao salão.'
+      "
+      action="Ver detalhes por canal"
+      (actionClick)="scrollToCanais()"
+    />
+
+    <!-- 4 — Cascata bruta -> líquida -->
+    <app-chart-card
+      title="Receita: bruta → líquida"
+      description="Quanto do faturamento realmente fica com você"
+      [loading]="loading()"
+      [height]="300"
+    >
+      <app-waterfall-chart [rows]="d.waterfall" />
+    </app-chart-card>
+
+    <!-- 5 — Heatmap -->
+    <div class="m3-card rounded-2xl p-5">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <h3 class="text-[15px] font-bold tracking-tight inline-flex items-center gap-1.5">
+            Quando você mais vende
+            <app-hint
+              text="Mostra como costumam ser seus dias e horários em geral — não um dia específico. Útil para planejar equipe e estoque."
+            />
+          </h3>
+          <p class="text-[12.5px] text-muted-foreground mt-0.5">
+            Padrão típico de vendas por dia da semana e horário (média das últimas semanas)
+          </p>
+        </div>
+      </div>
+      @if (loading()) {
+        <div class="h-[280px] w-full rounded-xl bg-muted animate-pulse"></div>
+      } @else if (!d.heatmap) {
+        <div
+          class="h-[220px] rounded-xl border border-dashed border-border grid place-items-center text-center px-6"
+        >
+          <div>
+            <app-icon
+              name="calendar_month"
+              className="text-muted-foreground"
+              [style]="{ fontSize: '28px' }"
+            />
+            <p class="mt-2 text-[13px] font-semibold">Sem padrão semanal neste período</p>
+            <p class="mt-1 text-[12px] text-muted-foreground max-w-[380px] mx-auto">
+              {{ d.heatmapVazioMsg }}
+            </p>
+          </div>
+        </div>
+      } @else {
+        <div class="overflow-x-auto">
+          <div class="min-w-[520px]">
+            <div class="grid grid-cols-[64px_repeat(4,1fr)] gap-2 mb-2">
+              <div></div>
+              @for (f of faixas; track f) {
+                <div class="text-[11.5px] font-semibold text-muted-foreground text-center">
+                  {{ f }}
+                </div>
+              }
+            </div>
+            @for (dia of diasSemana; track dia) {
+              <div class="grid grid-cols-[64px_repeat(4,1fr)] gap-2 mb-2 items-center">
+                <div class="text-[12px] font-semibold text-muted-foreground">{{ dia }}</div>
+                @for (faixa of faixas; track faixa) {
+                  @if (heatmapCell(dia, faixa); as cell) {
+                    <div
+                      tabindex="0"
+                      class="h-11 rounded-xl border border-border grid place-items-center text-[11px] font-semibold tabular-nums transition-all duration-150 hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint/40"
+                      [style.background]="heatmapBg(cell.valor)"
+                      [style.color]="heatmapColor(cell.valor)"
+                      [title]="dia + ' · ' + faixa + ': ' + fmtBRL(cell.valor)"
+                    >
+                      {{ cell.valor === 0 ? '—' : abrev(cell.valor) }}
+                    </div>
+                  }
+                }
+              </div>
+            }
+            <div class="flex items-center gap-2 mt-4 text-[11.5px] text-muted-foreground">
+              <span>Menos vendas</span>
+              @for (p of [0.1, 0.3, 0.5, 0.7, 0.9]; track p) {
+                <span
+                  class="h-3.5 w-7 rounded border border-border"
+                  [style.background]="
+                    'color-mix(in oklab, var(--mint) ' + p * 90 + '%, transparent)'
+                  "
+                ></span>
+              }
+              <span>Mais vendas</span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- 6 — Ranking -->
+    <app-chart-card
+      title="Itens mais vendidos"
+      description="Ordenado do maior para o menor"
+      [loading]="loading()"
+      [height]="430"
+    >
+      <div
+        slot="action"
+        class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
+      >
+        @for (m of ['receita', 'qtd']; track m) {
+          <button
+            type="button"
+            (click)="rankMode.set($any(m))"
+            [attr.aria-pressed]="rankMode() === m"
+            [class]="
+              'h-8 px-3 rounded-full text-[12px] font-semibold transition-colors duration-150 cursor-pointer ' +
+              (rankMode() === m
+                ? 'bg-mint-soft text-ocean'
+                : 'text-muted-foreground hover:bg-muted')
+            "
+          >
+            {{ m === 'receita' ? 'Por receita (R$)' : 'Por quantidade' }}
+          </button>
+        }
+      </div>
+      <app-bar-chart
+        [data]="ranking()"
+        categoryKey="nome"
+        [series]="rankingSeries()"
+        orientation="bars"
+        [categoryLabelWidth]="170"
+        [valueFormatter]="rankingValueFormatter()"
+      />
+    </app-chart-card>
+
+    <!-- 7 — Categoria + Canal -->
+    <div id="receitas-canais" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <app-chart-card
+        title="Receita por categoria"
+        description="Quanto cada grupo do cardápio representa"
+        [loading]="loading()"
+        [height]="300"
+      >
+        <div class="h-full flex items-center gap-4">
+          <div class="h-full flex-1 min-w-0">
+            <app-donut-chart [data]="porCategoriaSlices()" [valueFormatter]="fmtBRL" />
+          </div>
+          <ul class="w-[46%] shrink-0 space-y-2 text-[12px]">
+            @for (c of porCategoriaSlices(); track c.label) {
+              <li class="flex items-center gap-2">
+                <span class="h-2.5 w-2.5 rounded-full shrink-0" [style.background]="c.color"></span>
+                <span class="truncate">{{ c.label }}</span>
+                <span class="ml-auto font-semibold tabular-nums whitespace-nowrap">
+                  {{ Math.round((c.value / catTotal()) * 100) }}%
+                </span>
+              </li>
+            }
+          </ul>
+        </div>
+      </app-chart-card>
+
+      <app-chart-card
+        title="Salão vs. Delivery"
+        description="Receita por canal e o que sobra depois das taxas"
+        [loading]="loading()"
+        [height]="300"
+      >
+        <span slot="title-extra">
+          <app-hint
+            text="Compara quanto cada canal fatura (barra escura) e quanto realmente sobra depois das taxas (barra verde). No delivery, o iFood cobra comissão (~23%), que reduz seu lucro."
+          />
+        </span>
+        <div class="h-full flex flex-col">
+          <div class="flex-1 min-h-0">
+            <app-bar-chart
+              [data]="d.canais"
+              categoryKey="canal"
+              [series]="canaisSeries"
+              orientation="columns"
+              [valueFormatter]="abrev"
+            />
+          </div>
+          <div class="mt-3 space-y-1.5">
+            @for (c of d.canais; track c.canal) {
+              <div class="flex items-center gap-2 text-[12px]">
+                <app-chip
+                  [tone]="c.canal === 'Salão' ? 'mint' : 'warning'"
+                  [icon]="c.canal === 'Salão' ? 'storefront' : 'delivery_dining'"
+                >
+                  {{ c.canal }}
+                </app-chip>
+                <span class="text-muted-foreground truncate">{{ c.nota }}</span>
+                <span class="ml-auto font-semibold tabular-nums whitespace-nowrap"
+                  >líquido {{ fmtBRL(c.liquida) }}</span
+                >
+              </div>
+            }
+          </div>
+        </div>
+      </app-chart-card>
+    </div>
+
+    <!-- 8 — Formas de pagamento -->
+    <app-chart-card
+      title="Formas de pagamento"
+      description="Como seus clientes pagam"
+      [loading]="loading()"
+      [height]="280"
+    >
+      <app-bar-chart
+        [data]="d.formasPagamento"
+        categoryKey="forma"
+        [series]="formasPagamentoSeries"
+        orientation="bars"
+        [categoryLabelWidth]="90"
+        [valueFormatter]="abrev"
+        [colorFor]="payColor.bind(this)"
+      />
+    </app-chart-card>
+
+    <!-- 9 — Tendência -->
+    <app-chart-card
+      title="Tendência de receita"
+      [description]="d.tendenciaDescricao"
+      [loading]="loading()"
+      [height]="320"
+    >
+      <div
+        slot="action"
+        class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
+      >
+        @for (m of ['total', 'canal']; track m) {
+          <button
+            type="button"
+            (click)="trendMode.set($any(m))"
+            [attr.aria-pressed]="trendMode() === m"
+            [class]="
+              'h-8 px-3 rounded-full text-[12px] font-semibold transition-colors duration-150 cursor-pointer ' +
+              (trendMode() === m
+                ? 'bg-mint-soft text-ocean'
+                : 'text-muted-foreground hover:bg-muted')
+            "
+          >
+            {{ m === 'total' ? 'Total' : 'Por canal' }}
+          </button>
+        }
+      </div>
+      <app-line-chart
+        [data]="d.tendencia"
+        categoryKey="mes"
+        [series]="trendMode() === 'total' ? tendenciaSeriesTotal : tendenciaSeriesCanal"
+        [valueFormatter]="abrev"
+      />
+    </app-chart-card>
+
+    <div class="text-[12px] text-muted-foreground">
+      Impostos sobre venda no período ({{ d.refLabel }}): {{ fmtBRL(d.impostos) }}.
+    </div>
+  }
+</div>

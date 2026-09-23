@@ -64,6 +64,71 @@ import { passwordRules } from '../../shared/password-rules';
         }
 
         @if (step() === 0) {
+          <div class="flex flex-col items-center gap-2 mb-1">
+            <button
+              type="button"
+              (click)="fileInput.click()"
+              aria-label="Adicionar foto de perfil"
+              class="relative h-24 w-24 rounded-full overflow-hidden border-2 border-dashed border-border hover:border-mint transition cursor-pointer group shrink-0"
+            >
+              @if (avatarPreview()) {
+                <img [src]="avatarPreview()" alt="" class="h-full w-full object-cover" />
+              } @else if (initialsPreview()) {
+                <span
+                  class="h-full w-full grid place-items-center bg-mint-soft text-ocean text-2xl font-bold"
+                >
+                  {{ initialsPreview() }}
+                </span>
+              } @else {
+                <span class="h-full w-full grid place-items-center bg-muted text-muted-foreground">
+                  <app-icon name="person" [style]="{ fontSize: '36px' }" />
+                </span>
+              }
+              <span
+                class="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/30 transition grid place-items-center"
+              >
+                <app-icon
+                  name="photo_camera"
+                  [style]="{ fontSize: '22px' }"
+                  className="text-white opacity-0 group-hover:opacity-100 transition"
+                />
+              </span>
+            </button>
+            <input
+              #fileInput
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              class="hidden"
+              (change)="onAvatarPicked($event)"
+            />
+            <div class="flex items-center gap-2 text-[12px]">
+              <button
+                type="button"
+                (click)="fileInput.click()"
+                class="text-ocean font-semibold hover:underline cursor-pointer"
+              >
+                {{ avatarPreview() ? 'Trocar foto' : 'Adicionar foto' }}
+              </button>
+              @if (avatarPreview()) {
+                <span class="text-muted-foreground">·</span>
+                <button
+                  type="button"
+                  (click)="removeAvatar()"
+                  class="text-muted-foreground hover:text-error cursor-pointer"
+                >
+                  Remover
+                </button>
+              }
+            </div>
+            @if (avatarError()) {
+              <p class="text-[12px] text-error text-center">{{ avatarError() }}</p>
+            } @else {
+              <p class="text-[11px] text-muted-foreground text-center">
+                JPG, PNG ou WebP · até 1MB
+              </p>
+            }
+          </div>
+
           <app-form-field label="Seu nome" icon="person">
             <input
               [(ngModel)]="name"
@@ -217,6 +282,11 @@ export class CadastroComponent {
   protected loading = signal(false);
   protected error = signal<string | null>(null);
 
+  protected avatarPreview = signal<string | null>(null);
+  protected avatarError = signal<string | null>(null);
+  private readonly MAX_AVATAR_BYTES = 1024 * 1024; // 1MB — mesmo teto usado hoje por perfis de foto de mercado.
+  private readonly ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
   // Métodos (não computed()): name/phone/email/password/... são campos simples
   // (ngModel), não signals — um computed() aqui só reagiria à leitura de `step()`
   // e ficaria com cache travado a cada tecla digitada nos outros campos.
@@ -238,6 +308,44 @@ export class CadastroComponent {
     return digits.length === 10 || digits.length === 11;
   }
 
+  protected initialsPreview(): string {
+    const parts = this.name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    return (
+      (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
+    ).toUpperCase();
+  }
+
+  onAvatarPicked(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // permite escolher o mesmo arquivo de novo depois de remover
+    if (!file) return;
+
+    if (!this.ALLOWED_AVATAR_TYPES.includes(file.type)) {
+      this.avatarError.set('Formato não aceito. Use JPG, PNG ou WebP.');
+      return;
+    }
+    if (file.size > this.MAX_AVATAR_BYTES) {
+      this.avatarError.set(
+        `Imagem muito grande (${(file.size / 1024 / 1024).toFixed(1)}MB). Máximo de 1MB.`,
+      );
+      return;
+    }
+
+    this.avatarError.set(null);
+    const reader = new FileReader();
+    reader.onload = () => this.avatarPreview.set(reader.result as string);
+    reader.onerror = () =>
+      this.avatarError.set('Não foi possível ler a imagem. Tente outro arquivo.');
+    reader.readAsDataURL(file);
+  }
+
+  removeAvatar(): void {
+    this.avatarPreview.set(null);
+    this.avatarError.set(null);
+  }
+
   async onSubmit(): Promise<void> {
     if (!this.canNext()) return;
     this.error.set(null);
@@ -247,10 +355,14 @@ export class CadastroComponent {
     }
     this.loading.set(true);
     try {
+      const email = this.email.trim();
+      // Salva antes do signup pra já vir anexado ao usuário assim que a sessão é criada
+      // (ver TODO(débito técnico) em AuthService.saveAvatar).
+      if (this.avatarPreview()) this.auth.saveAvatar(email, this.avatarPreview()!);
       await this.auth.signup({
         name: this.name.trim(),
         phone: this.phone.trim(),
-        email: this.email.trim(),
+        email,
         password: this.password,
         restaurantName: this.restaurant.trim(),
         termsAccepted: this.terms,

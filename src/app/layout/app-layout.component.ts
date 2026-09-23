@@ -1,11 +1,18 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
 import { AuthService } from '../services/auth.service';
+import { NotificationsService, AppNotification } from '../services/notifications.service';
 import { LogoComponent } from '../shared/logo.component';
 import { IconComponent } from '../shared/icon.component';
 
 const NAV = [
+  { to: '/visao-geral', label: 'Visão Geral', icon: 'space_dashboard' },
+  { to: '/fluxo-de-caixa', label: 'Fluxo de Caixa', icon: 'account_balance_wallet' },
+  { to: '/receitas', label: 'Receitas', icon: 'trending_up' },
+  { to: '/custos', label: 'Custos & Despesas', icon: 'trending_down' },
+  { to: '/resultado', label: 'Resultado', icon: 'savings' },
+  { to: '/previsoes', label: 'Previsões', icon: 'auto_graph' },
   { to: '/movimentacoes', label: 'Movimentações', icon: 'swap_horiz' },
   { to: '/', label: 'Contas Financeiras', icon: 'account_balance' },
   { to: '/categorias', label: 'Categorias', icon: 'category' },
@@ -91,26 +98,111 @@ const NAV = [
                 [style]="{ fontSize: '20px' }"
               />
             </button>
-            <button
-              type="button"
-              aria-label="Notificações"
-              class="h-10 w-10 rounded-full border border-border grid place-items-center hover:bg-muted transition relative cursor-pointer"
-            >
-              <app-icon name="notifications" [style]="{ fontSize: '20px' }" />
-              <span
-                class="absolute top-2 right-2.5 h-2 w-2 rounded-full bg-mint ring-2 ring-background"
-              ></span>
-            </button>
+            <div class="relative">
+              <button
+                type="button"
+                (click)="notificationsOpen.set(!notificationsOpen())"
+                aria-label="Notificações"
+                [attr.aria-expanded]="notificationsOpen()"
+                class="h-10 w-10 rounded-full border border-border grid place-items-center hover:bg-muted transition relative cursor-pointer"
+              >
+                <app-icon name="notifications" [style]="{ fontSize: '20px' }" />
+                @if (notifications.unreadCount() > 0) {
+                  <span
+                    class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-mint text-primary-foreground text-[10px] font-bold grid place-items-center ring-2 ring-background"
+                  >
+                    {{ notifications.unreadCount() > 9 ? '9+' : notifications.unreadCount() }}
+                  </span>
+                }
+              </button>
+
+              @if (notificationsOpen()) {
+                <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+                <div class="fixed inset-0 z-30" (click)="notificationsOpen.set(false)"></div>
+                <div
+                  class="absolute right-0 top-[calc(100%+8px)] z-40 w-[360px] max-h-[440px] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col"
+                >
+                  <div
+                    class="px-4 py-3 border-b border-border flex items-center justify-between shrink-0"
+                  >
+                    <span class="font-semibold text-[14px]">Notificações</span>
+                    @if (notifications.unreadCount() > 0) {
+                      <button
+                        type="button"
+                        (click)="notifications.markAllAsRead()"
+                        class="text-[12px] font-medium text-ocean hover:underline cursor-pointer"
+                      >
+                        Marcar todas como lidas
+                      </button>
+                    }
+                  </div>
+                  <div class="overflow-y-auto flex-1">
+                    @if (notifications.notifications().length === 0) {
+                      <div class="px-4 py-8 text-center text-[13px] text-muted-foreground">
+                        Nenhuma notificação por aqui.
+                      </div>
+                    } @else {
+                      @for (n of notifications.notifications(); track n.id) {
+                        <div
+                          [class]="
+                            'px-4 py-3 border-b border-border/60 last:border-0 transition-colors ' +
+                            (n.read ? 'opacity-60' : 'bg-mint-soft/20')
+                          "
+                        >
+                          <div class="flex items-start gap-2.5">
+                            <span
+                              class="h-8 w-8 shrink-0 rounded-xl grid place-items-center bg-warning/10 text-warning"
+                            >
+                              <app-icon name="sell" [style]="{ fontSize: '16px' }" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                              <div class="text-[13px] font-semibold leading-snug">
+                                {{ n.title }}
+                              </div>
+                              <p class="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
+                                {{ n.description }}
+                              </p>
+                              <div class="mt-2 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  (click)="goToNotification(n)"
+                                  class="h-7 px-2.5 rounded-lg bg-mint-soft text-ocean text-[11.5px] font-semibold hover:brightness-95 cursor-pointer"
+                                >
+                                  {{ n.actionLabel }}
+                                </button>
+                                @if (!n.read) {
+                                  <button
+                                    type="button"
+                                    (click)="notifications.markAsRead(n.id)"
+                                    class="h-7 px-2.5 rounded-lg text-[11.5px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                                  >
+                                    Marcar como lida
+                                  </button>
+                                }
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    }
+                  </div>
+                </div>
+              }
+            </div>
             <a
               routerLink="/auth/logout"
               title="Sair da conta"
               class="flex items-center gap-2.5 pl-2 pr-3 h-10 rounded-full bg-card border border-border hover:bg-muted transition no-underline"
             >
-              <div
-                class="h-7 w-7 rounded-full bg-ocean text-white grid place-items-center text-xs font-semibold"
-              >
-                {{ userInitials }}
-              </div>
+              @if (userAvatar; as avatar) {
+                <img [src]="avatar" alt="" class="h-7 w-7 rounded-full object-cover shrink-0" />
+              } @else {
+                <div
+                  class="h-7 w-7 rounded-full bg-ocean text-white grid place-items-center text-xs font-semibold shrink-0"
+                >
+                  {{ userInitials }}
+                </div>
+              }
               <div class="hidden md:block leading-tight">
                 <div class="text-xs font-semibold">{{ userName }}</div>
                 <div class="text-[10px] text-muted-foreground">{{ userBusiness }}</div>
@@ -131,10 +223,24 @@ const NAV = [
     </div>
   `,
 })
-export class AppLayoutComponent {
+export class AppLayoutComponent implements OnInit {
   protected theme = inject(ThemeService);
   private auth = inject(AuthService);
+  protected notifications = inject(NotificationsService);
   protected navItems = NAV;
+  protected notificationsOpen = signal(false);
+
+  ngOnInit(): void {
+    this.notifications.refresh().catch(() => {
+      // Silencioso: notificações são um extra, não deve travar o layout se falhar.
+    });
+  }
+
+  goToNotification(n: AppNotification): void {
+    this.notifications.markAsRead(n.id);
+    this.notificationsOpen.set(false);
+    this.router.navigate([n.actionRoute], { queryParams: n.actionQueryParams ?? {} });
+  }
 
   // Usa o usuário autenticado; mantém "Ana Costa" como fallback enquanto não há dados.
   get userName(): string {
@@ -148,6 +254,10 @@ export class AppLayoutComponent {
     const parts = this.userName.split(/\s+/).filter(Boolean);
     const initials = (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '');
     return initials.toUpperCase() || 'AC';
+  }
+  /** Foto cadastrada no signup, se houver (ver TODO(débito técnico) em AuthService.saveAvatar). */
+  get userAvatar(): string | null {
+    return this.auth.currentUser()?.avatarDataUrl ?? null;
   }
 
   private readonly titles: Record<string, { title: string; sub: string }> = {

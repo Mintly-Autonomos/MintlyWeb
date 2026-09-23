@@ -83,6 +83,36 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/categorias/categorias.component').then((m) => m.CategoriasComponent),
       },
+      {
+        path: 'receitas',
+        loadComponent: () =>
+          import('./pages/receitas/receitas.component').then((m) => m.ReceitasComponent),
+      },
+      {
+        path: 'custos',
+        loadComponent: () =>
+          import('./pages/custos/custos.component').then((m) => m.CustosComponent),
+      },
+      {
+        path: 'fluxo-de-caixa',
+        loadComponent: () =>
+          import('./pages/fluxo-caixa/fluxo-caixa.component').then((m) => m.FluxoCaixaComponent),
+      },
+      {
+        path: 'resultado',
+        loadComponent: () =>
+          import('./pages/resultado/resultado.component').then((m) => m.ResultadoComponent),
+      },
+      {
+        path: 'previsoes',
+        loadComponent: () =>
+          import('./pages/previsoes/previsoes.component').then((m) => m.PrevisoesComponent),
+      },
+      {
+        path: 'visao-geral',
+        loadComponent: () =>
+          import('./pages/visao-geral/visao-geral.component').then((m) => m.VisaoGeralComponent),
+      },
     ],
   },
   { path: '**', redirectTo: '' },
