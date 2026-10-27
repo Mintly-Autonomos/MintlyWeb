@@ -11,7 +11,7 @@ export interface AuthUser {
   empresa?: string;
   /** Necessário para montar payloads de criação (a API reforça o valor real no servidor). */
   restaurantId?: string;
-  /** Ver TODO(débito técnico) em `saveAvatar` — hoje é só um cache local, não vem do servidor. */
+  /** Foto de perfil (data URL) — vem do servidor no login/signup (`user.person.avatar`). */
   avatarDataUrl?: string;
 }
 
@@ -21,6 +21,7 @@ interface MockRegisteredUser {
   password: string;
   restaurantName: string;
   restaurantId: string;
+  avatar?: string;
 }
 
 const REMEMBER_KEY = 'mintly-remember';
@@ -29,7 +30,7 @@ const KEYS = {
   refresh: 'mintly-refresh-token',
   user: 'mintly-user',
 } as const;
-const AVATAR_KEY_PREFIX = 'mintly-avatar:';
+const AVATAR_KEY = 'mintly-avatar';
 
 /**
  * Seed do modo mock (`environment.useMocks: true`, só local) — restaurante de demonstração
@@ -101,6 +102,7 @@ export class AuthService {
         email: match.email,
         empresa: match.restaurantName,
         restaurantId: match.restaurantId,
+        avatarDataUrl: match.avatar,
       });
       return;
     }
@@ -112,6 +114,7 @@ export class AuthService {
       nome: result.user.person.name,
       email: result.user.email,
       restaurantId: result.user.restaurantId,
+      avatarDataUrl: result.user.person.avatar,
     });
   }
 
@@ -119,6 +122,7 @@ export class AuthService {
   async signup(input: {
     name: string;
     phone: string;
+    avatar?: string;
     email: string;
     password: string;
     restaurantName: string;
@@ -140,19 +144,21 @@ export class AuthService {
         password: input.password,
         restaurantName: input.restaurantName,
         restaurantId,
+        avatar: input.avatar,
       });
       this.persistTokens(fakeToken('mock-access'), fakeToken('mock-refresh'), {
         nome: input.name,
         email: input.email,
         empresa: input.restaurantName,
         restaurantId,
+        avatarDataUrl: input.avatar,
       });
       return;
     }
 
     const response = await this.authClient.signup(
       {
-        person: { name: input.name, phone: input.phone },
+        person: { name: input.name, phone: input.phone, avatar: input.avatar },
         email: input.email,
         password: input.password,
         restaurantName: input.restaurantName,
@@ -167,6 +173,7 @@ export class AuthService {
       email: result.user.email,
       empresa: result.restaurant.name,
       restaurantId: result.user.restaurantId,
+      avatarDataUrl: result.user.person.avatar,
     });
   }
 
@@ -248,47 +255,18 @@ export class AuthService {
   private persistTokens(accessToken: string, refreshToken: string | null, user: AuthUser): void {
     this._accessToken.set(accessToken);
     this._refreshToken.set(refreshToken);
-    const avatarDataUrl = this.getAvatar(user.email) ?? undefined;
-    const fullUser: AuthUser = avatarDataUrl ? { ...user, avatarDataUrl } : user;
-    this._user.set(fullUser);
+    this._user.set(user);
     this.write(KEYS.access, accessToken);
     if (refreshToken) this.write(KEYS.refresh, refreshToken);
-    this.write(KEYS.user, JSON.stringify(fullUser));
-  }
-
-  /**
-   * TODO(débito técnico) — avatar de perfil:
-   * Não existe suporte a foto de perfil no back nem na modelagem (Person, no Mongo) ainda. Falta:
-   *   1) Campo pra guardar a imagem no Person (Mongo aceita base64 direto no documento pra
-   *      imagens pequenas — o front já limita a 1MB — ou um bucket/GridFS se preferir separar
-   *      do documento principal);
-   *   2) Endpoint de upload (recebe a imagem no cadastro e, futuramente, em outras telas);
-   *   3) Endpoint pra buscar a imagem do usuário pelo username/e-mail (algo como
-   *      GET /pessoas/:username/avatar);
-   *   4) A resposta de LOGIN passar a devolver essa imagem junto — hoje `AuthUser` não recebe
-   *      nada do servidor pra isso, e sem isso o front precisaria de uma chamada extra só
-   *      pra popular o ícone.
-   * Por ora: o front captura, valida (≤1MB, tipo imagem) e guarda em cache local por e-mail —
-   * só pra provar o fluxo de ponta a ponta. Troca este método por uma chamada real de upload
-   * (item 2) assim que o endpoint existir, e `getAvatar` por uma leitura do servidor (item 3).
-   * Pendência de negócio N10 (`MintlyApi/specs/modulos-novos/pendencias-negocio.md`): onde
-   * guardar o arquivo (S3, GridFS ou terceiro) ainda não foi decidido.
-   */
-  saveAvatar(email: string, dataUrl: string): void {
-    const key = AVATAR_KEY_PREFIX + email.trim().toLowerCase();
+    // A foto (até ~1,4 MB em base64) fica numa chave própria: se estourar a cota do storage,
+    // só ela se perde (volta pras iniciais) — o login não pode quebrar por causa de um enfeite.
+    const { avatarDataUrl, ...rest } = user;
+    this.write(KEYS.user, JSON.stringify(rest));
     try {
-      localStorage.setItem(key, dataUrl);
+      if (avatarDataUrl) this.write(AVATAR_KEY, avatarDataUrl);
+      else this.remove(AVATAR_KEY);
     } catch {
-      // Cache best-effort (ex.: localStorage cheio) — não deve travar o cadastro por isso.
-    }
-    this._user.update((u) => (u && u.email === email ? { ...u, avatarDataUrl: dataUrl } : u));
-  }
-
-  private getAvatar(email: string): string | null {
-    try {
-      return localStorage.getItem(AVATAR_KEY_PREFIX + email.trim().toLowerCase());
-    } catch {
-      return null;
+      /* sem cota: segue sem cache da foto */
     }
   }
 
@@ -299,13 +277,16 @@ export class AuthService {
     this.remove(KEYS.access);
     this.remove(KEYS.refresh);
     this.remove(KEYS.user);
+    this.remove(AVATAR_KEY);
   }
 
   private loadStoredUser(): AuthUser | null {
     const raw = this.read(KEYS.user);
     if (!raw) return null;
     try {
-      return JSON.parse(raw);
+      const user: AuthUser = JSON.parse(raw);
+      const avatarDataUrl = this.read(AVATAR_KEY);
+      return avatarDataUrl ? { ...user, avatarDataUrl } : user;
     } catch {
       return null;
     }
