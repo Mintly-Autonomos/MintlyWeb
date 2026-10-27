@@ -144,13 +144,11 @@ export class CustosComponent implements OnInit {
 
   /** Série "Por categoria": as 5 maiores despesas do mês, cada uma com sua própria série de cor. */
   protected trendSeriesCategoria = computed<LineSeries[]>(() =>
-    (this.data()?.items ?? [])
-      .slice(0, 5)
-      .map((item, i) => ({
-        key: item.key,
-        name: item.name,
-        color: TREND_COLORS[i % TREND_COLORS.length],
-      })),
+    (this.data()?.items ?? []).slice(0, 5).map((item, i) => ({
+      key: item.key,
+      name: item.name,
+      color: TREND_COLORS[i % TREND_COLORS.length],
+    })),
   );
   protected trendDataCategoria = computed(() => {
     const top5 = (this.data()?.items ?? []).slice(0, 5);
