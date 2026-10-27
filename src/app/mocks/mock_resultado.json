@@ -1,0 +1,71 @@
+{
+  "refLabel": "Julho/2026",
+  "receitaBruta": 58400,
+  "impostos": 3504,
+  "receitaLiquida": 54896,
+  "cmv": 21024,
+  "margemBruta": 33872,
+  "despesasOperacionais": 27500,
+  "lucroLiquido": 6372,
+  "anterior": {
+    "refLabel": "Junho/2026",
+    "receitaBruta": 54200,
+    "impostos": 3252,
+    "receitaLiquida": 50948,
+    "cmv": 19985,
+    "margemBruta": 30963,
+    "despesasOperacionais": 25863,
+    "lucroLiquido": 5100,
+    "margemLiquida": 9.4
+  },
+  "despesasDetalhe": [
+    { "nome": "Pró-labore", "valor": 8000, "anterior": 8000, "tipo": "fixo", "icon": "badge" },
+    { "nome": "Aluguel", "valor": 6000, "anterior": 6000, "tipo": "fixo", "icon": "storefront" },
+    {
+      "nome": "Taxa do iFood",
+      "valor": 6044,
+      "anterior": 5480,
+      "tipo": "variavel",
+      "icon": "delivery_dining"
+    },
+    {
+      "nome": "Utilidades (luz, água, gás)",
+      "valor": 2200,
+      "anterior": 1820,
+      "tipo": "fixo",
+      "icon": "bolt"
+    },
+    {
+      "nome": "Manutenção e limpeza",
+      "valor": 1400,
+      "anterior": 1300,
+      "tipo": "variavel",
+      "icon": "cleaning_services"
+    },
+    {
+      "nome": "Contador e outros",
+      "valor": 1456,
+      "anterior": 1235,
+      "tipo": "fixo",
+      "icon": "receipt_long"
+    },
+    {
+      "nome": "Taxas de cartão",
+      "valor": 1200,
+      "anterior": 1128,
+      "tipo": "variavel",
+      "icon": "credit_card"
+    },
+    { "nome": "Marketing", "valor": 1200, "anterior": 900, "tipo": "variavel", "icon": "campaign" }
+  ],
+  "custosFixos": 15200,
+  "custosVariaveis": 29268,
+  "historico": [
+    { "mes": "Fev", "lucro": 2980, "margem": 6.1, "receita": 48800 },
+    { "mes": "Mar", "lucro": 3640, "margem": 7.2, "receita": 50600 },
+    { "mes": "Abr", "lucro": 3120, "margem": 6.2, "receita": 50300 },
+    { "mes": "Mai", "lucro": 4480, "margem": 8.6, "receita": 52100 },
+    { "mes": "Jun", "lucro": 5100, "margem": 9.4, "receita": 54200 },
+    { "mes": "Jul", "lucro": 6372, "margem": 10.9, "receita": 58400 }
+  ]
+}

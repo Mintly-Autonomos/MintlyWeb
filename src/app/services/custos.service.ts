@@ -1,375 +1,204 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import type { Headers } from 'mintly-lib';
+import { CategoryBehavior, DreGroup, MovementChannel } from 'mintly-lib';
+import type {
+  ExpensesReport,
+  ExpensesQuery,
+  ExpenseItem,
+  ExpenseSubitem,
+  ExpenseAnomaly,
+  Headers,
+} from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
-import type { PeriodKey } from './receitas.service';
+import { MintlyClientService } from './mintly-client.service';
+import mockCustos from '../mocks/mock_custos.json';
 
-export type TipoDespesa = 'Fixo' | 'Variável' | 'Misto';
+export type { ExpensesReport, ExpensesQuery, ExpenseItem, ExpenseSubitem, ExpenseAnomaly };
+export type ChannelFilter = 'dineIn' | 'delivery' | undefined;
 
-export interface Subitem {
+function delay(ms = 380): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface MockSub {
   nome: string;
   valorMesAtual: number;
   valorMesAnterior: number;
   mediaUlt3Meses: number;
   tipo: 'fixo' | 'variavel';
 }
-
-export interface Despesa {
+interface MockCat {
   categoria: string;
-  valor: number;
-  valorAnterior: number;
-  tipo: TipoDespesa;
+  tipo: 'Fixo' | 'Variável' | 'Misto';
   icon: string;
   nota: string;
-  subitens: Subitem[];
+  subitens: MockSub[];
 }
 
-export interface Anomalia {
-  categoria: string;
-  subitem: string;
-  valor: number;
-  media: number;
-  excedente: number;
-  variacaoPct: number;
-}
-
-export interface CustosDataset {
-  key: string;
-  refLabel: string;
-  comparacaoLabel: string;
-  receita: number;
-  despesas: Despesa[];
-  total: number;
-  totalAnterior: number;
-  cmv: number;
-  cmvPct: number;
-  proLabore: number;
-  primeCostPct: number;
-  ifood: number;
-  ifoodPct: number;
-  deltas: { total: string; cmv: string; prime: string; ifood: string };
-  deltasUp: { total: boolean; cmv: boolean; prime: boolean; ifood: boolean };
-  sparks: { total: number[]; cmv: number[]; prime: number[]; ifood: number[] };
-  fixosVariaveis: { tipo: TipoDespesa; valor: number }[];
-  tendencia: {
-    mes: string;
-    total: number;
-    cmv: number;
-    proLabore: number;
-    ifood: number;
-    aluguel: number;
-    utilidades: number;
-    projecao?: boolean;
-  }[];
-  tendenciaTemProjecao: boolean;
-  saltos: { mes: string; dataKey: string; label: string }[];
-  anomalias: Anomalia[];
-}
-
-export const RECEITA_MES = 58400;
-export const RECEITA_DELIVERY_MES = 26280;
-export const TAXA_IFOOD_PCT = 23;
-
-/** Parcela de cada categoria atribuível ao delivery (o resto é salão) — usado na tela pra dividir por canal. */
-export const CANAL_DELIVERY: Record<string, number> = {
-  'Taxa iFood': 1,
-  'CMV / Insumos': 0.45,
-  'Taxas de cartão': 0.35,
-  Marketing: 0.6,
+const BEHAVIOR: Record<MockCat['tipo'], CategoryBehavior> = {
+  Fixo: CategoryBehavior.Fixed,
+  Variável: CategoryBehavior.Variable,
+  Misto: CategoryBehavior.Mixed,
+};
+const DREGROUP_GUESS: Record<string, DreGroup> = {
+  'CMV / Insumos': DreGroup.Cmv,
+  'Pró-labore família': DreGroup.Labor,
 };
 
-interface BaseCat {
-  categoria: string;
-  tipo: TipoDespesa;
-  icon: string;
-  nota: string;
-  subitens: Subitem[];
-}
+/**
+ * Mock aproximado pra dev local sem a MintlyApi no ar (`environment.useMocks: true`) — mesmo
+ * contrato real (`ExpensesReport`), construído a partir de `mocks/mock_custos.json`. Não
+ * reproduz o filtro de canal nem a projeção do mês atual com fidelidade — só dados plausíveis.
+ */
+function buildMockReport(month?: string): ExpensesReport {
+  const cats = mockCustos.categorias as MockCat[];
+  const receita = mockCustos.receitaMes;
 
-const s = (
-  nome: string,
-  valorMesAtual: number,
-  valorMesAnterior: number,
-  mediaUlt3Meses: number,
-  tipo: 'fixo' | 'variavel',
-): Subitem => ({ nome, valorMesAtual, valorMesAnterior, mediaUlt3Meses, tipo });
+  const items: ExpenseItem[] = cats
+    .map((c): ExpenseItem => {
+      const amount = c.subitens.reduce((a, s) => a + s.valorMesAtual, 0);
+      const previous = c.subitens.reduce((a, s) => a + s.valorMesAnterior, 0);
+      const average3 = c.subitens.reduce((a, s) => a + s.mediaUlt3Meses, 0);
+      const subitems: ExpenseSubitem[] = c.subitens.map((s, i): ExpenseSubitem => {
+        const excess = s.valorMesAtual - s.mediaUlt3Meses;
+        return {
+          key: `${c.categoria}-${i}`,
+          subcategoryId: `${c.categoria}-${i}`,
+          name: s.nome,
+          amount: s.valorMesAtual,
+          previous: s.valorMesAnterior,
+          average3: s.mediaUlt3Meses,
+          deltaPrevious: s.valorMesAnterior
+            ? (s.valorMesAtual - s.valorMesAnterior) / s.valorMesAnterior
+            : null,
+          deltaAverage3: s.mediaUlt3Meses ? excess / s.mediaUlt3Meses : null,
+          anomaly: s.mediaUlt3Meses > 0 && excess / s.mediaUlt3Meses > 0.3,
+        };
+      });
+      return {
+        key: c.categoria,
+        kind: 'category',
+        categoryId: c.categoria,
+        name: c.categoria,
+        behavior: BEHAVIOR[c.tipo],
+        dreGroup: DREGROUP_GUESS[c.categoria] ?? DreGroup.Opex,
+        amount,
+        previous,
+        average3,
+        deltaPrevious: previous ? (amount - previous) / previous : null,
+        deltaAverage3: average3 ? (amount - average3) / average3 : null,
+        pctOfRevenue: amount / receita,
+        subitems,
+        hasAnomaly: subitems.some((s) => s.anomaly),
+        history: ['Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago'].map((mes, i) => ({
+          month: mes,
+          amount: Math.round(amount * (0.85 + i * 0.03)),
+        })),
+        projected: null,
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
 
-const BASE_CATEGORIAS: BaseCat[] = [
-  {
-    categoria: 'CMV / Insumos',
-    tipo: 'Variável',
-    icon: 'shopping_basket',
-    nota: 'Frango, óleo, molhos e embalagens',
-    subitens: [
-      s('Frango', 12500, 12200, 12300, 'variavel'),
-      s('Óleo', 2800, 2700, 2720, 'variavel'),
-      s('Molhos e temperos', 2100, 2050, 2060, 'variavel'),
-      s('Embalagens', 2400, 1500, 1500, 'variavel'),
-      s('Bebidas para revenda', 1224, 1180, 1200, 'variavel'),
-    ],
-  },
-  {
-    categoria: 'Pró-labore família',
-    tipo: 'Fixo',
-    icon: 'groups',
-    nota: 'Retirada da família pelo trabalho no negócio',
-    subitens: [s('Retirada família', 8000, 8000, 8000, 'fixo')],
-  },
-  {
-    categoria: 'Taxa iFood',
-    tipo: 'Variável',
-    icon: 'delivery_dining',
-    nota: 'Comissão de ~23% sobre o delivery',
-    subitens: [s('Comissão iFood', 6044, 5200, 5350, 'variavel')],
-  },
-  {
-    categoria: 'Aluguel',
-    tipo: 'Fixo',
-    icon: 'storefront',
-    nota: 'Ponto comercial',
-    subitens: [s('Aluguel do ponto', 6000, 6000, 6000, 'fixo')],
-  },
-  {
-    categoria: 'Utilidades',
-    tipo: 'Misto',
-    icon: 'bolt',
-    nota: 'Luz, gás e água',
-    subitens: [
-      s('Luz', 900, 870, 880, 'variavel'),
-      s('Gás', 700, 480, 450, 'variavel'),
-      s('Água', 400, 390, 395, 'fixo'),
-    ],
-  },
-  {
-    categoria: 'Taxas de cartão',
-    tipo: 'Variável',
-    icon: 'credit_card',
-    nota: 'Maquininha e antecipação',
-    subitens: [s('Maquininha e antecipação', 1200, 1160, 1170, 'variavel')],
-  },
-  {
-    categoria: 'Contador / software',
-    tipo: 'Fixo',
-    icon: 'description',
-    nota: 'Contabilidade e sistemas',
-    subitens: [s('Contabilidade e sistemas', 1200, 1200, 1200, 'fixo')],
-  },
-  {
-    categoria: 'Marketing',
-    tipo: 'Variável',
-    icon: 'campaign',
-    nota: 'Anúncios e redes sociais',
-    subitens: [s('Anúncios e redes sociais', 1000, 950, 960, 'variavel')],
-  },
-];
+  const find = (nome: string) => items.find((i) => i.categoryId === nome)!;
+  const cmvItem = find('CMV / Insumos');
+  const proItem = find('Pró-labore família');
+  const ifoodItem = find('Taxa iFood');
+  const total = items.reduce((a, i) => a + i.amount, 0);
+  const totalAnterior = items.reduce((a, i) => a + i.previous, 0);
 
-function pctTxt(atual: number, anterior: number): { text: string; up: boolean } {
-  const p = anterior === 0 ? 0 : ((atual - anterior) / anterior) * 100;
-  return { text: `${p >= 0 ? '+' : '−'}${Math.abs(p).toFixed(1).replace('.', ',')}%`, up: p >= 0 };
-}
-
-function ramp(v: number, fs = [0.82, 0.86, 0.9, 0.94, 0.97, 1]): number[] {
-  return fs.map((f) => Math.round(v * f));
-}
-
-const MESES = ['Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago'];
-
-/** Subitens cujo valor atual está >30% acima da média dos últimos 3 meses. */
-export function detectarAnomalias(despesas: Despesa[]): Anomalia[] {
-  const out: Anomalia[] = [];
-  for (const d of despesas) {
-    for (const sub of d.subitens) {
-      if (sub.mediaUlt3Meses <= 0) continue;
-      const variacao = ((sub.valorMesAtual - sub.mediaUlt3Meses) / sub.mediaUlt3Meses) * 100;
-      if (variacao > 30) {
-        out.push({
-          categoria: d.categoria,
-          subitem: sub.nome,
-          valor: sub.valorMesAtual,
-          media: sub.mediaUlt3Meses,
-          excedente: sub.valorMesAtual - sub.mediaUlt3Meses,
-          variacaoPct: variacao,
-        });
-      }
-    }
-  }
-  return out.sort((a, b) => b.excedente - a.excedente);
-}
-
-export function isAnomalo(sub: Subitem): boolean {
-  return (
-    sub.mediaUlt3Meses > 0 && (sub.valorMesAtual - sub.mediaUlt3Meses) / sub.mediaUlt3Meses > 0.3
+  const anomalies: ExpenseAnomaly[] = items.flatMap((item) =>
+    item.subitems
+      .filter((s) => s.anomaly)
+      .map(
+        (s): ExpenseAnomaly => ({
+          itemKey: item.key,
+          categoryId: item.categoryId,
+          categoryName: item.name,
+          subcategoryId: s.subcategoryId,
+          subitemKey: s.key,
+          name: s.name,
+          amount: s.amount,
+          average3: s.average3 ?? 0,
+          excess: s.amount - (s.average3 ?? 0),
+          pctAbove: s.deltaAverage3 ?? 0,
+        }),
+      ),
   );
-}
-
-function build(
-  key: string,
-  refLabel: string,
-  comparacaoLabel: string,
-  fator: number,
-  fatorAnterior: number,
-  opts: { tendencia?: boolean } = {},
-): CustosDataset {
-  const r2 = (v: number) => Math.round(v * 100) / 100;
-
-  const despesas: Despesa[] = BASE_CATEGORIAS.map((c) => {
-    const subitens = c.subitens.map((sub) => ({
-      ...sub,
-      valorMesAtual: r2(sub.valorMesAtual * fator),
-      valorMesAnterior: r2(sub.valorMesAnterior * fatorAnterior),
-      mediaUlt3Meses: r2(sub.mediaUlt3Meses * fator),
-    }));
-    return {
-      categoria: c.categoria,
-      tipo: c.tipo,
-      icon: c.icon,
-      nota: c.nota,
-      subitens,
-      valor: r2(subitens.reduce((acc, x) => acc + x.valorMesAtual, 0)),
-      valorAnterior: r2(subitens.reduce((acc, x) => acc + x.valorMesAnterior, 0)),
-    };
-  }).sort((a, b) => b.valor - a.valor);
-
-  const receita = r2(RECEITA_MES * fator);
-  const total = r2(despesas.reduce((acc, d) => acc + d.valor, 0));
-  const totalAnterior = r2(despesas.reduce((acc, d) => acc + d.valorAnterior, 0));
-
-  const find = (nome: string) => despesas.find((d) => d.categoria === nome)!;
-  const cmvCat = find('CMV / Insumos');
-  const proCat = find('Pró-labore família');
-  const ifoodCat = find('Taxa iFood');
-
-  const cmv = cmvCat.valor;
-  const proLabore = proCat.valor;
-  const ifood = ifoodCat.valor;
-
-  const cmvPct = (cmv / receita) * 100;
-  const primeCostPct = ((cmv + proLabore) / receita) * 100;
-  const ifoodPct = (ifood / (RECEITA_DELIVERY_MES * fator)) * 100;
-
-  const dTotal = pctTxt(total, totalAnterior);
-  const dCmv = pctTxt(cmv, cmvCat.valorAnterior);
-  const dPrime = pctTxt(cmv + proLabore, cmvCat.valorAnterior + proCat.valorAnterior);
-  const dIfood = pctTxt(ifood, ifoodCat.valorAnterior);
-
-  const tipos: TipoDespesa[] = ['Fixo', 'Variável', 'Misto'];
-  const fixosVariaveis = tipos.map((t) => ({
-    tipo: t,
-    valor: r2(despesas.filter((d) => d.tipo === t).reduce((acc, d) => acc + d.valor, 0)),
-  }));
-
-  const comProjecao = opts.tendencia !== false;
-  const fs = [0.88, 0.91, 0.94, 0.96, 0.98, 1];
-  const tendencia = MESES.map((mes, i) => {
-    const f = fs[i];
-    const ultimo = i === MESES.length - 1;
-    return {
-      mes,
-      total: Math.round(46468 * f),
-      cmv: Math.round(ultimo ? 21024 : 20100 * f),
-      proLabore: 8000,
-      ifood: Math.round(ultimo ? 6044 : 5300 * f),
-      aluguel: 6000,
-      utilidades: Math.round(ultimo ? 2000 : 1750 * f),
-      projecao: false,
-    };
-  });
-  if (comProjecao) {
-    tendencia.push({
-      mes: 'Set',
-      total: 47900,
-      cmv: 21700,
-      proLabore: 8000,
-      ifood: 6300,
-      aluguel: 6000,
-      utilidades: 1900,
-      projecao: true,
-    });
-  }
-
-  const anomalias = detectarAnomalias(despesas);
-  const saltos = comProjecao
-    ? [
-        { mes: 'Ago', dataKey: 'cmv', label: 'Embalagens subiram 60%' },
-        { mes: 'Ago', dataKey: 'utilidades', label: 'Gás acima da média' },
-      ]
-    : [];
 
   return {
-    key,
-    refLabel,
-    comparacaoLabel,
-    receita,
-    despesas,
-    total,
-    totalAnterior,
-    cmv,
-    cmvPct,
-    proLabore,
-    primeCostPct,
-    ifood,
-    ifoodPct,
-    deltas: { total: dTotal.text, cmv: dCmv.text, prime: dPrime.text, ifood: dIfood.text },
-    deltasUp: { total: dTotal.up, cmv: dCmv.up, prime: dPrime.up, ifood: dIfood.up },
-    sparks: {
-      total: ramp(total),
-      cmv: ramp(cmv),
-      prime: ramp(cmv + proLabore),
-      ifood: ramp(ifood),
+    referenceMonth: month ?? '2026-07',
+    previousMonth: '2026-06',
+    channel: null,
+    revenue: { current: receita, previous: receita * 0.965 },
+    total: {
+      current: total,
+      previous: totalAnterior,
+      average3: totalAnterior,
+      deltaPrevious: totalAnterior ? (total - totalAnterior) / totalAnterior : null,
+      deltaAverage3: totalAnterior ? (total - totalAnterior) / totalAnterior : null,
     },
-    fixosVariaveis,
-    tendencia,
-    tendenciaTemProjecao: comProjecao,
-    saltos,
-    anomalias,
+    cmv: {
+      amount: cmvItem.amount,
+      pctOfRevenue: cmvItem.amount / receita,
+      target: { min: 0.28, max: 0.35 },
+    },
+    primeCost: {
+      amount: cmvItem.amount + proItem.amount,
+      cmv: cmvItem.amount,
+      labor: proItem.amount,
+      pctOfRevenue: (cmvItem.amount + proItem.amount) / receita,
+      targetMax: 0.65,
+    },
+    platformFee: {
+      amount: ifoodItem.amount,
+      previous: ifoodItem.previous,
+      deltaPrevious: ifoodItem.deltaPrevious,
+      deliveryRevenue: mockCustos.receitaDeliveryMes,
+      pctOfDelivery: ifoodItem.amount / mockCustos.receitaDeliveryMes,
+    },
+    byBehavior: {
+      fixed: items
+        .filter((i) => i.behavior === CategoryBehavior.Fixed)
+        .reduce((a, i) => a + i.amount, 0),
+      variable: items
+        .filter((i) => i.behavior === CategoryBehavior.Variable)
+        .reduce((a, i) => a + i.amount, 0),
+      mixed: items
+        .filter((i) => i.behavior === CategoryBehavior.Mixed)
+        .reduce((a, i) => a + i.amount, 0),
+    },
+    items,
+    sharedExcluded: null,
+    history: ['Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago'].map((mes, i) => ({
+      month: mes,
+      total: Math.round(total * (0.85 + i * 0.03)),
+    })),
+    anomalies: anomalies.sort((a, b) => b.excess - a.excess),
+    projection: {
+      total: Math.round(total * 1.03),
+      revenue: Math.round(receita * 1.03),
+      elapsedDays: 20,
+      daysInMonth: 31,
+    },
+    anomalyRule: { minPctAbove: 0.5, minExcess: 100, minHistoryMonths: 2 },
+    comparison: { kind: 'fullMonth', untilDay: null },
   };
-}
-
-const DATASETS: Record<Exclude<PeriodKey, 'Personalizado'>, CustosDataset> = {
-  Hoje: build('hoje', 'Hoje · 05/08/2026', 'vs. ontem', 1 / 30, 1 / 31, { tendencia: false }),
-  '7 dias': build('7d', 'Últimos 7 dias', 'vs. 7 dias anteriores', 7 / 30, 6.6 / 30, {
-    tendencia: false,
-  }),
-  'Este mês': build('mes', 'Agosto/2026', 'vs. mês anterior', 1, 0.965),
-  'Mês passado': build('mes-passado', 'Julho/2026', 'vs. junho/2026', 0.965, 0.93),
-};
-
-function getPeriodData(period: PeriodKey, from?: string, to?: string): CustosDataset {
-  if (period !== 'Personalizado') return DATASETS[period];
-  const start = from ? new Date(`${from}T00:00:00`) : null;
-  const end = to ? new Date(`${to}T00:00:00`) : null;
-  const dias =
-    start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())
-      ? Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1)
-      : 7;
-  const fmt = (d: Date | null) =>
-    d && !isNaN(d.getTime())
-      ? d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-      : '—';
-  return build(
-    `custom-${from}-${to}`,
-    `${fmt(start)} a ${fmt(end)}`,
-    'vs. período anterior',
-    dias / 30,
-    (dias * 0.95) / 30,
-    { tendencia: dias >= 28 },
-  );
 }
 
 @Injectable({ providedIn: 'root' })
 export class CustosService {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private reportClient = inject(MintlyClientService).client.reportClient;
 
-  readonly data = signal<CustosDataset | null>(null);
+  readonly data = signal<ExpensesReport | null>(null);
   readonly loading = signal(false);
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
   }
 
-  /** Mesmo wrapper autenticado dos outros services (401 -> refresh + retry) — pronto pra quando o endpoint existir. */
   private async call<T>(fn: (headers: Headers) => Promise<T>): Promise<T> {
     try {
       return await fn(this.headers);
@@ -391,20 +220,25 @@ export class CustosService {
     );
   }
 
-  /** TODO(API): sem endpoint de custos na mintly-lib ainda — mock local no mesmo formato de resposta ({ payload }). */
-  private async fetch(
-    period: PeriodKey,
-    from?: string,
-    to?: string,
-  ): Promise<{ payload: CustosDataset }> {
-    await new Promise((r) => setTimeout(r, 380));
-    return { payload: getPeriodData(period, from, to) };
-  }
-
-  async refresh(period: PeriodKey, from?: string, to?: string): Promise<void> {
+  async refresh(month?: string, channel?: ChannelFilter): Promise<void> {
     this.loading.set(true);
     try {
-      const response = await this.call(() => this.fetch(period, from, to));
+      if (environment.useMocks) {
+        await delay();
+        this.data.set(buildMockReport(month));
+        return;
+      }
+      const query: ExpensesQuery = {
+        month,
+        channel:
+          channel === 'dineIn'
+            ? MovementChannel.DineIn
+            : channel === 'delivery'
+              ? MovementChannel.Delivery
+              : undefined,
+      };
+      const response = await this.call((headers) => this.reportClient.expenses(query, headers));
+      if (!response.payload) throw new Error('Resposta de /reports/expenses sem payload.');
       this.data.set(response.payload);
     } finally {
       this.loading.set(false);

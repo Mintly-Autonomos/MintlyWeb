@@ -1,228 +1,129 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import type { Headers } from 'mintly-lib';
+import type { OverviewReport, OverviewQuery, OverviewInsight, Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
-import type { WaterfallRow } from '../shared/waterfall-chart.component';
-import type { InsightSeverity } from '../shared/insight-card.component';
+import { MintlyClientService } from './mintly-client.service';
+import mockDashboard from '../mocks/mock_dashboard.json';
 
-export interface DashboardSummary {
-  grossRevenue: number;
-  prevGrossRevenue: number;
-  taxes: number;
-  netRevenue: number;
-  cmv: number;
-  cmvPct: number;
-  prevCmvPct: number;
-  opex: number;
-  netProfit: number;
-  prevNetProfit: number;
-  marginPct: number;
-  primeCost: number;
-  primeCostPct: number;
-  cashToday: number;
-  cashIn30Days: number;
-  healthScore: number;
+export type { OverviewReport, OverviewQuery, OverviewInsight };
+
+function delay(ms = 380): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export interface MonthlyPoint {
-  month: string;
-  receita: number;
-  despesa: number;
-  lucro: number;
-}
+/**
+ * Mock aproximado pra dev local sem a MintlyApi no ar (`environment.useMocks: true`) — mesmo
+ * contrato real (`OverviewReport`), construído a partir de `mocks/mock_dashboard.json`. Não
+ * reproduz as regras exatas do score (pilares/faixas) — só dados plausíveis.
+ */
+function buildMockReport(): OverviewReport {
+  const s = mockDashboard.summary;
+  const hist = mockDashboard.monthlyHistory;
+  const netProfitHistory = hist.map((h) => ({ month: h.month, amount: h.lucro }));
+  const revenueHistory = hist.map((h) => ({ month: h.month, amount: h.receita }));
+  const folego = Math.round(s.cashToday / (s.opex / 30));
 
-export interface DashboardInsight {
-  severity: InsightSeverity;
-  title: string;
-  description: string;
-  action?: string;
-}
+  const scoreMargem =
+    s.marginPct < 0 ? 0 : s.marginPct < 4 ? 25 : s.marginPct < 8 ? 50 : s.marginPct < 12 ? 75 : 100;
+  const scorePrime =
+    s.primeCostPct <= 60 ? 100 : s.primeCostPct <= 65 ? 75 : s.primeCostPct <= 70 ? 50 : 25;
+  const scoreFolego = folego >= 60 ? 100 : folego >= 30 ? 75 : folego >= 15 ? 50 : 25;
+  const variacao = ((s.grossRevenue - s.prevGrossRevenue) / s.prevGrossRevenue) * 100;
+  const scoreTendencia = variacao > 2 ? 100 : variacao >= -2 ? 60 : 25;
+  const score = Math.round(
+    scoreMargem * 0.3 + scoreFolego * 0.3 + scorePrime * 0.25 + scoreTendencia * 0.15,
+  );
 
-export interface Pilar {
-  key: string;
-  label: string;
-  weight: number;
-  score: number;
-  detail: string;
-}
-
-export type NivelSaude = 'risco' | 'atencao' | 'saudavel';
-
-export interface ScoreSaude {
-  score: number;
-  pilares: Pilar[];
-  level: NivelSaude;
-}
-
-export interface DashboardDataset {
-  referenceMonth: string;
-  summary: DashboardSummary;
-  monthlyHistory: MonthlyPoint[];
-  waterfall: WaterfallRow[];
-  sparks: { lucro: number[]; caixa: number[]; projecao: number[]; receita: number[] };
-  insights: DashboardInsight[];
-  saude: ScoreSaude;
-  folegoDias: number;
-}
-
-const SUMMARY: DashboardSummary = {
-  grossRevenue: 58400,
-  prevGrossRevenue: 54200,
-  taxes: 3504,
-  netRevenue: 54896,
-  cmv: 21024,
-  cmvPct: 36,
-  prevCmvPct: 33,
-  opex: 27500,
-  netProfit: 6372,
-  prevNetProfit: 5100,
-  marginPct: 10.9,
-  primeCost: 36024,
-  primeCostPct: 61.7,
-  cashToday: 18500,
-  cashIn30Days: 3900,
-  healthScore: 74,
-};
-
-const MONTHLY_HISTORY: MonthlyPoint[] = [
-  { month: 'Fev', receita: 44800, despesa: 40100, lucro: 4700 },
-  { month: 'Mar', receita: 47300, despesa: 42600, lucro: 4700 },
-  { month: 'Abr', receita: 49900, despesa: 44500, lucro: 5400 },
-  { month: 'Mai', receita: 51600, despesa: 46700, lucro: 4900 },
-  { month: 'Jun', receita: 54200, despesa: 49100, lucro: 5100 },
-  { month: 'Jul', receita: 58400, despesa: 52028, lucro: 6372 },
-];
-
-const WATERFALL: WaterfallRow[] = [
-  { label: 'Receita Bruta', value: 58400, kind: 'start' },
-  { label: 'Impostos', value: -3504, kind: 'down' },
-  { label: 'CMV', value: -21024, kind: 'down' },
-  { label: 'Despesas', value: -27500, kind: 'down' },
-  { label: 'Lucro Líquido', value: 6372, kind: 'end' },
-];
-
-const SPARKS = {
-  lucro: [4700, 4700, 5400, 4900, 5100, 6372],
-  caixa: [12100, 13800, 15200, 14600, 17100, 18500],
-  projecao: [18500, 16200, 13400, 10100, 7200, 3900],
-  receita: [44800, 47300, 49900, 51600, 54200, 58400],
-};
-
-const INSIGHTS: DashboardInsight[] = [
-  {
-    severity: 'atencao',
-    title: 'Custo dos ingredientes acima do ideal',
-    description:
-      'O custo dos ingredientes subiu este mês e reduziu seu lucro em cerca de R$ 1.750.',
-    action: 'Ver custos',
-  },
-  {
-    severity: 'atencao',
-    title: 'Caixa apertado a partir do dia 22',
-    description:
-      'Contas concentradas devem reduzir seu caixa para cerca de R$ 900 por volta do dia 22, com risco de faltar recurso para a operação.',
-    action: 'Ver fluxo de caixa',
-  },
-  {
-    severity: 'oportunidade',
-    title: 'Oportunidade de margem na Moqueca',
-    description:
-      'A Moqueca tem alta procura e margem baixa. Um reajuste de cerca de R$ 4 no preço pode gerar aproximadamente R$ 640 a mais por mês.',
-    action: 'Ver cardápio',
-  },
-  {
-    severity: 'positivo',
-    title: 'Ponto de equilíbrio atingido',
-    description:
-      'Desde o dia 19, suas contas fixas do mês já estão cobertas. As próximas vendas são lucro.',
-  },
-];
-
-function scoreMargem(m: number): number {
-  if (m < 0) return 0;
-  if (m < 4) return 25;
-  if (m < 8) return 50;
-  if (m < 12) return 75;
-  return 100;
-}
-function scorePrimeCost(p: number): number {
-  if (p <= 60) return 100;
-  if (p <= 65) return 75;
-  if (p <= 70) return 50;
-  return 25;
-}
-function scoreFolego(d: number): number {
-  if (d >= 60) return 100;
-  if (d >= 30) return 75;
-  if (d >= 15) return 50;
-  return 25;
-}
-function scoreTendencia(variacaoPct: number): number {
-  if (variacaoPct > 2) return 100;
-  if (variacaoPct >= -2) return 60;
-  return 25;
-}
-
-function folegoDeCaixaDias(): number {
-  return Math.round(SUMMARY.cashToday / (SUMMARY.opex / 30));
-}
-
-function calcularScoreSaude(): ScoreSaude {
-  const margem = SUMMARY.marginPct;
-  const prime = SUMMARY.primeCostPct;
-  const folegoDias = SUMMARY.cashToday / (SUMMARY.opex / 30);
-  const prevReceita =
-    SUMMARY.prevGrossRevenue ||
-    MONTHLY_HISTORY[MONTHLY_HISTORY.length - 2]?.receita ||
-    SUMMARY.grossRevenue;
-  const variacao = ((SUMMARY.grossRevenue - prevReceita) / prevReceita) * 100;
-
-  const pilares: Pilar[] = [
+  const insights: OverviewInsight[] = [
     {
-      key: 'margem',
-      label: 'Margem líquida',
-      weight: 30,
-      score: scoreMargem(margem),
-      detail: `${margem.toFixed(1).replace('.', ',')}% de margem`,
+      kind: 'cmvAboveTarget',
+      severity: 'warning',
+      pct: s.cmvPct / 100,
+      targetMax: 0.35,
+      impact: 1750,
+      basisMonth: '2026-07',
     },
-    {
-      key: 'prime',
-      label: 'Prime Cost',
-      weight: 25,
-      score: scorePrimeCost(prime),
-      detail: `${prime.toFixed(1).replace('.', ',')}% da receita`,
-    },
-    {
-      key: 'folego',
-      label: 'Fôlego de caixa',
-      weight: 25,
-      score: scoreFolego(folegoDias),
-      detail: `~${Math.round(folegoDias)} dias de caixa`,
-    },
-    {
-      key: 'tendencia',
-      label: 'Tendência de vendas',
-      weight: 20,
-      score: scoreTendencia(variacao),
-      detail: `${variacao > 0 ? '+' : ''}${variacao.toFixed(1).replace('.', ',')}% vs. mês anterior`,
-    },
+    { kind: 'cashTight', severity: 'warning', date: '2026-07-22', balance: 900 },
   ];
+  const biggest = [...mockDashboard.insights].find((i) => i.severity === 'oportunidade');
+  if (biggest)
+    insights.push({
+      kind: 'expenseAnomaly',
+      severity: 'warning',
+      name: biggest.title,
+      categoryName: 'Custos',
+      excess: 640,
+      pctAbove: 0.1,
+    });
+  insights.push({ kind: 'breakEvenReached', severity: 'positive', day: 19 });
 
-  const score = Math.round(pilares.reduce((acc, p) => acc + (p.score * p.weight) / 100, 0));
-  return { score, pilares, level: score >= 70 ? 'saudavel' : score >= 50 ? 'atencao' : 'risco' };
-}
-
-function buildDataset(): DashboardDataset {
   return {
-    referenceMonth: 'Julho/2026',
-    summary: SUMMARY,
-    monthlyHistory: MONTHLY_HISTORY,
-    waterfall: WATERFALL,
-    sparks: SPARKS,
-    insights: INSIGHTS,
-    saude: calcularScoreSaude(),
-    folegoDias: folegoDeCaixaDias(),
+    referenceMonth: '2026-07',
+    today: '2026-07-31',
+    cards: {
+      netProfit: {
+        amount: s.netProfit,
+        delta: (s.netProfit - s.prevNetProfit) / s.prevNetProfit,
+        history: netProfitHistory,
+      },
+      revenue: {
+        amount: s.grossRevenue,
+        delta: (s.grossRevenue - s.prevGrossRevenue) / s.prevGrossRevenue,
+        history: revenueHistory,
+      },
+      cashToday: {
+        amount: s.cashToday,
+        realized: hist
+          .slice(-7)
+          .map((h, i) => ({ date: `2026-07-${25 + i}`, balance: s.cashToday - (6 - i) * 200 })),
+      },
+      projection: {
+        horizon: 30,
+        balance: s.cashIn30Days,
+        lowest: { date: '2026-08-22', balance: 900 },
+        runwayDays: folego,
+      },
+      cmv: {
+        pct: s.cmvPct / 100,
+        previousPct: s.prevCmvPct / 100,
+        deltaPoints: s.cmvPct - s.prevCmvPct,
+        target: { min: 0.28, max: 0.35 },
+      },
+      primeCost: {
+        pct: s.primeCostPct / 100,
+        previousPct: (s.primeCostPct - 1.8) / 100,
+        deltaPoints: 1.8,
+        targetMax: 0.65,
+      },
+    },
+    health: {
+      score,
+      label: score >= 70 ? 'healthy' : score >= 40 ? 'attention' : 'risk',
+      basisMonth: '2026-07',
+      pillars: [
+        { key: 'netMargin', weight: 0.3, score: scoreMargem, value: s.marginPct / 100 },
+        { key: 'runway', weight: 0.3, score: scoreFolego, value: folego },
+        { key: 'primeCost', weight: 0.25, score: scorePrime, value: s.primeCostPct / 100 },
+        { key: 'revenueTrend', weight: 0.15, score: scoreTendencia, value: variacao / 100 },
+      ],
+      bands: { risk: 40, attention: 70 },
+    },
+    insights,
+    revenueVsExpense: hist.map((h) => ({
+      month: h.month,
+      revenue: h.receita,
+      expense: h.despesa,
+      projected: false,
+    })),
+    profitWaterfall: {
+      grossRevenue: s.grossRevenue,
+      taxes: s.taxes,
+      cmv: s.cmv,
+      operatingExpenses: s.opex,
+      netProfit: s.netProfit,
+    },
+    comparison: { kind: 'fullMonth', untilDay: null },
   };
 }
 
@@ -230,15 +131,15 @@ function buildDataset(): DashboardDataset {
 export class DashboardService {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private dashboardClient = inject(MintlyClientService).client.dashboardClient;
 
-  readonly data = signal<DashboardDataset | null>(null);
+  readonly data = signal<OverviewReport | null>(null);
   readonly loading = signal(false);
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
   }
 
-  /** Mesmo wrapper autenticado dos outros services (401 -> refresh + retry) — pronto pra quando o endpoint existir. */
   private async call<T>(fn: (headers: Headers) => Promise<T>): Promise<T> {
     try {
       return await fn(this.headers);
@@ -260,16 +161,17 @@ export class DashboardService {
     );
   }
 
-  /** TODO(API): sem endpoint de dashboard/visão-geral na mintly-lib ainda — mock local no mesmo formato de resposta ({ payload }). */
-  private async fetch(): Promise<{ payload: DashboardDataset }> {
-    await new Promise((r) => setTimeout(r, 380));
-    return { payload: buildDataset() };
-  }
-
-  async refresh(): Promise<void> {
+  async refresh(month?: string): Promise<void> {
     this.loading.set(true);
     try {
-      const response = await this.call(() => this.fetch());
+      if (environment.useMocks) {
+        await delay();
+        this.data.set(buildMockReport());
+        return;
+      }
+      const query: OverviewQuery = { month };
+      const response = await this.call((headers) => this.dashboardClient.overview(query, headers));
+      if (!response.payload) throw new Error('Resposta de /dashboard/overview sem payload.');
       this.data.set(response.payload);
     } finally {
       this.loading.set(false);

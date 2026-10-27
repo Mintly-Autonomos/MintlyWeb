@@ -1,13 +1,12 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { MovementDirection, MovementStatus } from 'mintly-lib';
 import {
   FluxoCaixaService,
-  Vencimento,
   isoFromOffset,
   offsetFromIso,
   formatDia,
   formatDiaLongo,
   MAX_HORIZONTE_DIAS,
-  LIMITE_ALERTA,
 } from '../../services/fluxo-caixa.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -30,6 +29,18 @@ const abrev = (v: number) => {
 };
 
 type Tab = 'todos' | 'receber' | 'pagar' | 'vencidos';
+
+/** Shape local pra tela — adaptado do `DueItem` real (mesmo vocabulário em PT que a tela já usava). */
+interface VencimentoView {
+  id: string;
+  descricao: string;
+  valor: number;
+  tipo: 'receber' | 'pagar';
+  dataVencimento: string;
+  status: 'previsto' | 'pago' | 'recebido' | 'vencido';
+  categoria: string;
+  offset: number;
+}
 
 const EMPTY_STATE: Record<Tab, { icon: string; title: string; description: string }> = {
   todos: {
@@ -55,7 +66,7 @@ const EMPTY_STATE: Record<Tab, { icon: string; title: string; description: strin
 };
 
 const STATUS_META: Record<
-  Vencimento['status'],
+  VencimentoView['status'],
   { label: string; icon: string; tone: 'neutral' | 'success' | 'warning' | 'error' | 'ocean' }
 > = {
   previsto: { label: 'Previsto', icon: 'schedule', tone: 'ocean' },
@@ -122,52 +133,110 @@ export class FluxoCaixaComponent implements OnInit {
     return custom ? `até ${formatDia(custom)}` : `${this.horizon()} dias`;
   });
 
-  protected hojeRotulo = formatDia(isoFromOffset(0));
+  protected hoje = computed(() => this.data()?.today ?? isoFromOffset(0));
+  protected hojeRotulo = computed(() => formatDia(this.hoje()));
   protected minCustomDate = isoFromOffset(1);
   protected maxCustomDate = isoFromOffset(MAX_HORIZONTE_DIAS);
+
+  /** Primeiro dia (se houver) em que o saldo projetado cai abaixo da margem de segurança. */
+  protected criticalInsight = computed(() => {
+    const d = this.data();
+    return d?.insights.find((i) => i.kind === 'criticalDay');
+  });
+  protected alerta = computed(() => !!this.criticalInsight());
+  protected diaAperto = computed(() => {
+    const c = this.criticalInsight();
+    return c ? offsetFromIso(c.date) : 0;
+  });
+  protected menorSaldoOffset = computed(() => {
+    const d = this.data();
+    return d ? offsetFromIso(d.lowestBalance.date) : 0;
+  });
 
   protected serie = computed(() => {
     const d = this.data();
     if (!d) return [];
-    const passado = d.serieRealizada.map((p) => ({
-      ...p,
-      rotulo: formatDia(p.data),
-      real: p.saldo,
+    const passado = d.realized.map((p) => ({
+      rotulo: formatDia(p.date),
+      real: p.balance,
       futuro: null as number | null,
     }));
-    const futuro = d.resumo.serie.map((p) => ({
-      ...p,
-      rotulo: formatDia(p.data),
-      real: p.offset === 0 ? p.saldo : (null as number | null),
-      futuro: p.saldo,
+    const futuro = d.projection.map((p, i) => ({
+      rotulo: formatDia(p.date),
+      real: i === 0 ? p.balance : (null as number | null),
+      futuro: p.balance,
     }));
     return [...passado, ...futuro];
   });
 
-  protected menorSaldo = computed(() => this.data()?.resumo.menorSaldo);
-  protected diaAperto = computed(() => this.menorSaldo()?.offset ?? 0);
-  protected alerta = computed(() => (this.menorSaldo()?.saldo ?? 0) < LIMITE_ALERTA);
-
   protected dots = computed<AreaDot[]>(() => {
-    const m = this.menorSaldo();
     const d = this.data();
-    if (!m || !d) return [];
-    return [
-      { atLabel: this.hojeRotulo, key: 'real', color: 'var(--ocean)' },
-      {
-        atLabel: formatDia(m.data),
+    const c = this.criticalInsight();
+    if (!d) return [];
+    const base: AreaDot[] = [{ atLabel: this.hojeRotulo(), key: 'real', color: 'var(--ocean)' }];
+    if (c) {
+      base.push({
+        atLabel: formatDia(c.date),
         key: 'futuro',
         color: 'var(--warning)',
-        caption: `menor saldo ~${formatBRL(m.saldo)} · dia ${m.offset}`,
-      },
+        caption: `menor saldo ~${formatBRL(c.balance)} · dia ${offsetFromIso(c.date)}`,
+      });
+    }
+    return base;
+  });
+
+  /** `weeks` real (from/to) reempacotado no shape que o gráfico de barras já usava (semana/período). */
+  protected blocos = computed(() => {
+    const d = this.data();
+    if (!d) return [];
+    return d.weeks.map((w, i) => ({
+      semana: `Sem ${i + 1}`,
+      periodo: `${formatDia(w.from)} – ${formatDia(w.to)}`,
+      entradas: w.inflows,
+      saidas: w.outflows,
+    }));
+  });
+
+  /** Sparks curtos (não vêm mais do back) — últimos pontos realizados + previstos. */
+  protected sparkReceber = computed(() => {
+    const d = this.data();
+    if (!d) return [];
+    return [...d.realized.map((p) => p.inflows), ...d.projection.slice(1, 5).map((p) => p.inflows)];
+  });
+  protected sparkPagar = computed(() => {
+    const d = this.data();
+    if (!d) return [];
+    return [
+      ...d.realized.map((p) => p.outflows),
+      ...d.projection.slice(1, 5).map((p) => p.outflows),
     ];
   });
 
-  protected itens = computed<Vencimento[]>(() => {
+  protected itens = computed<VencimentoView[]>(() => {
     const d = this.data();
     if (!d) return [];
     const tab = this.tab();
-    return [...d.vencimentos]
+    const views: VencimentoView[] = d.dueItems.map((v) => {
+      const tipo = v.direction === MovementDirection.In ? 'receber' : 'pagar';
+      const status: VencimentoView['status'] = v.overdue
+        ? 'vencido'
+        : v.status === MovementStatus.Settled
+          ? tipo === 'receber'
+            ? 'recebido'
+            : 'pago'
+          : 'previsto';
+      return {
+        id: v.id,
+        descricao: v.title,
+        valor: v.amount,
+        tipo,
+        dataVencimento: v.dueDate,
+        status,
+        categoria: v.category.name,
+        offset: offsetFromIso(v.dueDate),
+      };
+    });
+    return views
       .filter((v) => {
         if (tab === 'vencidos') return v.status === 'vencido';
         if (tab === 'todos')
@@ -177,8 +246,8 @@ export class FluxoCaixaComponent implements OnInit {
       .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento));
   });
 
-  protected grupos = computed<[string, Vencimento[]][]>(() => {
-    const map = new Map<string, Vencimento[]>();
+  protected grupos = computed<[string, VencimentoView[]][]>(() => {
+    const map = new Map<string, VencimentoView[]>();
     for (const v of this.itens()) {
       const arr = map.get(v.dataVencimento) ?? [];
       arr.push(v);
@@ -253,7 +322,7 @@ export class FluxoCaixaComponent implements OnInit {
     return off === this.diaAperto();
   }
 
-  isAtrasado(lista: Vencimento[]): boolean {
+  isAtrasado(lista: VencimentoView[]): boolean {
     return lista.every((v) => v.status === 'vencido');
   }
 }

@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import mockPrevisoes from '../mocks/mock_previsoes.json';
 
 export type Severity = 'risco' | 'atencao' | 'oportunidade' | 'positivo';
 export type Horizonte = 30 | 60 | 90;
@@ -75,16 +76,9 @@ export interface QuadranteMeta {
 }
 
 export const REF_LABEL = 'Julho/2026';
-export const CAIXA_HOJE = 18500;
+export const CAIXA_HOJE = mockPrevisoes.caixaHoje;
 
-export const HISTORICO: MesHist[] = [
-  { mes: 'Fev', receita: 49800, despesa: 45900, lucro: 3900, caixa: 11200 },
-  { mes: 'Mar', receita: 51600, despesa: 47300, lucro: 4300, caixa: 12600 },
-  { mes: 'Abr', receita: 52900, despesa: 48350, lucro: 4550, caixa: 14100 },
-  { mes: 'Mai', receita: 53400, despesa: 48620, lucro: 4780, caixa: 15400 },
-  { mes: 'Jun', receita: 54200, despesa: 49100, lucro: 5100, caixa: 16900 },
-  { mes: 'Jul', receita: 58400, despesa: 52028, lucro: 6372, caixa: 18500 },
-];
+export const HISTORICO: MesHist[] = mockPrevisoes.historico;
 
 const PESOS = [0.08, 0.09, 0.1, 0.11, 0.19, 0.23, 0.2];
 const NOMES: [string, string][] = [
@@ -266,22 +260,15 @@ function mk(
   };
 }
 
-export const CARDAPIO: ItemCardapio[] = [
-  mk('Frango Yangnyeom', 'Frango', 420, 64, 26),
-  mk('Frango Soy Garlic', 'Frango', 356, 62, 25),
-  mk('Frango Honey Butter', 'Frango', 188, 66, 31),
-  mk('Frango ao Alho Crocante', 'Frango', 132, 60, 30),
-  mk('Frango Cheese Powder', 'Frango', 74, 68, 38),
-  mk('Batata Coreana', 'Acompanhamento', 310, 22, 8),
-  mk('Tteokbokki', 'Acompanhamento', 164, 34, 15),
-  mk('Kimchi da casa', 'Acompanhamento', 96, 18, 9),
-  mk('Japchae', 'Acompanhamento', 58, 38, 22),
-  mk('Cerveja long neck', 'Bebida', 148, 14, 4),
-  mk('Soju', 'Bebida', 92, 28, 9),
-  mk('Refrigerante lata', 'Bebida', 268, 8, 3),
-  mk('Chá gelado de cevada', 'Bebida', 46, 12, 4),
-  mk('Bingsu de morango', 'Sobremesa', 38, 32, 19),
-];
+export const CARDAPIO: ItemCardapio[] = (
+  mockPrevisoes.cardapio as {
+    nome: string;
+    categoria: Categoria;
+    qtdVendida: number;
+    preco: number;
+    custo: number;
+  }[]
+).map((i) => mk(i.nome, i.categoria, i.qtdVendida, i.preco, i.custo));
 
 export const MEDIA_QTD = CARDAPIO.reduce((s, i) => s + i.qtdVendida, 0) / CARDAPIO.length;
 export const MEDIA_MARGEM_PCT = CARDAPIO.reduce((s, i) => s + i.margemPct, 0) / CARDAPIO.length;

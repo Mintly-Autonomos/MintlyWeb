@@ -1,28 +1,41 @@
 <div class="space-y-6">
-  <!-- 1 — Período -->
+  <!-- 1 — Mês -->
   <div class="flex flex-wrap items-center gap-2">
     <div
       class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
     >
-      @for (p of periods; track p) {
+      @for (m of monthOpts; track m.key) {
         <button
           type="button"
-          (click)="setPeriod(p)"
-          [attr.aria-pressed]="period() === p"
+          (click)="setMonth(m.key)"
+          [attr.aria-pressed]="monthSel() === m.key"
           [class]="
             'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
-            (period() === p
+            (monthSel() === m.key
               ? 'bg-mint-soft text-ocean'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground')
           "
         >
-          {{ p }}
+          {{ m.label }}
         </button>
       }
     </div>
+    @if (monthSel() === 'personalizado') {
+      <div
+        class="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-border bg-card"
+      >
+        <input
+          type="month"
+          [value]="customMonth()"
+          (change)="setCustomMonth($any($event.target).value)"
+          aria-label="Mês de referência"
+          class="bg-transparent outline-none text-[12.5px]"
+        />
+      </div>
+    }
     @if (data(); as d) {
       <div class="ml-auto text-[12px] text-muted-foreground">
-        Referência: {{ d.referenceMonth }} · Cantina da Ana
+        Referência: {{ fmtMonthLong(d.referenceMonth) }}
       </div>
     }
   </div>
@@ -69,7 +82,7 @@
                     class="text-[44px] font-bold tracking-tight tabular-nums"
                     [style.color]="scoreMeta().color"
                   >
-                    {{ d.saude.score }}
+                    {{ d.health.score ?? '—' }}
                   </div>
                   <div class="text-[11px] text-muted-foreground -mt-1">de 100</div>
                 </div>
@@ -98,11 +111,15 @@
       <div class="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
         <app-stat-card
           label="Lucro do mês"
-          [value]="fmtBRL(d.summary.netProfit)"
-          [delta]="{ value: '+24,9%', up: true, note: 'vs. mês anterior' }"
+          [value]="fmtBRL(d.cards.netProfit.amount)"
+          [delta]="{
+            value: pctFmt(Math.abs((d.cards.netProfit.delta ?? 0) * 100)),
+            up: (d.cards.netProfit.delta ?? 0) >= 0,
+            note: 'vs. mês anterior',
+          }"
           icon="savings"
           status="neutral"
-          [spark]="d.sparks.lucro"
+          [spark]="netProfitSpark()"
         >
           <app-hint
             slot="hint"
@@ -111,18 +128,21 @@
         </app-stat-card>
         <app-stat-card
           label="Caixa hoje"
-          [value]="fmtBRL(d.summary.cashToday)"
+          [value]="fmtBRL(d.cards.cashToday.amount)"
           icon="account_balance_wallet"
           status="neutral"
-          [spark]="d.sparks.caixa"
+          [spark]="cashSpark()"
         />
         <app-stat-card
           label="Projeção 30 dias"
-          [value]="fmtBRL(d.summary.cashIn30Days)"
-          [subtext]="'fôlego de ~' + d.folegoDias + ' dias de caixa'"
+          [value]="fmtBRL(d.cards.projection.balance)"
+          [subtext]="
+            d.cards.projection.runwayDays !== null
+              ? 'fôlego de ~' + d.cards.projection.runwayDays + ' dias de caixa'
+              : ''
+          "
           icon="timeline"
           status="warning"
-          [spark]="d.sparks.projecao"
         >
           <app-hint
             slot="hint"
@@ -132,8 +152,15 @@
         </app-stat-card>
         <app-stat-card
           label="CMV"
-          value="36%"
-          [delta]="{ value: '+3 p.p.', up: true, note: 'vs. mês anterior' }"
+          [value]="pctFmt((d.cards.cmv.pct ?? 0) * 100)"
+          [delta]="{
+            value:
+              Math.abs(d.cards.cmv.deltaPoints ?? 0).toLocaleString('pt-BR', {
+                maximumFractionDigits: 1,
+              }) + ' p.p.',
+            up: (d.cards.cmv.deltaPoints ?? 0) >= 0,
+            note: 'vs. mês anterior',
+          }"
           icon="restaurant"
           status="warning"
         >
@@ -141,28 +168,57 @@
             slot="hint"
             text="Custo da Mercadoria Vendida: quanto dos seus insumos foi consumido para gerar as vendas. Ideal entre 28% e 35% da receita."
           />
-          <app-bullet slot="footer" [value]="36" [min]="28" [max]="35" label="Alvo 28–35%" />
+          <app-bullet
+            slot="footer"
+            [value]="(d.cards.cmv.pct ?? 0) * 100"
+            [min]="d.cards.cmv.target.min * 100"
+            [max]="d.cards.cmv.target.max * 100"
+            [label]="
+              'Alvo ' +
+              Math.round(d.cards.cmv.target.min * 100) +
+              '–' +
+              Math.round(d.cards.cmv.target.max * 100) +
+              '%'
+            "
+          />
         </app-stat-card>
         <app-stat-card
           label="Prime Cost"
-          value="61,7%"
-          [delta]="{ value: '+1,8 p.p.', up: true, note: 'vs. mês anterior' }"
+          [value]="pctFmt((d.cards.primeCost.pct ?? 0) * 100)"
+          [delta]="{
+            value:
+              Math.abs(d.cards.primeCost.deltaPoints ?? 0).toLocaleString('pt-BR', {
+                maximumFractionDigits: 1,
+              }) + ' p.p.',
+            up: (d.cards.primeCost.deltaPoints ?? 0) >= 0,
+            note: 'vs. mês anterior',
+          }"
           icon="stacked_bar_chart"
           status="warning"
         >
           <app-hint
             slot="hint"
-            text="CMV + custo de pessoal. É o maior custo controlável de um restaurante. Ideal ficar abaixo de 60–65% da receita."
+            text="CMV + custo de pessoal. É o maior custo controlável de um restaurante."
           />
-          <app-bullet slot="footer" [value]="61.7" [min]="0" [max]="65" label="Alvo ≤ 60–65%" />
+          <app-bullet
+            slot="footer"
+            [value]="(d.cards.primeCost.pct ?? 0) * 100"
+            [min]="0"
+            [max]="d.cards.primeCost.targetMax * 100"
+            [label]="'Alvo ≤ ' + Math.round(d.cards.primeCost.targetMax * 100) + '%'"
+          />
         </app-stat-card>
         <app-stat-card
           label="Receita do mês"
-          [value]="fmtBRL(d.summary.grossRevenue)"
-          [delta]="{ value: '+7,7%', up: true, note: 'vs. mês anterior' }"
+          [value]="fmtBRL(d.cards.revenue.amount)"
+          [delta]="{
+            value: pctFmt(Math.abs((d.cards.revenue.delta ?? 0) * 100)),
+            up: (d.cards.revenue.delta ?? 0) >= 0,
+            note: 'vs. mês anterior',
+          }"
           icon="trending_up"
           status="neutral"
-          [spark]="d.sparks.receita"
+          [spark]="revenueSpark()"
         />
       </div>
     </div>
@@ -171,13 +227,13 @@
     <section>
       <app-section-header title="O que fazer primeiro" />
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        @for (i of d.insights; track i.title) {
+        @for (i of d.insights; track i.kind) {
           <app-insight-card
-            [severity]="i.severity"
-            [title]="i.title"
-            [description]="i.description"
-            [action]="i.action ?? ''"
-            (actionClick)="goTo(actionRoute(i.action))"
+            [severity]="insightSeverity(i)"
+            [title]="insightTitle(i)"
+            [description]="insightDescription(i)"
+            [action]="insightAction(i)"
+            (actionClick)="insightGo(i)"
           />
         }
       </div>
@@ -187,7 +243,7 @@
     <div class="grid grid-cols-1 gap-6">
       <app-chart-card
         title="Receita vs. Despesa"
-        description="Últimos 6 meses e projeção dos próximos 30 dias."
+        description="Últimos 6 meses e projeção do fechamento do mês atual."
         [loading]="loading()"
         [height]="340"
       >
@@ -200,7 +256,7 @@
       </app-chart-card>
 
       <app-chart-card title="Como seu lucro se forma" [loading]="loading()" [height]="340">
-        <app-waterfall-chart [rows]="d.waterfall" />
+        <app-waterfall-chart [rows]="waterfall()" />
       </app-chart-card>
     </div>
 
@@ -219,27 +275,27 @@
       [open]="scoreOpen()"
       (closed)="scoreOpen.set(false)"
       title="Como calculamos sua saúde"
-      [subtitle]="'Score ' + d.saude.score + '/100 — média ponderada de 4 pilares.'"
+      [subtitle]="'Score ' + (d.health.score ?? '—') + '/100 — média ponderada de 4 pilares.'"
     >
       <div class="space-y-5">
-        @for (p of d.saude.pilares; track p.key) {
+        @for (p of d.health.pillars; track p.key) {
           <div>
             <div class="flex items-center justify-between text-[13px]">
-              <span class="font-semibold">{{ p.label }}</span>
-              <span class="tabular-nums font-bold">{{ p.score }}</span>
+              <span class="font-semibold">{{ pillarLabel[p.key] }}</span>
+              <span class="tabular-nums font-bold">{{ p.score ?? '—' }}</span>
             </div>
             <div class="mt-2 h-2 rounded-full bg-muted overflow-hidden">
               <div
                 class="h-full rounded-full"
-                [style.width.%]="p.score"
+                [style.width.%]="p.score ?? 0"
                 [style.background]="scoreMeta().color"
               ></div>
             </div>
             <div
               class="mt-1.5 flex items-center justify-between text-[11.5px] text-muted-foreground"
             >
-              <span>{{ p.detail }}</span>
-              <span>peso {{ p.weight }}%</span>
+              <span>{{ pillarDetail(p.key, p.value) }}</span>
+              <span>peso {{ Math.round(p.weight * 100) }}%</span>
             </div>
           </div>
         }

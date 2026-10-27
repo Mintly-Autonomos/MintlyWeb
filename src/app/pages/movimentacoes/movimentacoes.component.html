@@ -914,6 +914,21 @@
       <p class="text-[13px] text-muted-foreground">
         As movimentações importadas já aparecem na sua lista.
       </p>
+      @if (res.failedRows.length > 0) {
+        <div class="text-left rounded-xl border border-warning/30 bg-warning/10 p-3 space-y-1">
+          <p class="text-[12.5px] font-semibold text-warning">
+            {{ res.failedRows.length }}
+            {{
+              res.failedRows.length === 1 ? 'linha não foi gravada' : 'linhas não foram gravadas'
+            }}
+          </p>
+          @for (f of res.failedRows; track f.row) {
+            <p class="text-[12px] text-muted-foreground">
+              Linha {{ f.row }} ({{ f.title }}): {{ f.error }}
+            </p>
+          }
+        </div>
+      }
     </div>
     <ng-container ngProjectAs="[slot=footer]">
       <div class="flex justify-end">

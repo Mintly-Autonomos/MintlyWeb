@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { MintlyClientService } from './mintly-client.service';
+import mockAuth from '../mocks/mock_auth.json';
 
 export interface AuthUser {
   nome: string;
@@ -14,6 +15,14 @@ export interface AuthUser {
   avatarDataUrl?: string;
 }
 
+interface MockRegisteredUser {
+  name: string;
+  email: string;
+  password: string;
+  restaurantName: string;
+  restaurantId: string;
+}
+
 const REMEMBER_KEY = 'mintly-remember';
 const KEYS = {
   access: 'mintly-access-token',
@@ -21,6 +30,21 @@ const KEYS = {
   user: 'mintly-user',
 } as const;
 const AVATAR_KEY_PREFIX = 'mintly-avatar:';
+
+/**
+ * Seed do modo mock (`environment.useMocks: true`, só local) — restaurante de demonstração
+ * (Seoul Bird) de `mocks/mock_auth.json`. Ganha uma entrada nova a cada signup feito em modo
+ * mock; dura só a sessão da aba. Sem efeito nenhum quando `useMocks` é false (padrão).
+ */
+const registeredUsers: MockRegisteredUser[] = [{ ...mockAuth.user }];
+
+function delay(ms = 350): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function fakeToken(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -65,6 +89,22 @@ export class AuthService {
   async login(email: string, password: string, remember = true): Promise<void> {
     this.remember = remember;
     localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0');
+
+    if (environment.useMocks) {
+      await delay();
+      const match = registeredUsers.find(
+        (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password,
+      );
+      if (!match) throw new Error('E-mail ou senha inválidos.');
+      this.persistTokens(fakeToken('mock-access'), fakeToken('mock-refresh'), {
+        nome: match.name,
+        email: match.email,
+        empresa: match.restaurantName,
+        restaurantId: match.restaurantId,
+      });
+      return;
+    }
+
     const response = await this.authClient.login({ email, password }, this.headers);
     const result = response.payload;
     if (!result) throw new Error('Resposta de login sem payload.');
@@ -86,6 +126,30 @@ export class AuthService {
   }): Promise<void> {
     this.remember = true;
     localStorage.setItem(REMEMBER_KEY, '1');
+
+    if (environment.useMocks) {
+      await delay();
+      const email = input.email.trim().toLowerCase();
+      if (registeredUsers.some((u) => u.email.toLowerCase() === email)) {
+        throw new Error('Este e-mail já está cadastrado.');
+      }
+      const restaurantId = `rest-${Date.now()}`;
+      registeredUsers.push({
+        name: input.name,
+        email: input.email,
+        password: input.password,
+        restaurantName: input.restaurantName,
+        restaurantId,
+      });
+      this.persistTokens(fakeToken('mock-access'), fakeToken('mock-refresh'), {
+        nome: input.name,
+        email: input.email,
+        empresa: input.restaurantName,
+        restaurantId,
+      });
+      return;
+    }
+
     const response = await this.authClient.signup(
       {
         person: { name: input.name, phone: input.phone },
@@ -108,6 +172,10 @@ export class AuthService {
 
   /** Dispara o e-mail de recuperação. Resposta é sempre genérica (não revela se o e-mail existe). */
   async forgotPassword(email: string): Promise<string> {
+    if (environment.useMocks) {
+      await delay(300);
+      return 'Se o e-mail estiver cadastrado, você receberá as instruções em breve.';
+    }
     const response = await this.authClient.forgotPassword(email, this.headers);
     return (
       response.payload?.message ??
@@ -121,6 +189,11 @@ export class AuthService {
     newPassword: string,
     confirmNewPassword: string,
   ): Promise<string> {
+    if (environment.useMocks) {
+      await delay(300);
+      if (newPassword !== confirmNewPassword) throw new Error('As senhas não coincidem.');
+      return 'Senha redefinida com sucesso.';
+    }
     const response = await this.authClient.resetPassword(
       { token, newPassword, confirmNewPassword },
       this.headers,
@@ -131,6 +204,14 @@ export class AuthService {
   async refresh(): Promise<boolean> {
     const rt = this._refreshToken();
     if (!rt) return false;
+
+    if (environment.useMocks) {
+      const at = fakeToken('mock-access');
+      this._accessToken.set(at);
+      this.write(KEYS.access, at);
+      return true;
+    }
+
     try {
       const response = await this.authClient.refresh(rt, this.headers);
       const result = response.payload;
@@ -149,13 +230,15 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
-    const rt = this._refreshToken();
-    const at = this._accessToken();
-    if (rt && at) {
-      try {
-        await this.authClient.logout(rt, { ...this.headers, authorization: `Bearer ${at}` });
-      } catch {
-        /* best effort */
+    if (!environment.useMocks) {
+      const rt = this._refreshToken();
+      const at = this._accessToken();
+      if (rt && at) {
+        try {
+          await this.authClient.logout(rt, { ...this.headers, authorization: `Bearer ${at}` });
+        } catch {
+          /* best effort */
+        }
       }
     }
     this.clearSession();
@@ -188,6 +271,8 @@ export class AuthService {
    * Por ora: o front captura, valida (≤1MB, tipo imagem) e guarda em cache local por e-mail —
    * só pra provar o fluxo de ponta a ponta. Troca este método por uma chamada real de upload
    * (item 2) assim que o endpoint existir, e `getAvatar` por uma leitura do servidor (item 3).
+   * Pendência de negócio N10 (`MintlyApi/specs/modulos-novos/pendencias-negocio.md`): onde
+   * guardar o arquivo (S3, GridFS ou terceiro) ainda não foi decidido.
    */
   saveAvatar(email: string, dataUrl: string): void {
     const key = AVATAR_KEY_PREFIX + email.trim().toLowerCase();

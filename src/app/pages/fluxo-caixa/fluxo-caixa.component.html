@@ -79,35 +79,32 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
       <app-stat-card
         label="Caixa hoje"
-        [value]="fmtBRL(d.saldoAtual)"
+        [value]="fmtBRL(d.cashToday)"
         icon="account_balance_wallet"
         status="neutral"
         subtext="Somando todas as contas ativas"
       />
       <app-stat-card
         [label]="'A receber (' + label() + ')'"
-        [value]="fmtBRL(d.resumo.aReceber)"
+        [value]="fmtBRL(d.receivable)"
         icon="south_west"
         status="positive"
-        [spark]="d.sparksFluxo.aReceber"
+        [spark]="sparkReceber()"
       />
       <app-stat-card
         [label]="'A pagar (' + label() + ')'"
-        [value]="fmtBRL(d.resumo.aPagar)"
+        [value]="fmtBRL(d.payable)"
         icon="north_east"
         status="warning"
-        [spark]="d.sparksFluxo.aPagar"
+        [spark]="sparkPagar()"
       />
       <app-stat-card
         [label]="'Saldo previsto (' + label() + ')'"
-        [value]="fmtBRL(d.resumo.saldoPrevisto)"
+        [value]="fmtBRL(d.projectedBalance)"
         icon="query_stats"
         status="warning"
         [subtext]="
-          'menor saldo: ~' +
-          fmtBRL(d.resumo.menorSaldo.saldo) +
-          ' no dia ' +
-          d.resumo.menorSaldo.offset
+          'menor saldo: ~' + fmtBRL(d.lowestBalance.balance) + ' no dia ' + menorSaldoOffset()
         "
       >
         <app-hint
@@ -125,7 +122,7 @@
         [title]="'Seu caixa vai ficar apertado por volta do dia ' + diaAperto()"
         [description]="
           'Várias contas vencem juntas e seu caixa deve cair para cerca de ' +
-          fmtBRL(d.resumo.menorSaldo.saldo) +
+          fmtBRL(criticalInsight()!.balance) +
           ' no dia ' +
           diaAperto() +
           '. Considere antecipar recebimentos ou renegociar prazos.'
@@ -153,7 +150,7 @@
         [series]="areaSeries"
         [valueFormatter]="abrev"
         [zeroLine]="true"
-        [todayLabel]="hojeRotulo"
+        [todayLabel]="hojeRotulo()"
         [dots]="dots()"
       />
     </app-chart-card>
@@ -168,7 +165,7 @@
       [height]="300"
     >
       <app-bar-chart
-        [data]="d.blocos"
+        [data]="blocos()"
         categoryKey="semana"
         [series]="blocosSeries"
         orientation="columns"

@@ -691,7 +691,11 @@ export class MovimentacoesComponent implements OnInit {
     if (items.length === 0) return;
     this.confirmingImport.set(true);
     try {
-      const result = await this.svc.confirmImport(items);
+      const categoryIdByName: Record<string, string> = {};
+      for (const c of this.categoriasSvc.categories()) categoryIdByName[c.name] = c.id;
+      const accountIdByName: Record<string, string> = {};
+      for (const a of this.contasSvc.accounts()) accountIdByName[a.name] = a.id;
+      const result = await this.svc.confirmImport(items, { categoryIdByName, accountIdByName });
       this.closeImportPreview();
       this.importResult.set(result);
       this.closeModal();

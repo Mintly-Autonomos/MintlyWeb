@@ -1,66 +1,25 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import type { Headers } from 'mintly-lib';
+import { MovementDirection, MovementStatus } from 'mintly-lib';
+import type {
+  CashFlowReport,
+  CashFlowQuery,
+  DailyPoint,
+  CashFlowWeek,
+  DueItem,
+  CashFlowInsight,
+  Headers,
+} from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { MintlyClientService } from './mintly-client.service';
+import mockFluxoCaixa from '../mocks/mock_fluxo_caixa.json';
 
-export type VencimentoTipo = 'receber' | 'pagar';
-export type VencimentoStatus = 'previsto' | 'pago' | 'recebido' | 'vencido';
+export type { CashFlowReport, CashFlowQuery, DailyPoint, CashFlowWeek, DueItem, CashFlowInsight };
 
-export interface Vencimento {
-  id: string;
-  descricao: string;
-  valor: number;
-  tipo: VencimentoTipo;
-  dataVencimento: string;
-  status: VencimentoStatus;
-  categoria: string;
-  offset: number;
-}
-
-export interface PontoFluxo {
-  offset: number;
-  data: string;
-  saldo: number;
-  entradas: number;
-  saidas: number;
-}
-
-export interface ResumoHorizonte {
-  horizonte: number;
-  aReceber: number;
-  aPagar: number;
-  saldoPrevisto: number;
-  serie: PontoFluxo[];
-  menorSaldo: PontoFluxo;
-}
-
-export interface Bloco {
-  semana: string;
-  periodo: string;
-  entradas: number;
-  saidas: number;
-}
-
-export interface FluxoCaixaDataset {
-  saldoAtual: number;
-  horizonte: number;
-  resumo: ResumoHorizonte;
-  blocos: Bloco[];
-  serieRealizada: PontoFluxo[];
-  vencimentos: Vencimento[];
-  vencidos: Vencimento[];
-  sparksFluxo: { aReceber: number[]; aPagar: number[] };
-}
-
-export const SALDO_ATUAL = 18500;
-export const LIMITE_ALERTA = 2000;
 export const MAX_HORIZONTE_DIAS = 365;
-
-export const SPARKS_FLUXO = {
-  aReceber: [26800, 28400, 30100, 29500, 31800, 32500],
-  aPagar: [38200, 39600, 41100, 40500, 42800, 47100],
-};
+/** Dias de margem de segurança do "dia crítico" (N13 — palpite, mesmo valor usado no mock). */
+const SAFETY_DAYS = 7;
 
 function baseDate(): Date {
   const d = new Date();
@@ -101,229 +60,22 @@ export function formatDiaLongo(iso: string): string {
   });
 }
 
-interface Seed {
+/**
+ * Mock aproximado pra dev local sem a MintlyApi no ar (`environment.useMocks: true`). Não
+ * reproduz as regras exatas do back (canal efetivo, repasses agrupados etc.) — só o suficiente
+ * pra telas renderizarem com dados plausíveis. Seed: `mocks/mock_fluxo_caixa.json`.
+ */
+interface MockSeed {
   offset: number;
   descricao: string;
   valor: number;
-  tipo: VencimentoTipo;
+  tipo: 'receber' | 'pagar';
   categoria: string;
   quitado?: boolean;
 }
 
-const SEEDS: Seed[] = [
-  {
-    offset: -5,
-    descricao: 'Repasse iFood',
-    valor: 2950,
-    tipo: 'receber',
-    categoria: 'Venda Delivery',
-    quitado: true,
-  },
-  {
-    offset: -4,
-    descricao: 'Energia elétrica',
-    valor: 1120,
-    tipo: 'pagar',
-    categoria: 'Utilidades',
-    quitado: true,
-  },
-  {
-    offset: -2,
-    descricao: 'Fornecedor Carnes',
-    valor: 3800,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-    quitado: true,
-  },
-  {
-    offset: -1,
-    descricao: 'Recebível cartão de crédito',
-    valor: 2650,
-    tipo: 'receber',
-    categoria: 'Venda Balcão',
-    quitado: true,
-  },
-  {
-    offset: -9,
-    descricao: 'Fornecedor Embalagens',
-    valor: 730,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-  },
-  {
-    offset: -6,
-    descricao: 'Fornecedor Bebidas',
-    valor: 1450,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-  },
-  { offset: -3, descricao: 'Taxas de cartão', valor: 620, tipo: 'pagar', categoria: 'Taxas' },
-  {
-    offset: 1,
-    descricao: 'Repasse iFood',
-    valor: 3200,
-    tipo: 'receber',
-    categoria: 'Venda Delivery',
-  },
-  {
-    offset: 2,
-    descricao: 'Fornecedor Hortifruti',
-    valor: 1850,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-  },
-  {
-    offset: 3,
-    descricao: 'Recebível cartão de crédito',
-    valor: 2900,
-    tipo: 'receber',
-    categoria: 'Venda Balcão',
-  },
-  { offset: 4, descricao: 'Energia elétrica', valor: 1180, tipo: 'pagar', categoria: 'Utilidades' },
-  { offset: 5, descricao: 'Taxas de cartão', valor: 1420, tipo: 'pagar', categoria: 'Taxas' },
-  {
-    offset: 6,
-    descricao: 'Repasse iFood',
-    valor: 3400,
-    tipo: 'receber',
-    categoria: 'Venda Delivery',
-  },
-  {
-    offset: 8,
-    descricao: 'Fornecedor Bebidas',
-    valor: 2600,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-  },
-  {
-    offset: 9,
-    descricao: 'Recebível cartão de crédito',
-    valor: 3100,
-    tipo: 'receber',
-    categoria: 'Venda Balcão',
-  },
-  {
-    offset: 10,
-    descricao: 'Fornecedor Carnes',
-    valor: 4900,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-  },
-  {
-    offset: 12,
-    descricao: 'Internet e telefone',
-    valor: 380,
-    tipo: 'pagar',
-    categoria: 'Utilidades',
-  },
-  {
-    offset: 13,
-    descricao: 'Repasse iFood',
-    valor: 3500,
-    tipo: 'receber',
-    categoria: 'Venda Delivery',
-  },
-  {
-    offset: 15,
-    descricao: 'Fornecedor Embalagens',
-    valor: 1320,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-  },
-  {
-    offset: 16,
-    descricao: 'Recebível cartão de crédito',
-    valor: 3250,
-    tipo: 'receber',
-    categoria: 'Venda Balcão',
-  },
-  { offset: 17, descricao: 'Água e esgoto', valor: 520, tipo: 'pagar', categoria: 'Utilidades' },
-  { offset: 19, descricao: 'Gás de cozinha', valor: 680, tipo: 'pagar', categoria: 'Utilidades' },
-  {
-    offset: 20,
-    descricao: 'Repasse iFood',
-    valor: 3600,
-    tipo: 'receber',
-    categoria: 'Venda Delivery',
-  },
-  {
-    offset: 20,
-    descricao: 'Fornecedor Hortifruti',
-    valor: 2100,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-  },
-  { offset: 20, descricao: 'Taxas de cartão', valor: 2300, tipo: 'pagar', categoria: 'Taxas' },
-  { offset: 20, descricao: 'Simples Nacional', valor: 3700, tipo: 'pagar', categoria: 'Impostos' },
-  {
-    offset: 20,
-    descricao: 'Manutenção de equipamentos',
-    valor: 700,
-    tipo: 'pagar',
-    categoria: 'Utilidades',
-  },
-  {
-    offset: 21,
-    descricao: 'Salários — 1ª parcela',
-    valor: 6500,
-    tipo: 'pagar',
-    categoria: 'Salários',
-  },
-  { offset: 22, descricao: 'Aluguel do ponto', valor: 2200, tipo: 'pagar', categoria: 'Aluguel' },
-  {
-    offset: 22,
-    descricao: 'Salários — 2ª parcela',
-    valor: 5400,
-    tipo: 'pagar',
-    categoria: 'Salários',
-  },
-  {
-    offset: 23,
-    descricao: 'Recebível cartão de crédito',
-    valor: 3300,
-    tipo: 'receber',
-    categoria: 'Venda Balcão',
-  },
-  {
-    offset: 24,
-    descricao: 'Fornecedor Hortifruti',
-    valor: 1800,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-  },
-  {
-    offset: 26,
-    descricao: 'Repasse iFood',
-    valor: 3450,
-    tipo: 'receber',
-    categoria: 'Venda Delivery',
-  },
-  {
-    offset: 27,
-    descricao: 'Fornecedor Bebidas',
-    valor: 2150,
-    tipo: 'pagar',
-    categoria: 'CMV/Insumos',
-  },
-  {
-    offset: 28,
-    descricao: 'Contas de consumo',
-    valor: 1600,
-    tipo: 'pagar',
-    categoria: 'Utilidades',
-  },
-  {
-    offset: 29,
-    descricao: 'Recebível cartão de crédito',
-    valor: 2800,
-    tipo: 'receber',
-    categoria: 'Venda Balcão',
-  },
-  { offset: 30, descricao: 'Taxas de cartão', valor: 1000, tipo: 'pagar', categoria: 'Taxas' },
-];
-
-function seedsRecorrentes(): Seed[] {
-  const out: Seed[] = [];
+function seedsRecorrentes(): MockSeed[] {
+  const out: MockSeed[] = [];
   for (let d = 31; d <= MAX_HORIZONTE_DIAS; d++) {
     const w = d % 7;
     if (w === 2)
@@ -362,146 +114,150 @@ function seedsRecorrentes(): Seed[] {
   return out;
 }
 
-const ALL_SEEDS: Seed[] = [...SEEDS, ...seedsRecorrentes()];
+const ALL_SEEDS: MockSeed[] = [...(mockFluxoCaixa.seeds as MockSeed[]), ...seedsRecorrentes()];
+const SALDO_ATUAL: number = mockFluxoCaixa.saldoAtual;
 
-function statusDe(s: Seed): VencimentoStatus {
-  if (s.offset > 0) return 'previsto';
-  if (s.quitado) return s.tipo === 'receber' ? 'recebido' : 'pago';
-  return 'vencido';
+function mockDueItems(): DueItem[] {
+  return ALL_SEEDS.map((s, i): DueItem => {
+    const overdue = s.offset < 0 && !s.quitado;
+    const settled = s.offset <= 0 && s.quitado;
+    return {
+      id: `vc-${String(i + 1).padStart(3, '0')}`,
+      title: s.descricao,
+      category: { _id: s.categoria, name: s.categoria },
+      direction: s.tipo === 'receber' ? MovementDirection.In : MovementDirection.Out,
+      amount: s.valor,
+      dueDate: isoFromOffset(s.offset),
+      status: settled ? MovementStatus.Settled : MovementStatus.Pending,
+      overdue,
+      settledAt: settled ? isoFromOffset(s.offset) : undefined,
+      kind: 'movement',
+      itemCount: 1,
+    };
+  });
 }
 
-const VENCIMENTOS: Vencimento[] = ALL_SEEDS.map((s, i) => ({
-  id: `vc-${String(i + 1).padStart(3, '0')}`,
-  descricao: s.descricao,
-  valor: s.valor,
-  tipo: s.tipo,
-  dataVencimento: isoFromOffset(s.offset),
-  status: statusDe(s),
-  categoria: s.categoria,
-  offset: s.offset,
-}));
+function buildMockReport(horizon: number): CashFlowReport {
+  const dueItems = mockDueItems();
+  const overdueItems = dueItems.filter((d) => d.overdue);
+  const pendingInWindow = dueItems.filter(
+    (d) =>
+      d.status === MovementStatus.Pending &&
+      offsetFromIso(d.dueDate) >= 1 &&
+      offsetFromIso(d.dueDate) <= horizon,
+  );
+  const sum = (items: DueItem[], dir: MovementDirection) =>
+    items.filter((d) => d.direction === dir).reduce((a, d) => a + d.amount, 0);
 
-const VENCIDOS = VENCIMENTOS.filter((v) => v.status === 'vencido');
+  const receivable =
+    sum(pendingInWindow, MovementDirection.In) + sum(overdueItems, MovementDirection.In);
+  const payable =
+    sum(pendingInWindow, MovementDirection.Out) + sum(overdueItems, MovementDirection.Out);
 
-function serieProjecao(horizonte: number): PontoFluxo[] {
-  const pontos: PontoFluxo[] = [];
+  const projection: DailyPoint[] = [];
   let saldo = SALDO_ATUAL;
-  for (let offset = 0; offset <= horizonte; offset++) {
-    const doDia = VENCIMENTOS.filter((v) => v.offset === offset && v.status === 'previsto');
-    let entradas = doDia.filter((v) => v.tipo === 'receber').reduce((a, v) => a + v.valor, 0);
-    let saidas = doDia.filter((v) => v.tipo === 'pagar').reduce((a, v) => a + v.valor, 0);
-    if (offset === 1) {
-      entradas += VENCIDOS.filter((v) => v.tipo === 'receber').reduce((a, v) => a + v.valor, 0);
-      saidas += VENCIDOS.filter((v) => v.tipo === 'pagar').reduce((a, v) => a + v.valor, 0);
+  for (let offset = 0; offset <= horizon; offset++) {
+    const doDia = dueItems.filter(
+      (d) => d.status === MovementStatus.Pending && offsetFromIso(d.dueDate) === offset,
+    );
+    let inflows = sum(doDia, MovementDirection.In);
+    let outflows = sum(doDia, MovementDirection.Out);
+    if (offset === 0) {
+      inflows += sum(overdueItems, MovementDirection.In);
+      outflows += sum(overdueItems, MovementDirection.Out);
     }
-    if (offset > 0) saldo += entradas - saidas;
-    pontos.push({
-      offset,
-      data: isoFromOffset(offset),
-      saldo: Math.round(saldo),
-      entradas,
-      saidas,
+    if (offset > 0) saldo += inflows - outflows;
+    projection.push({ date: isoFromOffset(offset), balance: Math.round(saldo), inflows, outflows });
+  }
+
+  const realized: DailyPoint[] = [];
+  for (let offset = -7; offset < 0; offset++) {
+    const doDia = dueItems.filter(
+      (d) => d.status === MovementStatus.Settled && d.settledAt === isoFromOffset(offset),
+    );
+    realized.push({
+      date: isoFromOffset(offset),
+      balance: SALDO_ATUAL,
+      inflows: sum(doDia, MovementDirection.In),
+      outflows: sum(doDia, MovementDirection.Out),
     });
   }
-  return pontos;
-}
 
-function resumoHorizonte(horizonte: number): ResumoHorizonte {
-  const noPrazo = VENCIMENTOS.filter(
-    (v) => v.status === 'previsto' && v.offset >= 1 && v.offset <= horizonte,
-  );
-  const aReceber =
-    noPrazo.filter((v) => v.tipo === 'receber').reduce((a, v) => a + v.valor, 0) +
-    VENCIDOS.filter((v) => v.tipo === 'receber').reduce((a, v) => a + v.valor, 0);
-  const aPagar =
-    noPrazo.filter((v) => v.tipo === 'pagar').reduce((a, v) => a + v.valor, 0) +
-    VENCIDOS.filter((v) => v.tipo === 'pagar').reduce((a, v) => a + v.valor, 0);
-  const serie = serieProjecao(horizonte);
-  const menorSaldo = serie.reduce((min, p) => (p.saldo < min.saldo ? p : min), serie[0]);
-  return {
-    horizonte,
-    aReceber,
-    aPagar,
-    saldoPrevisto: SALDO_ATUAL + aReceber - aPagar,
-    serie,
-    menorSaldo,
-  };
-}
-
-function blocosHorizonte(horizonte: number): Bloco[] {
-  const nBlocos = Math.max(1, Math.min(12, Math.round(horizonte / 7.5)));
-  const blocos: Bloco[] = [];
-  let ini = 1;
+  const weeks: CashFlowWeek[] = [];
+  const nBlocos = Math.max(1, Math.ceil(horizon / 7));
+  let ini = 0;
   for (let i = 0; i < nBlocos; i++) {
-    const fim = Math.round(((i + 1) * horizonte) / nBlocos);
-    if (fim < ini) continue;
-    const bloco = VENCIMENTOS.filter(
-      (v) => v.status === 'previsto' && v.offset >= ini && v.offset <= fim,
+    const fim = Math.min(horizon, ini + 6);
+    const bloco = projection.filter(
+      (p) => offsetFromIso(p.date) >= ini && offsetFromIso(p.date) <= fim,
     );
-    let entradas = bloco.filter((v) => v.tipo === 'receber').reduce((a, v) => a + v.valor, 0);
-    let saidas = bloco.filter((v) => v.tipo === 'pagar').reduce((a, v) => a + v.valor, 0);
-    if (ini === 1) {
-      entradas += VENCIDOS.filter((v) => v.tipo === 'receber').reduce((a, v) => a + v.valor, 0);
-      saidas += VENCIDOS.filter((v) => v.tipo === 'pagar').reduce((a, v) => a + v.valor, 0);
-    }
-    blocos.push({
-      semana: `Sem ${i + 1}`,
-      periodo: `${formatDia(isoFromOffset(ini))} – ${formatDia(isoFromOffset(fim))}`,
-      entradas,
-      saidas,
+    weeks.push({
+      from: isoFromOffset(ini),
+      to: isoFromOffset(fim),
+      inflows: bloco.reduce((a, p) => a + p.inflows, 0),
+      outflows: bloco.reduce((a, p) => a + p.outflows, 0),
     });
     ini = fim + 1;
+    if (ini > horizon) break;
   }
-  return blocos;
-}
 
-function serieRealizada(dias = 7): PontoFluxo[] {
-  const pontos: PontoFluxo[] = [];
-  for (let offset = -dias; offset < 0; offset++) {
-    const posteriores = VENCIMENTOS.filter(
-      (v) => v.offset > offset && v.offset <= 0 && (v.status === 'pago' || v.status === 'recebido'),
-    );
-    const delta = posteriores.reduce((a, v) => a + (v.tipo === 'receber' ? v.valor : -v.valor), 0);
-    const doDia = VENCIMENTOS.filter(
-      (v) => v.offset === offset && (v.status === 'pago' || v.status === 'recebido'),
-    );
-    pontos.push({
-      offset,
-      data: isoFromOffset(offset),
-      saldo: Math.round(SALDO_ATUAL - delta),
-      entradas: doDia.filter((v) => v.tipo === 'receber').reduce((a, v) => a + v.valor, 0),
-      saidas: doDia.filter((v) => v.tipo === 'pagar').reduce((a, v) => a + v.valor, 0),
+  const lowest = projection.reduce((min, p) => (p.balance < min.balance ? p : min), projection[0]);
+  const avgDailyOutflow =
+    Math.round(realized.reduce((a, p) => a + p.outflows, 0) / 7) ||
+    Math.round(payable / Math.max(horizon, 1));
+  const threshold = avgDailyOutflow * SAFETY_DAYS;
+  const insights: CashFlowInsight[] = [];
+  if (lowest.balance < threshold) {
+    insights.push({
+      kind: 'criticalDay',
+      severity: 'warning',
+      date: lowest.date,
+      balance: lowest.balance,
+      threshold,
     });
   }
-  return pontos;
+
+  return {
+    horizon,
+    today: isoFromOffset(0),
+    cashToday: SALDO_ATUAL,
+    receivable,
+    payable,
+    projectedBalance: projection[projection.length - 1]?.balance ?? SALDO_ATUAL,
+    lowestBalance: { date: lowest.date, balance: lowest.balance },
+    overdue: {
+      count: overdueItems.length,
+      receivable: sum(overdueItems, MovementDirection.In),
+      payable: sum(overdueItems, MovementDirection.Out),
+    },
+    safetyThreshold: { value: threshold, days: SAFETY_DAYS, avgDailyOutflow },
+    projection,
+    realized,
+    weeks,
+    dueItems: dueItems.filter(
+      (d) => offsetFromIso(d.dueDate) >= -7 && offsetFromIso(d.dueDate) <= horizon,
+    ),
+    insights,
+  };
 }
 
-function getDataset(horizonte: number): FluxoCaixaDataset {
-  return {
-    saldoAtual: SALDO_ATUAL,
-    horizonte,
-    resumo: resumoHorizonte(horizonte),
-    blocos: blocosHorizonte(horizonte),
-    serieRealizada: serieRealizada(7),
-    vencimentos: VENCIMENTOS.filter((v) => v.offset <= horizonte),
-    vencidos: VENCIDOS,
-    sparksFluxo: SPARKS_FLUXO,
-  };
+function delay(ms = 380): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 @Injectable({ providedIn: 'root' })
 export class FluxoCaixaService {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private reportClient = inject(MintlyClientService).client.reportClient;
 
-  readonly data = signal<FluxoCaixaDataset | null>(null);
+  readonly data = signal<CashFlowReport | null>(null);
   readonly loading = signal(false);
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
   }
 
-  /** Mesmo wrapper autenticado dos outros services (401 -> refresh + retry) — pronto pra quando o endpoint existir. */
   private async call<T>(fn: (headers: Headers) => Promise<T>): Promise<T> {
     try {
       return await fn(this.headers);
@@ -523,16 +279,17 @@ export class FluxoCaixaService {
     );
   }
 
-  /** TODO(API): sem endpoint de fluxo de caixa na mintly-lib ainda — mock local no mesmo formato de resposta ({ payload }). */
-  private async fetch(horizonte: number): Promise<{ payload: FluxoCaixaDataset }> {
-    await new Promise((r) => setTimeout(r, 380));
-    return { payload: getDataset(horizonte) };
-  }
-
   async refresh(horizonte: number): Promise<void> {
     this.loading.set(true);
     try {
-      const response = await this.call(() => this.fetch(horizonte));
+      if (environment.useMocks) {
+        await delay();
+        this.data.set(buildMockReport(horizonte));
+        return;
+      }
+      const query: CashFlowQuery = { horizon: horizonte };
+      const response = await this.call((headers) => this.reportClient.cashFlow(query, headers));
+      if (!response.payload) throw new Error('Resposta de /reports/cash-flow sem payload.');
       this.data.set(response.payload);
     } finally {
       this.loading.set(false);

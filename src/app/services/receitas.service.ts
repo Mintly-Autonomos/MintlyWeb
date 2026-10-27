@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import mockReceitas from '../mocks/mock_receitas.json';
 
 export type PeriodKey = 'Hoje' | '7 dias' | 'Este mês' | 'Mês passado' | 'Personalizado';
 export type Canal = 'salao' | 'delivery';
@@ -56,106 +57,9 @@ export const FAIXAS = ['Manhã', 'Almoço', 'Tarde', 'Noite'] as const;
 export const DIAS_SEMANA = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'] as const;
 export const TAXA_DELIVERY_PCT = 23;
 
-const CARDAPIO: ItemCardapio[] = [
-  {
-    nome: 'Frango Yangnyeom (agridoce apimentado)',
-    categoria: 'Frango',
-    canalPrincipal: 'delivery',
-    preco: 79.9,
-    custo: 30.4,
-    qtd: 118,
-  },
-  {
-    nome: 'Frango Soy Garlic (shoyu e alho)',
-    categoria: 'Frango',
-    canalPrincipal: 'salao',
-    preco: 79.9,
-    custo: 30.0,
-    qtd: 104,
-  },
-  {
-    nome: 'Frango Original',
-    categoria: 'Frango',
-    canalPrincipal: 'salao',
-    preco: 72.9,
-    custo: 27.2,
-    qtd: 96,
-  },
-  {
-    nome: 'Frango Honey Butter',
-    categoria: 'Frango',
-    canalPrincipal: 'delivery',
-    preco: 82.9,
-    custo: 32.5,
-    qtd: 62,
-  },
-  {
-    nome: 'Combo Casal (balde + 2 bebidas)',
-    categoria: 'Combos',
-    canalPrincipal: 'salao',
-    preco: 129.9,
-    custo: 49.8,
-    qtd: 48,
-  },
-  {
-    nome: 'Combo Frango + Bebida',
-    categoria: 'Combos',
-    canalPrincipal: 'delivery',
-    preco: 89.9,
-    custo: 34.6,
-    qtd: 66,
-  },
-  {
-    nome: 'Coxinha de frango',
-    categoria: 'Acompanhamentos',
-    canalPrincipal: 'salao',
-    preco: 9.9,
-    custo: 3.4,
-    qtd: 210,
-  },
-  {
-    nome: 'Kimchi',
-    categoria: 'Acompanhamentos',
-    canalPrincipal: 'salao',
-    preco: 16.9,
-    custo: 5.6,
-    qtd: 118,
-  },
-  {
-    nome: 'Arroz',
-    categoria: 'Acompanhamentos',
-    canalPrincipal: 'salao',
-    preco: 11.9,
-    custo: 3.1,
-    qtd: 146,
-  },
-  {
-    nome: 'Cerveja',
-    categoria: 'Bebidas',
-    canalPrincipal: 'salao',
-    preco: 14.9,
-    custo: 4.6,
-    qtd: 386,
-  },
-  {
-    nome: 'Soju',
-    categoria: 'Bebidas',
-    canalPrincipal: 'salao',
-    preco: 29.9,
-    custo: 9.2,
-    qtd: 168,
-  },
-];
+const CARDAPIO: ItemCardapio[] = mockReceitas.cardapio as ItemCardapio[];
 
-const MATRIZ_MES: number[][] = [
-  [0, 380, 260, 1450],
-  [0, 420, 290, 1620],
-  [0, 460, 310, 1980],
-  [0, 510, 340, 2460],
-  [0, 620, 420, 4980],
-  [0, 880, 660, 6240],
-  [0, 940, 720, 4360],
-];
+const MATRIZ_MES: number[][] = mockReceitas.matrizMes;
 
 const CATEGORIAS: CategoriaMenu[] = ['Frango', 'Combos', 'Acompanhamentos', 'Bebidas'];
 const BRUTO_CARDAPIO = CARDAPIO.reduce((s, i) => s + i.preco * i.qtd, 0);
@@ -283,86 +187,26 @@ function build(opts: BuildOpts): ReceitasDataset {
   };
 }
 
-const MESES_TENDENCIA = [
-  { mes: 'Fev', total: 46200 },
-  { mes: 'Mar', total: 48900 },
-  { mes: 'Abr', total: 50400 },
-  { mes: 'Mai', total: 52800 },
-  { mes: 'Jun', total: 54200 },
-  { mes: 'Jul', total: 58400 },
-];
+const MESES_TENDENCIA = mockReceitas.mesesTendencia;
+const P = mockReceitas.periodos;
 
 const DATASET_ESTE_MES = build({
-  key: 'Este mês',
-  refLabel: 'Julho/2026',
-  comparacaoLabel: 'vs. mês anterior',
-  bruta: 58400,
-  pedidos: 1042,
-  brutaPrev: 54200,
-  pedidosPrev: 985,
-  heatmapFator: 1,
+  ...P.esteMes,
   tendencia: MESES_TENDENCIA,
-  tendenciaDescricao: 'Últimos 6 meses',
-  pedidosLabel: 'Pedidos no mês',
 });
 
 const DATASET_MES_PASSADO = build({
-  key: 'Mês passado',
-  refLabel: 'Junho/2026',
-  comparacaoLabel: 'vs. mês anterior',
-  bruta: 54200,
-  pedidos: 985,
-  brutaPrev: 52800,
-  pedidosPrev: 968,
-  heatmapFator: 54200 / 58400,
+  ...P.mesPassado,
   tendencia: MESES_TENDENCIA.slice(0, 5),
-  tendenciaDescricao: 'Últimos 5 meses até Junho',
-  pedidosLabel: 'Pedidos no mês',
 });
 
 const DATASET_7_DIAS = build({
-  key: '7 dias',
-  refLabel: '01–07/Jul/2026',
-  comparacaoLabel: 'vs. 7 dias anteriores',
-  bruta: 13600,
-  pedidos: 243,
-  brutaPrev: 12750,
-  pedidosPrev: 231,
-  heatmapFator: 1 / 4.3,
-  tendencia: [
-    { mes: 'Seg', total: 1290 },
-    { mes: 'Ter', total: 1410 },
-    { mes: 'Qua', total: 1680 },
-    { mes: 'Qui', total: 1980 },
-    { mes: 'Sex', total: 2640 },
-    { mes: 'Sáb', total: 3020 },
-    { mes: 'Dom', total: 1580 },
-  ],
-  tendenciaDescricao: 'Dia a dia dos últimos 7 dias',
-  pedidosLabel: 'Pedidos no período',
+  ...P.seteDias,
 });
 
 const DATASET_HOJE = build({
-  key: 'Hoje',
-  refLabel: 'Hoje · 07/Jul/2026',
-  comparacaoLabel: 'vs. ontem',
-  bruta: 2180,
-  pedidos: 39,
-  brutaPrev: 2040,
-  pedidosPrev: 37,
+  ...P.hoje,
   heatmapFator: null,
-  heatmapVazioMsg:
-    'O padrão semanal precisa de pelo menos uma semana de vendas. Escolha "7 dias" ou "Este mês".',
-  tendencia: [
-    { mes: '11h', total: 120 },
-    { mes: '13h', total: 340 },
-    { mes: '15h', total: 180 },
-    { mes: '18h', total: 420 },
-    { mes: '20h', total: 780 },
-    { mes: '22h', total: 340 },
-  ],
-  tendenciaDescricao: 'Vendas por horário de hoje',
-  pedidosLabel: 'Pedidos hoje',
 });
 
 const fmtData = (iso: string) => {

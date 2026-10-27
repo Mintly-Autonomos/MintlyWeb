@@ -24,3 +24,47 @@ export function fmtShortDate(iso: string): string {
     year: 'numeric',
   });
 }
+
+const MESES_ABREV = [
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
+];
+const MESES_LONGO = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+];
+
+/** Mês curto pra eixo de gráfico: "2026-07" → "Jul/26". Formato inválido devolve a entrada. */
+export function fmtMonthShort(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m || m < 1 || m > 12) return month;
+  const abrev = MESES_ABREV[m - 1];
+  return `${abrev.charAt(0).toUpperCase()}${abrev.slice(1)}/${String(y).slice(2)}`;
+}
+
+/** Mês por extenso: "2026-07" → "Julho/2026". Formato inválido devolve a entrada. */
+export function fmtMonthLong(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m || m < 1 || m > 12) return month;
+  return `${MESES_LONGO[m - 1]}/${y}`;
+}

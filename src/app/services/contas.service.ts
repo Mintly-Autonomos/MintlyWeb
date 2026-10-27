@@ -5,6 +5,7 @@ import type { FinancialAccount, Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { MintlyClientService } from './mintly-client.service';
+import mockAccounts from '../mocks/mock_accounts.json';
 
 export type AccType = 'Bank' | 'Cash Register' | 'Digital Wallet' | 'Financial Platform';
 
@@ -162,14 +163,28 @@ export interface UpdateAccountInput {
   active?: boolean;
 }
 
+function delay(ms = 350): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 @Injectable({ providedIn: 'root' })
 export class ContasService {
   private auth = inject(AuthService);
   private router = inject(Router);
   private accountClient = inject(MintlyClientService).client.financialAccountClient;
 
+  /** Seed do modo mock (`environment.useMocks: true`, só local) — sem efeito quando false. */
+  private mockStore: Account[] = (mockAccounts as Account[]).map((a) => ({
+    ...a,
+    history: [...a.history],
+  }));
+
   readonly accounts = signal<Account[]>([]);
   readonly loading = signal(false);
+
+  private get by(): string {
+    return this.auth.currentUser()?.nome ?? '—';
+  }
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
@@ -200,6 +215,11 @@ export class ContasService {
   async refresh(): Promise<void> {
     this.loading.set(true);
     try {
+      if (environment.useMocks) {
+        await delay(200);
+        this.accounts.set(this.mockStore.map((a) => ({ ...a, history: [...a.history] })));
+        return;
+      }
       const response = await this.call((headers) =>
         this.accountClient.findAll({ page: 1, size: 500 }, headers),
       );
@@ -215,13 +235,40 @@ export class ContasService {
    * Quem chama decide se promove a conta recém-criada a padrão (via setDefault),
    * usando o id retornado aqui.
    */
-  /**
-   * restaurantId/isDefault/availableBalance/predictedBalance/audit ficam de fora:
-   * o financialAccountInsertSchema (mintly-lib 2.7.0-preview) os tornou opcionais
-   * — o servidor preenche audit e força restaurantId/isDefault/saldos.
-   */
   async create(input: CreateAccountInput): Promise<string> {
     const isPlatform = input.type === 'Financial Platform';
+
+    if (environment.useMocks) {
+      await delay();
+      const id = `acc-${Date.now()}`;
+      const now = new Date().toISOString();
+      const account: Account = {
+        id,
+        name: input.name,
+        type: input.type,
+        active: true,
+        isDefault: false,
+        balance: 0,
+        predictedBalance: 0,
+        ...(isPlatform
+          ? { taxPct: input.taxPct ?? 0, settlementDays: input.settlementDays ?? 0 }
+          : {}),
+        createdBy: this.by,
+        createdAt: now,
+        updatedBy: this.by,
+        updatedAt: now,
+        history: [{ id: 1, at: now, by: this.by, action: 'create', icon: 'add_circle' }],
+      };
+      this.mockStore.push(account);
+      await this.refresh();
+      return id;
+    }
+
+    /**
+     * restaurantId/isDefault/availableBalance/predictedBalance/audit ficam de fora:
+     * o financialAccountInsertSchema (mintly-lib 2.7.0-preview) os tornou opcionais
+     * — o servidor preenche audit e força restaurantId/isDefault/saldos.
+     */
     const body = {
       name: input.name,
       type: TYPE_TO_LIB[input.type],
@@ -238,6 +285,29 @@ export class ContasService {
 
   async update(id: string, input: UpdateAccountInput): Promise<void> {
     const isPlatform = input.type === 'Financial Platform';
+
+    if (environment.useMocks) {
+      await delay();
+      const acc = this.mockStore.find((a) => a.id === id);
+      if (!acc) throw new Error('Conta não encontrada.');
+      const now = new Date().toISOString();
+      if (input.name !== undefined) acc.name = input.name;
+      if (input.type !== undefined) acc.type = input.type;
+      if (input.active !== undefined) acc.active = input.active;
+      if (isPlatform) {
+        if (input.taxPct !== undefined) acc.taxPct = input.taxPct;
+        if (input.settlementDays !== undefined) acc.settlementDays = input.settlementDays;
+      }
+      acc.updatedBy = this.by;
+      acc.updatedAt = now;
+      acc.history = [
+        { id: acc.history.length + 1, at: now, by: this.by, action: 'update', icon: 'edit' },
+        ...acc.history,
+      ];
+      await this.refresh();
+      return;
+    }
+
     const patch: Partial<FinancialAccount> = {
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.type !== undefined ? { type: TYPE_TO_LIB[input.type] } : {}),
@@ -257,12 +327,73 @@ export class ContasService {
 
   /** Define a conta como padrão (guards e transação no servidor). */
   async setDefault(id: string): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      const now = new Date().toISOString();
+      for (const acc of this.mockStore) {
+        if (acc.isDefault && acc.id !== id) {
+          acc.isDefault = false;
+          acc.history = [
+            {
+              id: acc.history.length + 1,
+              at: now,
+              by: this.by,
+              action: 'unset-default',
+              icon: 'star_border',
+            },
+            ...acc.history,
+          ];
+        }
+      }
+      const target = this.mockStore.find((a) => a.id === id);
+      if (target) {
+        target.isDefault = true;
+        target.history = [
+          {
+            id: target.history.length + 1,
+            at: now,
+            by: this.by,
+            action: 'set-default',
+            icon: 'star',
+          },
+          ...target.history,
+        ];
+      }
+      await this.refresh();
+      return;
+    }
+
     await this.call((headers) => this.accountClient.defaultUpdate(id, headers));
     await this.refresh();
   }
 
   /** Inativa a conta (guards de saldo/única-ativa/padrão no servidor). */
   async inactivate(id: string, replacementDefaultId?: string): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      const now = new Date().toISOString();
+      const acc = this.mockStore.find((a) => a.id === id);
+      if (acc) {
+        acc.active = false;
+        acc.history = [
+          {
+            id: acc.history.length + 1,
+            at: now,
+            by: this.by,
+            action: 'inactivate',
+            icon: 'pause_circle',
+          },
+          ...acc.history,
+        ];
+      }
+      if (replacementDefaultId) {
+        await this.setDefault(replacementDefaultId);
+        return;
+      }
+      await this.refresh();
+      return;
+    }
+
     await this.call((headers) =>
       this.accountClient.inactivateUpdate(id, { replacementDefaultId }, headers),
     );

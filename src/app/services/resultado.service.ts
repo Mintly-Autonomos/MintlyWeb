@@ -1,241 +1,132 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import type { Headers } from 'mintly-lib';
+import { CategoryBehavior, TaxRegime } from 'mintly-lib';
+import type { ResultReport, ResultQuery, OpexItem, ResultInsight, Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
-import type { WaterfallRow } from '../shared/waterfall-chart.component';
+import { MintlyClientService } from './mintly-client.service';
+import mockResultado from '../mocks/mock_resultado.json';
 
-export interface LinhaDRE {
-  label: string;
-  valor: number;
-  anterior: number;
-  tipo: 'receita' | 'deducao' | 'subtotal' | 'resultado';
-  pctReceita: number;
-  explicacao: string;
-}
+export type { ResultReport, ResultQuery, OpexItem, ResultInsight };
 
-export interface DespesaOperacional {
-  nome: string;
-  valor: number;
-  anterior: number;
-  tipo: 'fixo' | 'variavel';
-  icon: string;
-}
-
-export interface MesResultado {
-  mes: string;
-  lucro: number;
-  margem: number;
-  receita: number;
-}
-
-export interface ResultadoDataset {
-  refLabel: string;
-  receitaBruta: number;
-  impostos: number;
-  receitaLiquida: number;
-  cmv: number;
-  margemBruta: number;
-  despesasOperacionais: number;
-  lucroLiquido: number;
-  margemLiquida: number;
-  anterior: {
-    refLabel: string;
-    receitaBruta: number;
-    impostos: number;
-    receitaLiquida: number;
-    cmv: number;
-    margemBruta: number;
-    despesasOperacionais: number;
-    lucroLiquido: number;
-    margemLiquida: number;
+/**
+ * Mock aproximado pra dev local sem a MintlyApi no ar (`environment.useMocks: true`) — mesmo
+ * contrato real (`ResultReport`), construído a partir de `mocks/mock_resultado.json`. Não
+ * reproduz as regras exatas do back (mês atual × fechado, etc.), só dados plausíveis.
+ */
+function buildMockReport(): ResultReport {
+  const m = mockResultado;
+  const current = {
+    grossRevenue: m.receitaBruta,
+    taxes: m.impostos,
+    netRevenue: m.receitaLiquida,
+    cmv: m.cmv,
+    grossMargin: m.margemBruta,
+    operatingExpenses: m.despesasOperacionais,
+    netProfit: m.lucroLiquido,
+    netMargin: m.lucroLiquido / m.receitaBruta,
   };
-  linhasDRE: LinhaDRE[];
-  waterfallResultado: WaterfallRow[];
-  despesasDetalhe: DespesaOperacional[];
-  custosFixos: number;
-  custosVariaveis: number;
-  margemContribuicaoPct: number;
-  pontoEquilibrio: number;
-  diasParaEquilibrio: number;
-  historico: MesResultado[];
-  lucroSpark: number[];
-}
-
-function buildDataset(): ResultadoDataset {
-  const refLabel = 'Julho/2026';
-  const receitaBruta = 58400;
-  const impostos = 3504;
-  const receitaLiquida = 54896;
-  const cmv = 21024;
-  const margemBruta = 33872;
-  const despesasOperacionais = 27500;
-  const lucroLiquido = 6372;
-  const margemLiquida = (lucroLiquido / receitaBruta) * 100;
-
-  const anterior = {
-    refLabel: 'Junho/2026',
-    receitaBruta: 54200,
-    impostos: 3252,
-    receitaLiquida: 50948,
-    cmv: 19985,
-    margemBruta: 30963,
-    despesasOperacionais: 25863,
-    lucroLiquido: 5100,
-    margemLiquida: 9.4,
+  const previous = {
+    grossRevenue: m.anterior.receitaBruta,
+    taxes: m.anterior.impostos,
+    netRevenue: m.anterior.receitaLiquida,
+    cmv: m.anterior.cmv,
+    grossMargin: m.anterior.margemBruta,
+    operatingExpenses: m.anterior.despesasOperacionais,
+    netProfit: m.anterior.lucroLiquido,
+    netMargin: m.anterior.margemLiquida / 100,
   };
+  const delta = (a: number, b: number) => (b === 0 ? null : (a - b) / b);
 
-  const pct = (v: number) => (v / receitaBruta) * 100;
+  const operatingExpenseItems: OpexItem[] = m.despesasDetalhe.map((d) => ({
+    categoryId: d.nome,
+    name: d.nome,
+    kind: d.tipo === 'fixo' && d.nome.toLowerCase().includes('pró-labore') ? 'labor' : 'opex',
+    behavior: d.tipo === 'fixo' ? CategoryBehavior.Fixed : CategoryBehavior.Variable,
+    amount: d.valor,
+    previousAmount: d.anterior,
+    delta: delta(d.valor, d.anterior),
+    revenuePct: d.valor / current.grossRevenue,
+  }));
 
-  const linhasDRE: LinhaDRE[] = [
+  const insights: ResultInsight[] = [
     {
-      label: 'Receita bruta',
-      valor: receitaBruta,
-      anterior: anterior.receitaBruta,
-      tipo: 'receita',
-      pctReceita: 100,
-      explicacao:
-        'Tudo que você vendeu no mês, no salão e no delivery, antes de qualquer desconto.',
-    },
-    {
-      label: 'Impostos sobre venda',
-      valor: -impostos,
-      anterior: -anterior.impostos,
-      tipo: 'deducao',
-      pctReceita: -pct(impostos),
-      explicacao: 'O que sai direto do faturamento para o governo (Simples Nacional).',
-    },
-    {
-      label: 'Receita líquida',
-      valor: receitaLiquida,
-      anterior: anterior.receitaLiquida,
-      tipo: 'subtotal',
-      pctReceita: pct(receitaLiquida),
-      explicacao: 'O que realmente entrou depois dos impostos.',
-    },
-    {
-      label: 'CMV — ingredientes e insumos',
-      valor: -cmv,
-      anterior: -anterior.cmv,
-      tipo: 'deducao',
-      pctReceita: -pct(cmv),
-      explicacao: 'Quanto custou o que você vendeu: frango, óleo, molhos, bebidas e embalagens.',
-    },
-    {
-      label: 'Margem bruta',
-      valor: margemBruta,
-      anterior: anterior.margemBruta,
-      tipo: 'subtotal',
-      pctReceita: pct(margemBruta),
-      explicacao: 'O que sobra da venda para pagar todas as contas do restaurante.',
-    },
-    {
-      label: 'Despesas operacionais',
-      valor: -despesasOperacionais,
-      anterior: -anterior.despesasOperacionais,
-      tipo: 'deducao',
-      pctReceita: -pct(despesasOperacionais),
-      explicacao: 'Pró-labore, aluguel, taxa do iFood, energia, cartão, marketing e contador.',
-    },
-    {
-      label: 'Resultado do mês',
-      valor: lucroLiquido,
-      anterior: anterior.lucroLiquido,
-      tipo: 'resultado',
-      pctReceita: pct(lucroLiquido),
-      explicacao: 'O que sobrou de verdade no fim das contas.',
+      kind: 'profitChanged',
+      severity: current.netProfit >= previous.netProfit ? 'positive' : 'warning',
+      difference: current.netProfit - previous.netProfit,
+      previousProfit: previous.netProfit,
+      currentProfit: current.netProfit,
+      previousMargin: previous.netMargin,
+      currentMargin: current.netMargin,
     },
   ];
-
-  const waterfallResultado: WaterfallRow[] = [
-    { label: 'Receita bruta', value: receitaBruta, kind: 'start' },
-    { label: 'Impostos', value: -impostos, kind: 'down' },
-    { label: 'CMV', value: -cmv, kind: 'down' },
-    { label: 'Despesas', value: -despesasOperacionais, kind: 'down' },
-    { label: 'Resultado', value: lucroLiquido, kind: 'end' },
-  ];
-
-  const despesasDetalhe: DespesaOperacional[] = [
-    { nome: 'Pró-labore', valor: 8000, anterior: 8000, tipo: 'fixo', icon: 'badge' },
-    { nome: 'Aluguel', valor: 6000, anterior: 6000, tipo: 'fixo', icon: 'storefront' },
-    {
-      nome: 'Taxa do iFood',
-      valor: 6044,
-      anterior: 5480,
-      tipo: 'variavel',
-      icon: 'delivery_dining',
-    },
-    {
-      nome: 'Utilidades (luz, água, gás)',
-      valor: 2200,
-      anterior: 1820,
-      tipo: 'fixo',
-      icon: 'bolt',
-    },
-    {
-      nome: 'Manutenção e limpeza',
-      valor: 1400,
-      anterior: 1300,
-      tipo: 'variavel',
-      icon: 'cleaning_services',
-    },
-    { nome: 'Contador e outros', valor: 1456, anterior: 1235, tipo: 'fixo', icon: 'receipt_long' },
-    { nome: 'Taxas de cartão', valor: 1200, anterior: 1128, tipo: 'variavel', icon: 'credit_card' },
-    { nome: 'Marketing', valor: 1200, anterior: 900, tipo: 'variavel', icon: 'campaign' },
-  ];
-
-  const custosFixos = 15200;
-  const custosVariaveis = 29268;
-  const margemContribuicaoPct = ((receitaBruta - custosVariaveis) / receitaBruta) * 100;
-  const pontoEquilibrio = custosFixos / ((receitaBruta - custosVariaveis) / receitaBruta);
-  const diasParaEquilibrio = Math.ceil((pontoEquilibrio / receitaBruta) * 30);
-
-  const historico: MesResultado[] = [
-    { mes: 'Fev', lucro: 2980, margem: 6.1, receita: 48800 },
-    { mes: 'Mar', lucro: 3640, margem: 7.2, receita: 50600 },
-    { mes: 'Abr', lucro: 3120, margem: 6.2, receita: 50300 },
-    { mes: 'Mai', lucro: 4480, margem: 8.6, receita: 52100 },
-    { mes: 'Jun', lucro: 5100, margem: 9.4, receita: 54200 },
-    { mes: 'Jul', lucro: 6372, margem: 10.9, receita: 58400 },
-  ];
+  const maiorDespesa = [...operatingExpenseItems].sort((a, b) => b.amount - a.amount)[0];
+  if (maiorDespesa) {
+    insights.push({
+      kind: 'largestOpexItem',
+      severity: 'warning',
+      name: maiorDespesa.name,
+      amount: maiorDespesa.amount,
+      revenuePct: maiorDespesa.revenuePct,
+    });
+  }
 
   return {
-    refLabel,
-    receitaBruta,
-    impostos,
-    receitaLiquida,
-    cmv,
-    margemBruta,
-    despesasOperacionais,
-    lucroLiquido,
-    margemLiquida,
-    anterior,
-    linhasDRE,
-    waterfallResultado,
-    despesasDetalhe,
-    custosFixos,
-    custosVariaveis,
-    margemContribuicaoPct,
-    pontoEquilibrio,
-    diasParaEquilibrio,
-    historico,
-    lucroSpark: historico.map((h) => h.lucro),
+    referenceMonth: m.refLabel,
+    previousMonth: m.anterior.refLabel,
+    current,
+    previous,
+    deltas: {
+      grossRevenue: delta(current.grossRevenue, previous.grossRevenue),
+      taxes: delta(current.taxes, previous.taxes),
+      netRevenue: delta(current.netRevenue, previous.netRevenue),
+      cmv: delta(current.cmv, previous.cmv),
+      grossMargin: delta(current.grossMargin, previous.grossMargin),
+      operatingExpenses: delta(current.operatingExpenses, previous.operatingExpenses),
+      netProfit: delta(current.netProfit, previous.netProfit),
+    },
+    tax: {
+      regime: TaxRegime.SimplesNacionalAnexoI,
+      effectiveRate: m.impostos / m.receitaBruta,
+      meiMonthlyDas: null,
+    },
+    operatingExpenseItems,
+    breakEven: {
+      fixedCosts: m.custosFixos,
+      variableCosts: m.custosVariaveis,
+      contributionMarginPct: (current.netRevenue - m.custosVariaveis) / current.netRevenue,
+      breakEvenRevenue:
+        m.custosFixos / ((current.grossRevenue - m.custosVariaveis) / current.grossRevenue),
+      reachedOnDay: 16,
+    },
+    history: m.historico.map((h) => ({
+      month: h.mes,
+      grossRevenue: h.receita,
+      netProfit: h.lucro,
+      netMargin: h.margem / 100,
+    })),
+    insights,
+    comparison: { kind: 'fullMonth', untilDay: null },
   };
+}
+
+function delay(ms = 380): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 @Injectable({ providedIn: 'root' })
 export class ResultadoService {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private reportClient = inject(MintlyClientService).client.reportClient;
 
-  readonly data = signal<ResultadoDataset | null>(null);
+  readonly data = signal<ResultReport | null>(null);
   readonly loading = signal(false);
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
   }
 
-  /** Mesmo wrapper autenticado dos outros services (401 -> refresh + retry) — pronto pra quando o endpoint existir. */
   private async call<T>(fn: (headers: Headers) => Promise<T>): Promise<T> {
     try {
       return await fn(this.headers);
@@ -257,16 +148,17 @@ export class ResultadoService {
     );
   }
 
-  /** TODO(API): sem endpoint de DRE/resultado na mintly-lib ainda — mock local no mesmo formato de resposta ({ payload }). */
-  private async fetch(): Promise<{ payload: ResultadoDataset }> {
-    await new Promise((r) => setTimeout(r, 380));
-    return { payload: buildDataset() };
-  }
-
-  async refresh(): Promise<void> {
+  async refresh(month?: string): Promise<void> {
     this.loading.set(true);
     try {
-      const response = await this.call(() => this.fetch());
+      if (environment.useMocks) {
+        await delay();
+        this.data.set(buildMockReport());
+        return;
+      }
+      const query: ResultQuery = { month };
+      const response = await this.call((headers) => this.reportClient.result(query, headers));
+      if (!response.payload) throw new Error('Resposta de /reports/result sem payload.');
       this.data.set(response.payload);
     } finally {
       this.loading.set(false);
