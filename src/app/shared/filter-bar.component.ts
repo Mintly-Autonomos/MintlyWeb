@@ -1,9 +1,29 @@
-import { Component, Input, Output, EventEmitter, signal } from '@angular/core';
+import {
+  Component,
+  Injectable,
+  Input,
+  Output,
+  EventEmitter,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { IconComponent } from './icon.component';
 
 export interface FilterOption<T = string> {
   value: T;
   label: string;
+}
+
+/** Garante que só um app-filter-select fique aberto por vez (evita painéis sobrepostos). */
+@Injectable({ providedIn: 'root' })
+export class FilterDropdownCoordinator {
+  readonly activeId = signal<number | null>(null);
+  private nextId = 0;
+
+  nextInstanceId(): number {
+    return this.nextId++;
+  }
 }
 
 @Component({
@@ -111,7 +131,7 @@ export class FilterBarComponent {
     <div class="relative inline-flex">
       <button
         type="button"
-        (click)="open.set(!open())"
+        (click)="toggleOpen()"
         [class]="
           'inline-flex items-center gap-1 h-8 pl-2.5 pr-1.5 rounded-md border bg-card text-[13px] transition-colors duration-150 hover:bg-muted/60 cursor-pointer ' +
           (isDefault
@@ -120,7 +140,7 @@ export class FilterBarComponent {
           (open() ? ' ring-2 ring-mint/20 border-mint/60' : '')
         "
       >
-        <span [class]="isDefault ? '' : 'font-medium'">{{ placeholder }}</span>
+        <span [class]="isDefault ? '' : 'font-medium'">{{ label }}</span>
         @if (!isDefault) {
           <span class="text-muted-foreground">:</span>
           <span class="font-medium truncate max-w-[160px]">{{ selectedLabel }}</span>
@@ -166,11 +186,17 @@ export class FilterBarComponent {
 })
 export class FilterSelectComponent {
   @Input() value = '';
-  @Input() placeholder = '';
+  @Input() label = '';
   @Input() options: FilterOption[] = [];
   @Output() valueChange = new EventEmitter<string>();
 
-  protected open = signal(false);
+  private coordinator = inject(FilterDropdownCoordinator);
+  private readonly id = this.coordinator.nextInstanceId();
+  protected open = computed(() => this.coordinator.activeId() === this.id);
+
+  toggleOpen(): void {
+    this.coordinator.activeId.update((cur) => (cur === this.id ? null : this.id));
+  }
 
   get isDefault(): boolean {
     return !this.value || this.value === this.options[0]?.value;
@@ -181,7 +207,7 @@ export class FilterSelectComponent {
 
   select(v: string): void {
     this.valueChange.emit(v);
-    this.open.set(false);
+    this.coordinator.activeId.set(null);
   }
 }
 

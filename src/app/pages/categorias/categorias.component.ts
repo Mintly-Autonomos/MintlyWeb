@@ -12,7 +12,7 @@ import { ChipComponent } from '../../shared/chip.component';
 import { ToggleComponent } from '../../shared/toggle.component';
 import { ModalComponent } from '../../shared/modal.component';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
-import { FilterBarComponent } from '../../shared/filter-bar.component';
+import { FilterBarComponent, FilterSelectComponent } from '../../shared/filter-bar.component';
 import { AuditTimelineComponent } from '../../shared/audit-timeline.component';
 import { ToastService } from '../../shared/toast.service';
 import { fmtDateTime } from '../../shared/format';
@@ -36,6 +36,7 @@ interface CatForm {
     ModalComponent,
     EmptyStateComponent,
     FilterBarComponent,
+    FilterSelectComponent,
     AuditTimelineComponent,
   ],
   templateUrl: './categorias.component.html',
@@ -50,6 +51,9 @@ export class CategoriasComponent implements OnInit {
   protected details = signal<Category | null>(null);
   protected protectedAlert = signal<Category | null>(null);
   protected query = signal('');
+  protected behaviorFilter = signal<'all' | Behavior>('all');
+  protected natureFilter = signal<'all' | Nature>('all');
+  protected statusFilter = signal<'all' | 'active' | 'inactive'>('all');
 
   protected form = signal<CatForm>({
     name: '',
@@ -63,10 +67,25 @@ export class CategoriasComponent implements OnInit {
   protected loading = this.svc.loading;
   protected fmtDate = fmtDateTime;
 
+  protected activeFilters = computed(
+    () =>
+      (this.behaviorFilter() !== 'all' ? 1 : 0) +
+      (this.natureFilter() !== 'all' ? 1 : 0) +
+      (this.statusFilter() !== 'all' ? 1 : 0),
+  );
+
   protected filtered = computed(() => {
     const q = this.query().trim().toLowerCase();
     return this.categories()
-      .filter((c) => c.type === this.tab() && (!q || c.name.toLowerCase().includes(q)))
+      .filter((c) => {
+        if (c.type !== this.tab()) return false;
+        if (q && !c.name.toLowerCase().includes(q)) return false;
+        if (this.behaviorFilter() !== 'all' && c.behavior !== this.behaviorFilter()) return false;
+        if (this.natureFilter() !== 'all' && c.nature !== this.natureFilter()) return false;
+        if (this.statusFilter() === 'active' && !c.active) return false;
+        if (this.statusFilter() === 'inactive' && c.active) return false;
+        return true;
+      })
       .sort((a, b) => {
         if (a.protected !== b.protected) return a.protected ? -1 : 1;
         return a.name.localeCompare(b.name, 'pt-BR');
@@ -82,6 +101,12 @@ export class CategoriasComponent implements OnInit {
 
   ngOnInit(): void {
     this.svc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
+  }
+
+  clearFilters(): void {
+    this.behaviorFilter.set('all');
+    this.natureFilter.set('all');
+    this.statusFilter.set('all');
   }
 
   get nameError(): string {
@@ -203,4 +228,20 @@ export class CategoriasComponent implements OnInit {
   natureLabel(n: Nature): string {
     return n === 'operational' ? 'Operacional' : 'Não operacional';
   }
+
+  protected behaviorOpts = [
+    { value: 'all', label: 'Todos' },
+    { value: 'fixed', label: 'Fixo' },
+    { value: 'variable', label: 'Variável' },
+  ];
+  protected natureOpts = [
+    { value: 'all', label: 'Todas' },
+    { value: 'operational', label: 'Operacional' },
+    { value: 'non-operational', label: 'Não operacional' },
+  ];
+  protected statusOpts = [
+    { value: 'all', label: 'Todos' },
+    { value: 'active', label: 'Ativas' },
+    { value: 'inactive', label: 'Inativas' },
+  ];
 }

@@ -127,6 +127,11 @@ export class ContasComponent implements OnInit {
     this.svc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
   }
 
+  clearFilters(): void {
+    this.typeFilter.set('all');
+    this.statusFilter.set('all');
+  }
+
   // Open create/edit modal
   openCreate(): void {
     this.form.set({
