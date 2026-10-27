@@ -1,6 +1,7 @@
 import { Component, signal, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { AVATAR_MAX_BYTES, AVATAR_MIME_TYPES } from 'mintly-lib';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
@@ -284,8 +285,6 @@ export class CadastroComponent {
 
   protected avatarPreview = signal<string | null>(null);
   protected avatarError = signal<string | null>(null);
-  private readonly MAX_AVATAR_BYTES = 1024 * 1024; // 1MB — mesmo teto usado hoje por perfis de foto de mercado.
-  private readonly ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
   // Métodos (não computed()): name/phone/email/password/... são campos simples
   // (ngModel), não signals — um computed() aqui só reagiria à leitura de `step()`
@@ -322,11 +321,11 @@ export class CadastroComponent {
     input.value = ''; // permite escolher o mesmo arquivo de novo depois de remover
     if (!file) return;
 
-    if (!this.ALLOWED_AVATAR_TYPES.includes(file.type)) {
+    if (!(AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
       this.avatarError.set('Formato não aceito. Use JPG, PNG ou WebP.');
       return;
     }
-    if (file.size > this.MAX_AVATAR_BYTES) {
+    if (file.size > AVATAR_MAX_BYTES) {
       this.avatarError.set(
         `Imagem muito grande (${(file.size / 1024 / 1024).toFixed(1)}MB). Máximo de 1MB.`,
       );
@@ -356,12 +355,10 @@ export class CadastroComponent {
     this.loading.set(true);
     try {
       const email = this.email.trim();
-      // Salva antes do signup pra já vir anexado ao usuário assim que a sessão é criada
-      // (ver TODO(débito técnico) em AuthService.saveAvatar).
-      if (this.avatarPreview()) this.auth.saveAvatar(email, this.avatarPreview()!);
       await this.auth.signup({
         name: this.name.trim(),
         phone: this.phone.trim(),
+        avatar: this.avatarPreview() ?? undefined,
         email,
         password: this.password,
         restaurantName: this.restaurant.trim(),
