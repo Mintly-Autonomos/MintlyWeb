@@ -1,0 +1,305 @@
+<div class="space-y-6">
+  <!-- 1 — Mês -->
+  <div class="flex flex-wrap items-center gap-2">
+    <div
+      class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
+    >
+      @for (m of monthOpts; track m.key) {
+        <button
+          type="button"
+          (click)="setMonth(m.key)"
+          [attr.aria-pressed]="monthSel() === m.key"
+          [class]="
+            'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
+            (monthSel() === m.key
+              ? 'bg-mint-soft text-ocean'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+          "
+        >
+          {{ m.label }}
+        </button>
+      }
+    </div>
+    @if (monthSel() === 'personalizado') {
+      <div
+        class="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-border bg-card"
+      >
+        <input
+          type="month"
+          [value]="customMonth()"
+          (change)="setCustomMonth($any($event.target).value)"
+          aria-label="Mês de referência"
+          class="bg-transparent outline-none text-[12.5px]"
+        />
+      </div>
+    }
+    @if (data(); as d) {
+      <div class="ml-auto text-[12px] text-muted-foreground">
+        Referência: {{ fmtMonthLong(d.referenceMonth) }}
+      </div>
+    }
+  </div>
+
+  @if (data(); as d) {
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- 2 — Score -->
+      <div class="lg:col-span-4">
+        <button
+          type="button"
+          (click)="scoreOpen.set(true)"
+          class="w-full h-full text-left rounded-2xl cursor-pointer"
+        >
+          <div
+            class="m3-card p-5 h-full flex flex-col items-center text-center transition-all duration-200 hover:m3-elev hover:border-mint/50"
+          >
+            <div
+              class="w-full flex items-center justify-center gap-1 text-[12px] font-medium text-muted-foreground"
+            >
+              <span>Saúde financeira</span>
+              <app-hint
+                text="Calculado a partir da sua margem de lucro, controle de custos (prime cost), fôlego de caixa e tendência de vendas."
+              />
+            </div>
+            <div class="relative w-[180px] h-[180px] mt-2">
+              <svg viewBox="0 0 100 100" class="w-full h-full -rotate-90">
+                <circle cx="50" cy="50" r="46" fill="none" stroke="var(--muted)" stroke-width="8" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="46"
+                  fill="none"
+                  [attr.stroke]="scoreMeta().color"
+                  stroke-width="8"
+                  stroke-linecap="round"
+                  [attr.stroke-dasharray]="circumference"
+                  [attr.stroke-dashoffset]="scoreDashoffset()"
+                  style="transition: stroke-dashoffset 0.6s ease"
+                />
+              </svg>
+              <div class="absolute inset-0 grid place-items-center pointer-events-none">
+                <div>
+                  <div
+                    class="text-[44px] font-bold tracking-tight tabular-nums"
+                    [style.color]="scoreMeta().color"
+                  >
+                    {{ d.health.score ?? '—' }}
+                  </div>
+                  <div class="text-[11px] text-muted-foreground -mt-1">de 100</div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="mx-auto mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-bold"
+              [style.color]="scoreMeta().color"
+              [style.background]="'color-mix(in oklab, ' + scoreMeta().color + ' 12%, transparent)'"
+            >
+              <app-icon name="monitor_heart" [style]="{ fontSize: '16px' }" />
+              {{ scoreMeta().label }}
+            </div>
+            <p class="mt-3 text-[13px] leading-relaxed text-muted-foreground max-w-[280px]">
+              {{ scoreResumo() }}
+            </p>
+            <div class="mt-3 inline-flex items-center gap-0.5 text-[13px] font-semibold text-ocean">
+              Ver como calculamos
+              <app-icon name="chevron_right" [style]="{ fontSize: '18px' }" />
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <!-- 3 — KPIs -->
+      <div class="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+        <app-stat-card
+          label="Lucro do mês"
+          [value]="fmtBRL(d.cards.netProfit.amount)"
+          [delta]="{
+            value: pctFmt(Math.abs((d.cards.netProfit.delta ?? 0) * 100)),
+            up: (d.cards.netProfit.delta ?? 0) >= 0,
+            note: 'vs. mês anterior',
+          }"
+          icon="savings"
+          status="neutral"
+          [spark]="netProfitSpark()"
+        >
+          <app-hint
+            slot="hint"
+            text="O que sobra depois de todos os custos, despesas e impostos."
+          />
+        </app-stat-card>
+        <app-stat-card
+          label="Caixa hoje"
+          [value]="fmtBRL(d.cards.cashToday.amount)"
+          icon="account_balance_wallet"
+          status="neutral"
+          [spark]="cashSpark()"
+        />
+        <app-stat-card
+          label="Projeção 30 dias"
+          [value]="fmtBRL(d.cards.projection.balance)"
+          [subtext]="
+            d.cards.projection.runwayDays !== null
+              ? 'fôlego de ~' + d.cards.projection.runwayDays + ' dias de caixa'
+              : ''
+          "
+          icon="timeline"
+          status="warning"
+        >
+          <app-hint
+            slot="hint"
+            text="Estimativa de quanto você terá em caixa daqui a 30 dias, com base no seu histórico e contas já lançadas."
+          />
+          <app-chip slot="badge" tone="ocean">Estimativa</app-chip>
+        </app-stat-card>
+        <app-stat-card
+          label="CMV"
+          [value]="pctFmt((d.cards.cmv.pct ?? 0) * 100)"
+          [delta]="{
+            value:
+              Math.abs(d.cards.cmv.deltaPoints ?? 0).toLocaleString('pt-BR', {
+                maximumFractionDigits: 1,
+              }) + ' p.p.',
+            up: (d.cards.cmv.deltaPoints ?? 0) >= 0,
+            note: 'vs. mês anterior',
+          }"
+          icon="restaurant"
+          status="warning"
+        >
+          <app-hint
+            slot="hint"
+            text="Custo da Mercadoria Vendida: quanto dos seus insumos foi consumido para gerar as vendas. Ideal entre 28% e 35% da receita."
+          />
+          <app-bullet
+            slot="footer"
+            [value]="(d.cards.cmv.pct ?? 0) * 100"
+            [min]="d.cards.cmv.target.min * 100"
+            [max]="d.cards.cmv.target.max * 100"
+            [label]="
+              'Alvo ' +
+              Math.round(d.cards.cmv.target.min * 100) +
+              '–' +
+              Math.round(d.cards.cmv.target.max * 100) +
+              '%'
+            "
+          />
+        </app-stat-card>
+        <app-stat-card
+          label="Prime Cost"
+          [value]="pctFmt((d.cards.primeCost.pct ?? 0) * 100)"
+          [delta]="{
+            value:
+              Math.abs(d.cards.primeCost.deltaPoints ?? 0).toLocaleString('pt-BR', {
+                maximumFractionDigits: 1,
+              }) + ' p.p.',
+            up: (d.cards.primeCost.deltaPoints ?? 0) >= 0,
+            note: 'vs. mês anterior',
+          }"
+          icon="stacked_bar_chart"
+          status="warning"
+        >
+          <app-hint
+            slot="hint"
+            text="CMV + custo de pessoal. É o maior custo controlável de um restaurante."
+          />
+          <app-bullet
+            slot="footer"
+            [value]="(d.cards.primeCost.pct ?? 0) * 100"
+            [min]="0"
+            [max]="d.cards.primeCost.targetMax * 100"
+            [label]="'Alvo ≤ ' + Math.round(d.cards.primeCost.targetMax * 100) + '%'"
+          />
+        </app-stat-card>
+        <app-stat-card
+          label="Receita do mês"
+          [value]="fmtBRL(d.cards.revenue.amount)"
+          [delta]="{
+            value: pctFmt(Math.abs((d.cards.revenue.delta ?? 0) * 100)),
+            up: (d.cards.revenue.delta ?? 0) >= 0,
+            note: 'vs. mês anterior',
+          }"
+          icon="trending_up"
+          status="neutral"
+          [spark]="revenueSpark()"
+        />
+      </div>
+    </div>
+
+    <!-- 4 — Insights -->
+    <section>
+      <app-section-header title="O que fazer primeiro" />
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        @for (i of d.insights; track i.kind) {
+          <app-insight-card
+            [severity]="insightSeverity(i)"
+            [title]="insightTitle(i)"
+            [description]="insightDescription(i)"
+            [action]="insightAction(i)"
+            (actionClick)="insightGo(i)"
+          />
+        }
+      </div>
+    </section>
+
+    <!-- 5 & 6 — Gráficos -->
+    <div class="grid grid-cols-1 gap-6">
+      <app-chart-card
+        title="Receita vs. Despesa"
+        description="Últimos 6 meses e projeção do fechamento do mês atual."
+        [loading]="loading()"
+        [height]="340"
+      >
+        <app-area-chart
+          [data]="mainData()"
+          categoryKey="month"
+          [series]="mainSeries"
+          [valueFormatter]="abrev"
+        />
+      </app-chart-card>
+
+      <app-chart-card title="Como seu lucro se forma" [loading]="loading()" [height]="340">
+        <app-waterfall-chart [rows]="waterfall()" />
+      </app-chart-card>
+    </div>
+
+    <!-- 7 — Ações rápidas -->
+    <div class="flex flex-wrap items-center gap-3">
+      <app-button icon="point_of_sale" (clicked)="goTo('/movimentacoes')">Lançar venda</app-button>
+      <app-button variant="tonal" icon="receipt_long" (clicked)="goTo('/movimentacoes')"
+        >Lançar despesa</app-button
+      >
+      <app-button variant="outlined" icon="description" (clicked)="goTo('/resultado')"
+        >Ver relatório do mês</app-button
+      >
+    </div>
+
+    <app-modal
+      [open]="scoreOpen()"
+      (closed)="scoreOpen.set(false)"
+      title="Como calculamos sua saúde"
+      [subtitle]="'Score ' + (d.health.score ?? '—') + '/100 — média ponderada de 4 pilares.'"
+    >
+      <div class="space-y-5">
+        @for (p of d.health.pillars; track p.key) {
+          <div>
+            <div class="flex items-center justify-between text-[13px]">
+              <span class="font-semibold">{{ pillarLabel[p.key] }}</span>
+              <span class="tabular-nums font-bold">{{ p.score ?? '—' }}</span>
+            </div>
+            <div class="mt-2 h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                class="h-full rounded-full"
+                [style.width.%]="p.score ?? 0"
+                [style.background]="scoreMeta().color"
+              ></div>
+            </div>
+            <div
+              class="mt-1.5 flex items-center justify-between text-[11.5px] text-muted-foreground"
+            >
+              <span>{{ pillarDetail(p.key, p.value) }}</span>
+              <span>peso {{ Math.round(p.weight * 100) }}%</span>
+            </div>
+          </div>
+        }
+      </div>
+    </app-modal>
+  }
+</div>

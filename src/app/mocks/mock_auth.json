@@ -1,0 +1,9 @@
+{
+  "user": {
+    "name": "Ana Costa",
+    "email": "ana@seoulbird.com.br",
+    "password": "mintly123",
+    "restaurantName": "Seoul Bird",
+    "restaurantId": "rest-seoulbird-001"
+  }
+}

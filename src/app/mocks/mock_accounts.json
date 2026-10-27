@@ -1,0 +1,99 @@
+[
+  {
+    "id": "acc-bb",
+    "name": "Banco do Brasil PJ",
+    "type": "Bank",
+    "active": true,
+    "isDefault": true,
+    "balance": 12400,
+    "predictedBalance": 15300,
+    "createdBy": "Ana Costa",
+    "createdAt": "2026-01-10T09:00:00.000Z",
+    "updatedBy": "Ana Costa",
+    "updatedAt": "2026-01-10T09:00:00.000Z",
+    "history": [
+      {
+        "id": 1,
+        "at": "2026-01-10T09:00:00.000Z",
+        "by": "Ana Costa",
+        "action": "create",
+        "icon": "add_circle"
+      },
+      {
+        "id": 2,
+        "at": "2026-01-10T09:01:00.000Z",
+        "by": "Ana Costa",
+        "action": "set-default",
+        "icon": "star"
+      }
+    ]
+  },
+  {
+    "id": "acc-caixa",
+    "name": "Caixa do salão",
+    "type": "Cash Register",
+    "active": true,
+    "isDefault": false,
+    "balance": 1850,
+    "predictedBalance": 1850,
+    "createdBy": "Ana Costa",
+    "createdAt": "2026-01-10T09:00:00.000Z",
+    "updatedBy": "Ana Costa",
+    "updatedAt": "2026-01-10T09:00:00.000Z",
+    "history": [
+      {
+        "id": 1,
+        "at": "2026-01-10T09:00:00.000Z",
+        "by": "Ana Costa",
+        "action": "create",
+        "icon": "add_circle"
+      }
+    ]
+  },
+  {
+    "id": "acc-pix",
+    "name": "Carteira PIX",
+    "type": "Digital Wallet",
+    "active": true,
+    "isDefault": false,
+    "balance": 4250,
+    "predictedBalance": 4250,
+    "createdBy": "Ana Costa",
+    "createdAt": "2026-01-12T14:00:00.000Z",
+    "updatedBy": "Ana Costa",
+    "updatedAt": "2026-01-12T14:00:00.000Z",
+    "history": [
+      {
+        "id": 1,
+        "at": "2026-01-12T14:00:00.000Z",
+        "by": "Ana Costa",
+        "action": "create",
+        "icon": "add_circle"
+      }
+    ]
+  },
+  {
+    "id": "acc-ifood",
+    "name": "iFood",
+    "type": "Financial Platform",
+    "active": true,
+    "isDefault": false,
+    "balance": 0,
+    "predictedBalance": 3200,
+    "taxPct": 23,
+    "settlementDays": 15,
+    "createdBy": "Ana Costa",
+    "createdAt": "2026-01-15T11:30:00.000Z",
+    "updatedBy": "Ana Costa",
+    "updatedAt": "2026-01-15T11:30:00.000Z",
+    "history": [
+      {
+        "id": 1,
+        "at": "2026-01-15T11:30:00.000Z",
+        "by": "Ana Costa",
+        "action": "create",
+        "icon": "add_circle"
+      }
+    ]
+  }
+]

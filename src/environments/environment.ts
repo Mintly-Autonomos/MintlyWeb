@@ -6,4 +6,8 @@ export const environment = {
   mintlyEnv: 'staging',
   production: false,
   enableDevTools: true,
+  // Default SEMPRE false (bate no back real). Vire true só localmente (não comitar)
+  // quando a MintlyApi não estiver rodando — os services então usam os JSON de
+  // `src/app/mocks/` em vez do client real.
+  useMocks: false,
 } as const;

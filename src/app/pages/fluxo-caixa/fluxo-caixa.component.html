@@ -1,0 +1,309 @@
+<div class="space-y-6">
+  <!-- 1 — Horizonte -->
+  <div class="space-y-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-[12.5px] text-muted-foreground"
+        >Horizonte de projeção — vale para toda a página</span
+      >
+      <div
+        class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
+      >
+        @for (h of horizons; track h) {
+          <button
+            type="button"
+            (click)="setHorizon(h)"
+            [attr.aria-pressed]="!customAplicado() && horizon() === h"
+            [class]="
+              'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
+              (!customAplicado() && horizon() === h
+                ? 'bg-mint-soft text-ocean'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+            "
+          >
+            {{ h }} dias
+          </button>
+        }
+        <button
+          type="button"
+          (click)="toggleCustom()"
+          [attr.aria-pressed]="!!customAplicado()"
+          [attr.aria-expanded]="customOpen()"
+          [class]="
+            'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
+            (customAplicado()
+              ? 'bg-mint-soft text-ocean'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+          "
+        >
+          {{ customAplicado() ? 'Até ' + formatDia(customAplicado()!) : 'Personalizado' }}
+        </button>
+      </div>
+      <div class="ml-auto text-[12px] text-muted-foreground">Cantina da Ana</div>
+    </div>
+
+    @if (customOpen()) {
+      <div class="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="text-[12.5px] text-muted-foreground" for="horizonte-data"
+            >Projetar até</label
+          >
+          <input
+            id="horizonte-data"
+            type="date"
+            [value]="customDate()"
+            [min]="minCustomDate"
+            [max]="maxCustomDate"
+            (change)="setCustomDate($any($event.target).value)"
+            class="h-8 px-2.5 rounded-md border border-border bg-card text-[13px] outline-none focus:border-mint focus:ring-2 focus:ring-mint/20"
+          />
+          <button
+            type="button"
+            (click)="aplicarCustom()"
+            class="h-8 px-3.5 rounded-full bg-mint-soft text-ocean text-[12.5px] font-semibold hover:opacity-90 transition cursor-pointer"
+          >
+            Aplicar
+          </button>
+        </div>
+        @if (customError()) {
+          <div class="flex items-start gap-1.5 text-[12.5px] text-error">
+            <app-icon name="error" [style]="{ fontSize: '16px' }" />
+            <span>{{ customError() }}</span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  @if (data(); as d) {
+    <!-- 2 — KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+      <app-stat-card
+        label="Caixa hoje"
+        [value]="fmtBRL(d.cashToday)"
+        icon="account_balance_wallet"
+        status="neutral"
+        subtext="Somando todas as contas ativas"
+      />
+      <app-stat-card
+        [label]="'A receber (' + label() + ')'"
+        [value]="fmtBRL(d.receivable)"
+        icon="south_west"
+        status="positive"
+        [spark]="sparkReceber()"
+      />
+      <app-stat-card
+        [label]="'A pagar (' + label() + ')'"
+        [value]="fmtBRL(d.payable)"
+        icon="north_east"
+        status="warning"
+        [spark]="sparkPagar()"
+      />
+      <app-stat-card
+        [label]="'Saldo previsto (' + label() + ')'"
+        [value]="fmtBRL(d.projectedBalance)"
+        icon="query_stats"
+        status="warning"
+        [subtext]="
+          'menor saldo: ~' + fmtBRL(d.lowestBalance.balance) + ' no dia ' + menorSaldoOffset()
+        "
+      >
+        <app-hint
+          slot="hint"
+          text="Estimativa de quanto sobra em caixa ao fim do horizonte escolhido, com base nas contas já lançadas."
+        />
+        <app-chip slot="badge" tone="ocean" icon="insights">Estimativa</app-chip>
+      </app-stat-card>
+    </div>
+
+    <!-- 3 — Alerta -->
+    @if (alerta()) {
+      <app-insight-card
+        severity="atencao"
+        [title]="'Seu caixa vai ficar apertado por volta do dia ' + diaAperto()"
+        [description]="
+          'Várias contas vencem juntas e seu caixa deve cair para cerca de ' +
+          fmtBRL(criticalInsight()!.balance) +
+          ' no dia ' +
+          diaAperto() +
+          '. Considere antecipar recebimentos ou renegociar prazos.'
+        "
+        action="Ver vencimentos"
+        (actionClick)="scrollToVencimentos()"
+      />
+    }
+
+    <!-- 4 — Projeção de caixa -->
+    <app-chart-card
+      title="Projeção de caixa"
+      description="Como seu saldo deve evoluir com as contas já lançadas."
+      [loading]="loading()"
+      [height]="340"
+    >
+      <div slot="action">
+        <app-hint
+          text="Estimativa de como seu saldo deve evoluir, com base nas contas já lançadas."
+        />
+      </div>
+      <app-area-chart
+        [data]="serie()"
+        categoryKey="rotulo"
+        [series]="areaSeries"
+        [valueFormatter]="abrev"
+        [zeroLine]="true"
+        [todayLabel]="hojeRotulo()"
+        [dots]="dots()"
+      />
+    </app-chart-card>
+
+    <!-- 5 — Entradas vs Saídas -->
+    <app-chart-card
+      title="Entradas vs. Saídas"
+      [description]="
+        'Comparativo por período dentro dos próximos ' + label().replace('até ', '') + '.'
+      "
+      [loading]="loading()"
+      [height]="300"
+    >
+      <app-bar-chart
+        [data]="blocos()"
+        categoryKey="semana"
+        [series]="blocosSeries"
+        orientation="columns"
+        [valueFormatter]="abrev"
+      />
+    </app-chart-card>
+
+    <!-- 6 — Próximos vencimentos -->
+    <div id="fluxo-vencimentos" class="scroll-mt-24">
+      <app-section-header
+        title="Próximos vencimentos"
+        [description]="
+          'Tudo que entra e sai dentro do horizonte de ' + label().replace('até ', '') + '.'
+        "
+      >
+        <div
+          slot="action"
+          class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
+        >
+          @for (t of tabOpts; track t.key) {
+            <button
+              type="button"
+              (click)="setTab(t.key)"
+              [attr.aria-pressed]="tab() === t.key"
+              [class]="
+                'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
+                (tab() === t.key
+                  ? 'bg-mint-soft text-ocean'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+              "
+            >
+              {{ t.label }}
+            </button>
+          }
+        </div>
+      </app-section-header>
+
+      @if (grupos().length === 0) {
+        <div class="m3-card rounded-2xl">
+          <app-empty-state
+            [icon]="emptyState[tab()].icon"
+            [title]="emptyState[tab()].title"
+            [description]="emptyState[tab()].description"
+          />
+        </div>
+      } @else {
+        <div class="space-y-3">
+          @for (grupo of grupos(); track grupo[0]) {
+            <div
+              [class]="
+                'm3-card rounded-2xl p-4 md:p-5 transition-all duration-200 hover:m3-elev ' +
+                (isAtrasado(grupo[1])
+                  ? 'border-error/40 bg-error/5'
+                  : isCritico(grupo[1][0].offset)
+                    ? 'border-warning/50 bg-warning/8'
+                    : '')
+              "
+            >
+              <div class="flex items-center gap-2 mb-3 flex-wrap">
+                <app-icon
+                  [name]="isAtrasado(grupo[1]) ? 'error' : 'event'"
+                  [style]="{ fontSize: '18px' }"
+                  [className]="
+                    isAtrasado(grupo[1])
+                      ? 'text-error'
+                      : isCritico(grupo[1][0].offset)
+                        ? 'text-warning'
+                        : 'text-muted-foreground'
+                  "
+                />
+                <div class="text-[13px] font-semibold capitalize">
+                  {{ formatDiaLongo(grupo[0]) }}
+                </div>
+                @if (isAtrasado(grupo[1])) {
+                  <app-chip tone="error" icon="priority_high">Em atraso</app-chip>
+                } @else if (isCritico(grupo[1][0].offset)) {
+                  <app-chip tone="warning" icon="warning">Dia crítico</app-chip>
+                }
+              </div>
+
+              <div class="space-y-2">
+                @for (v of grupo[1]; track v.id) {
+                  <div
+                    class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 rounded-xl px-3 py-2.5 hover:bg-muted/60 transition-colors duration-150"
+                  >
+                    <span
+                      [class]="
+                        'h-9 w-9 shrink-0 rounded-xl grid place-items-center ' +
+                        (v.tipo === 'receber'
+                          ? 'bg-mint-soft text-success'
+                          : 'bg-error/10 text-error')
+                      "
+                    >
+                      <app-icon
+                        [name]="v.tipo === 'receber' ? 'arrow_downward' : 'arrow_upward'"
+                        [style]="{ fontSize: '18px' }"
+                      />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-[14px] font-semibold truncate">{{ v.descricao }}</div>
+                      <div class="mt-1 flex items-center gap-2 flex-wrap">
+                        <app-chip tone="neutral">{{ v.categoria }}</app-chip>
+                        <span
+                          [class]="
+                            'text-[12px] ' +
+                            (v.status === 'vencido'
+                              ? 'text-error font-semibold'
+                              : 'text-muted-foreground')
+                          "
+                        >
+                          {{
+                            v.status === 'vencido'
+                              ? 'venceu em ' + formatDia(v.dataVencimento)
+                              : 'vence em ' + formatDia(v.dataVencimento)
+                          }}
+                        </span>
+                      </div>
+                    </div>
+                    <app-chip
+                      [tone]="statusMeta[v.status].tone"
+                      [icon]="statusMeta[v.status].icon"
+                      >{{ statusMeta[v.status].label }}</app-chip
+                    >
+                    <div
+                      [class]="
+                        'text-[15px] font-bold tabular-nums md:w-[130px] md:text-right ' +
+                        (v.tipo === 'receber' ? 'text-success' : 'text-error')
+                      "
+                    >
+                      {{ v.tipo === 'receber' ? '+' : '−' }} {{ fmtBRL(v.valor) }}
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

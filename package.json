@@ -30,7 +30,8 @@
     "@angular/material": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
-    "mintly-lib": "^2.7.0-preview",
+    "exceljs": "^4.4.0",
+    "mintly-lib": "2.18.0-preview",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

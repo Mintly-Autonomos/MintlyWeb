@@ -1,0 +1,160 @@
+{
+  "saldoAtual": 18500,
+  "sparksFluxo": {
+    "aReceber": [26800, 28400, 30100, 29500, 31800, 32500],
+    "aPagar": [38200, 39600, 41100, 40500, 42800, 47100]
+  },
+  "seeds": [
+    {
+      "offset": -9,
+      "descricao": "Fornecedor Embalagens",
+      "valor": 730,
+      "tipo": "pagar",
+      "categoria": "CMV/Insumos"
+    },
+    {
+      "offset": -6,
+      "descricao": "Fornecedor Bebidas",
+      "valor": 1450,
+      "tipo": "pagar",
+      "categoria": "CMV/Insumos"
+    },
+    {
+      "offset": -5,
+      "descricao": "Repasse iFood",
+      "valor": 2950,
+      "tipo": "receber",
+      "categoria": "Venda Delivery",
+      "quitado": true
+    },
+    {
+      "offset": -4,
+      "descricao": "Energia elétrica",
+      "valor": 1120,
+      "tipo": "pagar",
+      "categoria": "Utilidades",
+      "quitado": true
+    },
+    {
+      "offset": -3,
+      "descricao": "Taxas de cartão",
+      "valor": 620,
+      "tipo": "pagar",
+      "categoria": "Taxas"
+    },
+    {
+      "offset": -2,
+      "descricao": "Fornecedor Carnes",
+      "valor": 3800,
+      "tipo": "pagar",
+      "categoria": "CMV/Insumos",
+      "quitado": true
+    },
+    {
+      "offset": -1,
+      "descricao": "Recebível cartão de crédito",
+      "valor": 2650,
+      "tipo": "receber",
+      "categoria": "Venda Balcão",
+      "quitado": true
+    },
+    {
+      "offset": 1,
+      "descricao": "Repasse iFood",
+      "valor": 3200,
+      "tipo": "receber",
+      "categoria": "Venda Delivery"
+    },
+    {
+      "offset": 2,
+      "descricao": "Fornecedor Hortifruti",
+      "valor": 1850,
+      "tipo": "pagar",
+      "categoria": "CMV/Insumos"
+    },
+    {
+      "offset": 3,
+      "descricao": "Recebível cartão de crédito",
+      "valor": 2900,
+      "tipo": "receber",
+      "categoria": "Venda Balcão"
+    },
+    {
+      "offset": 4,
+      "descricao": "Energia elétrica",
+      "valor": 1180,
+      "tipo": "pagar",
+      "categoria": "Utilidades"
+    },
+    {
+      "offset": 6,
+      "descricao": "Repasse iFood",
+      "valor": 3400,
+      "tipo": "receber",
+      "categoria": "Venda Delivery"
+    },
+    {
+      "offset": 9,
+      "descricao": "Recebível cartão de crédito",
+      "valor": 3100,
+      "tipo": "receber",
+      "categoria": "Venda Balcão"
+    },
+    {
+      "offset": 10,
+      "descricao": "Fornecedor Carnes",
+      "valor": 4900,
+      "tipo": "pagar",
+      "categoria": "CMV/Insumos"
+    },
+    {
+      "offset": 13,
+      "descricao": "Repasse iFood",
+      "valor": 3500,
+      "tipo": "receber",
+      "categoria": "Venda Delivery"
+    },
+    {
+      "offset": 17,
+      "descricao": "Água e esgoto",
+      "valor": 520,
+      "tipo": "pagar",
+      "categoria": "Utilidades"
+    },
+    {
+      "offset": 20,
+      "descricao": "Simples Nacional",
+      "valor": 3700,
+      "tipo": "pagar",
+      "categoria": "Impostos"
+    },
+    {
+      "offset": 21,
+      "descricao": "Salários — 1ª parcela",
+      "valor": 6500,
+      "tipo": "pagar",
+      "categoria": "Salários"
+    },
+    {
+      "offset": 22,
+      "descricao": "Aluguel do ponto",
+      "valor": 2200,
+      "tipo": "pagar",
+      "categoria": "Aluguel"
+    },
+    {
+      "offset": 26,
+      "descricao": "Repasse iFood",
+      "valor": 3450,
+      "tipo": "receber",
+      "categoria": "Venda Delivery"
+    },
+    {
+      "offset": 30,
+      "descricao": "Taxas de cartão",
+      "valor": 1000,
+      "tipo": "pagar",
+      "categoria": "Taxas"
+    }
+  ]
+}

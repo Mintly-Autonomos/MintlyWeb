@@ -4,4 +4,5 @@ export const environment = {
   mintlyEnv: 'staging',
   production: false,
   enableDevTools: true,
+  useMocks: false,
 } as const;

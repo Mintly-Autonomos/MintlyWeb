@@ -1,0 +1,460 @@
+<div class="space-y-6">
+  @if (data(); as d) {
+    <!-- 1 — Referência -->
+    <div class="flex flex-wrap items-center gap-2">
+      <app-chip icon="calendar_month" tone="ocean">{{ fmtMonthLong(d.referenceMonth) }}</app-chip>
+      @if (d.tax.regime) {
+        <app-chip icon="account_balance">{{ regimeLabel[d.tax.regime] }}</app-chip>
+      } @else {
+        <button type="button" (click)="regimeOpen.set(true)" class="cursor-pointer">
+          <app-chip icon="warning" tone="warning">Regime tributário não configurado</app-chip>
+        </button>
+      }
+      <span class="text-[11.5px] text-muted-foreground">Estrutura contábil: DRE simplificada</span>
+      <div class="ml-auto">
+        <app-button variant="text" icon="help_outline" (clicked)="dreOpen.set(true)"
+          >Como esse número é calculado</app-button
+        >
+      </div>
+    </div>
+
+    <!-- 2 — Big number -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="m3-card p-5 lg:col-span-2 flex flex-col justify-center">
+        <div class="flex items-center gap-1.5 text-[12.5px] text-muted-foreground font-medium">
+          Sobrou no fim das contas
+          <app-hint
+            text="É o que restou depois de pagar impostos, ingredientes e todas as despesas do mês."
+          />
+        </div>
+        <div
+          class="mt-2 text-[40px] xl:text-[52px] leading-none font-bold tracking-tight tabular-nums text-success"
+        >
+          {{ fmtBRL(d.current.netProfit) }}
+        </div>
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <app-chip tone="success" icon="percent">Margem de {{ pctFmt(margemLiquida()) }}</app-chip>
+          <app-chip
+            [tone]="deltaLucro() >= 0 ? 'mint' : 'warning'"
+            [icon]="deltaLucro() >= 0 ? 'trending_up' : 'trending_down'"
+          >
+            {{ deltaLucro() >= 0 ? '+' : '−' }}{{ pctFmt(Math.abs(deltaLucro())) }} vs.
+            {{ fmtMonthLong(d.previousMonth) }}
+          </app-chip>
+          <span class="text-[12.5px] text-muted-foreground">
+            De cada R$ 100 vendidos, R$
+            {{ margemLiquida().toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }} ficaram com
+            você.
+          </span>
+        </div>
+      </div>
+
+      <div class="m3-card p-5 flex flex-col justify-center">
+        <div class="text-[12.5px] text-muted-foreground font-medium flex items-center gap-1.5">
+          Ponto de equilíbrio
+          <app-hint
+            text="Quanto você precisa vender no mês só para pagar as contas, sem lucro nem prejuízo."
+          />
+        </div>
+        <div class="mt-2 text-[26px] font-bold tracking-tight tabular-nums">
+          {{ d.breakEven.breakEvenRevenue ? fmtBRL(d.breakEven.breakEvenRevenue) : '—' }}
+        </div>
+        <p class="text-[12.5px] text-muted-foreground mt-2 leading-relaxed">
+          @if (d.breakEven.reachedOnDay) {
+            Você atingiu esse valor no dia {{ d.breakEven.reachedOnDay }} do mês. Cada real vendido
+            depois disso tem {{ pctFmt(margemContribuicaoPct()) }} de margem.
+          } @else {
+            Ainda não atingido neste mês. Cada real vendido depois do ponto de equilíbrio tem
+            {{ pctFmt(margemContribuicaoPct()) }} de margem.
+          }
+        </p>
+        <div class="mt-3 h-2 rounded-full bg-muted overflow-hidden">
+          <div class="h-full rounded-full bg-mint" [style.width.%]="breakEvenPct()"></div>
+        </div>
+        <div class="mt-1.5 text-[11.5px] text-muted-foreground">
+          Custos fixos de {{ fmtBRL(d.breakEven.fixedCosts) }} no mês
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 — KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+      <app-stat-card
+        label="Receita bruta"
+        [value]="fmtBRL(d.current.grossRevenue)"
+        icon="payments"
+        status="positive"
+        [delta]="{ value: pctFmt((d.deltas.grossRevenue ?? 0) * 100), up: true }"
+        subtext="Salão + delivery"
+      />
+      <app-stat-card
+        label="Margem bruta"
+        [value]="fmtBRL(d.current.grossMargin)"
+        icon="restaurant_menu"
+        status="positive"
+        [subtext]="pctFmt((d.current.grossMargin / d.current.grossRevenue) * 100) + ' da receita'"
+        [delta]="{ value: pctFmt((d.deltas.grossMargin ?? 0) * 100), up: true }"
+      >
+        <app-hint slot="hint" text="Receita líquida menos o custo dos ingredientes (CMV)." />
+      </app-stat-card>
+      <app-stat-card
+        label="Despesas operacionais"
+        [value]="fmtBRL(d.current.operatingExpenses)"
+        icon="receipt_long"
+        status="warning"
+        [subtext]="
+          pctFmt((d.current.operatingExpenses / d.current.grossRevenue) * 100) + ' da receita'
+        "
+        [delta]="{ value: pctFmt((d.deltas.operatingExpenses ?? 0) * 100), up: true }"
+      />
+      <app-stat-card
+        label="Margem líquida"
+        [value]="pctFmt(margemLiquida())"
+        icon="savings"
+        status="positive"
+        [spark]="lucroSpark()"
+        [subtext]="
+          'Era ' + pctFmt(margemLiquidaAnterior()) + ' em ' + fmtMonthLong(d.previousMonth)
+        "
+      />
+    </div>
+
+    <!-- 4 — Insights -->
+    <div>
+      <app-section-header
+        title="Leitura do mês"
+        [description]="'O que explica o resultado de ' + fmtMonthLong(d.referenceMonth) + '.'"
+      />
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        @for (insight of d.insights; track insight.kind) {
+          @switch (insight.kind) {
+            @case ('profitChanged') {
+              <app-insight-card
+                [severity]="insight.severity === 'positive' ? 'positivo' : 'atencao'"
+                [title]="
+                  (insight.difference >= 0 ? 'Seu lucro cresceu ' : 'Seu lucro caiu ') +
+                  fmtBRL(Math.abs(insight.difference)) +
+                  ' em relação a ' +
+                  fmtMonthLong(d.previousMonth)
+                "
+                [description]="
+                  'A margem passou de ' +
+                  pctFmt((insight.previousMargin ?? 0) * 100) +
+                  ' para ' +
+                  pctFmt((insight.currentMargin ?? 0) * 100) +
+                  '.'
+                "
+              />
+            }
+            @case ('largestOpexItem') {
+              <app-insight-card
+                severity="atencao"
+                [title]="
+                  insight.name +
+                  ' é hoje sua maior despesa fora dos ingredientes: ' +
+                  fmtBRL(insight.amount)
+                "
+                [description]="
+                  'Isso representa ' +
+                  pctFmt((insight.revenuePct ?? 0) * 100) +
+                  ' de tudo que você vendeu. Junto com o CMV de ' +
+                  fmtBRL(d.current.cmv) +
+                  ', essas duas linhas consomem a maior parte da margem bruta.'
+                "
+              />
+            }
+            @case ('taxRegimeNotConfigured') {
+              <app-insight-card
+                severity="atencao"
+                title="Regime tributário não configurado"
+                description="Sem o regime definido, o imposto do DRE sai zerado e a receita líquida fica maior do que deveria."
+                action="Configurar regime"
+                (actionClick)="regimeOpen.set(true)"
+              />
+            }
+          }
+        }
+      </div>
+    </div>
+
+    <!-- 5 — Cascata -->
+    <app-chart-card
+      title="Como seu lucro se forma"
+      description="Do que entrou até o que sobrou, passo a passo."
+      [loading]="loading()"
+      [height]="340"
+    >
+      <app-waterfall-chart [rows]="waterfallResultado()" />
+    </app-chart-card>
+
+    <!-- 6 — DRE -->
+    <div class="m3-card rounded-2xl p-5">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 class="text-[15px] font-bold tracking-tight">Linha a linha do mês</h3>
+          <p class="text-[12.5px] text-muted-foreground mt-0.5">
+            Cada etapa entre a venda e o lucro — o contador chama isso de DRE.
+          </p>
+        </div>
+        <div class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card">
+          @for (u of ['reais', 'pct']; track u) {
+            <button
+              type="button"
+              (click)="unidade.set($any(u))"
+              [attr.aria-pressed]="unidade() === u"
+              [class]="
+                'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer ' +
+                (unidade() === u
+                  ? 'bg-mint-soft text-ocean'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+              "
+            >
+              {{ u === 'reais' ? 'R$' : '% da receita' }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="divide-y divide-border">
+        @for (l of linhasDRE(); track l.label) {
+          <div
+            [class]="
+              'flex items-center gap-3 py-3 px-3 ' +
+              (l.tipo === 'resultado' ? 'bg-mint-soft/50 rounded-xl mt-2' : '')
+            "
+          >
+            <div class="min-w-0 flex-1 flex items-center gap-1.5">
+              <span
+                [class]="
+                  l.tipo === 'resultado' || l.tipo === 'subtotal'
+                    ? 'truncate text-[14px] font-bold'
+                    : 'truncate text-[13.5px] text-foreground/80'
+                "
+              >
+                {{ l.tipo === 'deducao' ? '(−) ' + l.label : l.label }}
+              </span>
+              <app-hint [text]="l.explicacao" />
+            </div>
+            <div class="hidden sm:block w-[110px] text-right">
+              @if (formatDelta(l.deltaFraction, l.tipo === 'deducao'); as dl) {
+                @if (dl.novo) {
+                  <span class="text-[12px] text-muted-foreground">novo</span>
+                } @else if (dl.estavel) {
+                  <span class="text-[12px] text-muted-foreground">estável</span>
+                } @else {
+                  <span
+                    [class]="
+                      'inline-flex items-center gap-0.5 text-[12px] font-semibold tabular-nums ' +
+                      (dl.bom ? 'text-success' : 'text-warning')
+                    "
+                  >
+                    <app-icon
+                      [name]="dl.subiu ? 'arrow_upward' : 'arrow_downward'"
+                      [style]="{ fontSize: '13px' }"
+                    />
+                    {{ dl.text }}
+                  </span>
+                }
+              }
+            </div>
+            <div
+              [class]="
+                'w-[140px] text-right tabular-nums ' +
+                (l.tipo === 'resultado'
+                  ? 'text-[17px] font-bold text-success'
+                  : l.tipo === 'subtotal'
+                    ? 'text-[14.5px] font-bold'
+                    : l.tipo === 'deducao'
+                      ? 'text-[13.5px] font-semibold text-warning'
+                      : 'text-[13.5px] font-semibold')
+              "
+            >
+              {{ unidade() === 'reais' ? fmtBRL(l.valor) : pctFmt(l.pctReceita) }}
+            </div>
+          </div>
+        }
+      </div>
+      <div class="mt-3 flex items-start gap-1.5 text-[11.5px] text-muted-foreground">
+        <app-icon name="info" [style]="{ fontSize: '14px' }" />
+        <span
+          >As variações comparam com {{ fmtMonthLong(d.previousMonth) }}. Verde = melhorou o
+          resultado, âmbar = piorou.</span
+        >
+      </div>
+    </div>
+
+    <!-- 7 — Despesas operacionais -->
+    <div class="m3-card rounded-2xl p-5">
+      <app-section-header
+        title="O que compõe as despesas operacionais"
+        [description]="fmtBRL(d.current.operatingExpenses) + ' no mês, do maior para o menor.'"
+      />
+      <div class="space-y-2">
+        @for (desp of despesasOrdenadas(); track desp.nome) {
+          <div class="flex items-center gap-3">
+            <span
+              class="h-8 w-8 shrink-0 rounded-lg bg-muted grid place-items-center text-muted-foreground"
+            >
+              <app-icon [name]="desp.icon" [style]="{ fontSize: '17px' }" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span class="text-[13.5px] font-medium truncate">{{ desp.nome }}</span>
+                <span class="text-[11px] text-muted-foreground">{{
+                  desp.tipo === 'fixo' ? 'fixo' : desp.tipo === 'misto' ? 'misto' : 'variável'
+                }}</span>
+              </div>
+              <div class="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  [class]="
+                    'h-full rounded-full ' +
+                    (desp.tipo === 'fixo'
+                      ? 'bg-ocean'
+                      : desp.tipo === 'misto'
+                        ? 'bg-warning'
+                        : 'bg-mint')
+                  "
+                  [style.width.%]="despesaShare(desp)"
+                ></div>
+              </div>
+            </div>
+            <div class="w-[92px] text-right">
+              @if (formatDelta(desp.delta, true); as dl) {
+                @if (dl.novo) {
+                  <span class="text-[12px] text-muted-foreground">novo</span>
+                } @else if (dl.estavel) {
+                  <span class="text-[12px] text-muted-foreground">estável</span>
+                } @else {
+                  <span
+                    [class]="
+                      'inline-flex items-center gap-0.5 text-[12px] font-semibold tabular-nums ' +
+                      (dl.bom ? 'text-success' : 'text-warning')
+                    "
+                  >
+                    <app-icon
+                      [name]="dl.subiu ? 'arrow_upward' : 'arrow_downward'"
+                      [style]="{ fontSize: '13px' }"
+                    />
+                    {{ dl.text }}
+                  </span>
+                }
+              }
+            </div>
+            <div class="w-[110px] text-right text-[13.5px] font-semibold tabular-nums">
+              {{ fmtBRL(desp.valor) }}
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- 8 — Histórico -->
+    <app-chart-card
+      title="Seu resultado nos últimos 6 meses"
+      description="Barras mostram o lucro do mês; a linha mostra a margem."
+      [loading]="loading()"
+      [height]="320"
+    >
+      <div
+        slot="action"
+        class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
+      >
+        @for (s of ['lucro', 'margem']; track s) {
+          <button
+            type="button"
+            (click)="serie.set($any(s))"
+            [attr.aria-pressed]="serie() === s"
+            [class]="
+              'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer ' +
+              (serie() === s
+                ? 'bg-mint-soft text-ocean'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+            "
+          >
+            {{ s === 'lucro' ? 'Lucro' : 'Margem' }}
+          </button>
+        }
+      </div>
+      @if (serie() === 'lucro') {
+        <app-bar-chart
+          [data]="historicoView()"
+          categoryKey="mes"
+          [series]="lucroSeries"
+          orientation="columns"
+          [valueFormatter]="abrev"
+        />
+      } @else {
+        <app-line-chart
+          [data]="historicoView()"
+          categoryKey="mes"
+          [series]="margemSeries"
+          [valueFormatter]="pctFmt"
+        />
+      }
+    </app-chart-card>
+
+    <app-modal
+      [open]="dreOpen()"
+      (closed)="dreOpen.set(false)"
+      title="Como chegamos no seu resultado"
+      subtitle="A conta é sempre a mesma, mês a mês."
+      size="lg"
+    >
+      <div class="space-y-3 text-[13.5px] leading-relaxed">
+        <p class="text-muted-foreground">
+          Partimos de tudo que você vendeu e vamos tirando, na ordem, o que não é seu:
+        </p>
+        <ol class="space-y-2">
+          @for (l of linhasDRE(); track l.label) {
+            <li class="flex items-start gap-3 p-3 rounded-xl bg-muted/50">
+              <span class="text-[13px] font-bold tabular-nums w-[110px] shrink-0 text-right">{{
+                fmtBRL(l.valor)
+              }}</span>
+              <span
+                ><span class="font-semibold">{{ l.label }}</span> — {{ l.explicacao }}</span
+              >
+            </li>
+          }
+        </ol>
+        <p class="text-[12.5px] text-muted-foreground">
+          Impostos de {{ fmtBRL(d.current.taxes) }} e ingredientes de
+          {{ fmtBRL(d.current.cmv) }} são os dois maiores descontos antes das despesas. Contadores
+          chamam essa estrutura de DRE (Demonstração do Resultado do Exercício).
+        </p>
+      </div>
+    </app-modal>
+
+    <app-modal
+      [open]="regimeOpen()"
+      (closed)="regimeOpen.set(false)"
+      title="Regime tributário"
+      subtitle="Decide como o imposto do DRE é calculado todo mês."
+      size="md"
+    >
+      <div class="space-y-2">
+        <button
+          type="button"
+          [disabled]="savingRegime()"
+          (click)="setRegime('mei')"
+          class="w-full text-left p-4 rounded-xl border border-border hover:border-mint hover:bg-mint-soft/40 transition cursor-pointer disabled:opacity-60"
+        >
+          <div class="font-semibold text-[14px]">MEI</div>
+          <p class="text-[12.5px] text-muted-foreground mt-0.5">
+            DAS fixo mensal, independente do faturamento.
+          </p>
+        </button>
+        <button
+          type="button"
+          [disabled]="savingRegime()"
+          (click)="setRegime('simplesNacionalAnexoI')"
+          class="w-full text-left p-4 rounded-xl border border-border hover:border-mint hover:bg-mint-soft/40 transition cursor-pointer disabled:opacity-60"
+        >
+          <div class="font-semibold text-[14px]">Simples Nacional — Anexo I</div>
+          <p class="text-[12.5px] text-muted-foreground mt-0.5">
+            Alíquota efetiva sobre a receita, conforme a faixa do RBT12.
+          </p>
+        </button>
+      </div>
+    </app-modal>
+  }
+</div>

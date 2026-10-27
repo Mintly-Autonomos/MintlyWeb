@@ -1,0 +1,67 @@
+{
+  "referenceMonth": "Julho/2026",
+  "summary": {
+    "grossRevenue": 58400,
+    "prevGrossRevenue": 54200,
+    "taxes": 3504,
+    "netRevenue": 54896,
+    "cmv": 21024,
+    "cmvPct": 36,
+    "prevCmvPct": 33,
+    "opex": 27500,
+    "netProfit": 6372,
+    "prevNetProfit": 5100,
+    "marginPct": 10.9,
+    "primeCost": 36024,
+    "primeCostPct": 61.7,
+    "cashToday": 18500,
+    "cashIn30Days": 3900,
+    "healthScore": 74
+  },
+  "monthlyHistory": [
+    { "month": "Fev", "receita": 44800, "despesa": 40100, "lucro": 4700 },
+    { "month": "Mar", "receita": 47300, "despesa": 42600, "lucro": 4700 },
+    { "month": "Abr", "receita": 49900, "despesa": 44500, "lucro": 5400 },
+    { "month": "Mai", "receita": 51600, "despesa": 46700, "lucro": 4900 },
+    { "month": "Jun", "receita": 54200, "despesa": 49100, "lucro": 5100 },
+    { "month": "Jul", "receita": 58400, "despesa": 52028, "lucro": 6372 }
+  ],
+  "waterfall": [
+    { "label": "Receita Bruta", "value": 58400, "kind": "start" },
+    { "label": "Impostos", "value": -3504, "kind": "down" },
+    { "label": "CMV", "value": -21024, "kind": "down" },
+    { "label": "Despesas", "value": -27500, "kind": "down" },
+    { "label": "Lucro Líquido", "value": 6372, "kind": "end" }
+  ],
+  "sparks": {
+    "lucro": [4700, 4700, 5400, 4900, 5100, 6372],
+    "caixa": [12100, 13800, 15200, 14600, 17100, 18500],
+    "projecao": [18500, 16200, 13400, 10100, 7200, 3900],
+    "receita": [44800, 47300, 49900, 51600, 54200, 58400]
+  },
+  "insights": [
+    {
+      "severity": "atencao",
+      "title": "Custo dos ingredientes acima do ideal",
+      "description": "O custo dos ingredientes subiu este mês e reduziu seu lucro em cerca de R$ 1.750.",
+      "action": "Ver custos"
+    },
+    {
+      "severity": "atencao",
+      "title": "Caixa apertado a partir do dia 22",
+      "description": "Contas concentradas devem reduzir seu caixa para cerca de R$ 900 por volta do dia 22, com risco de faltar recurso para a operação.",
+      "action": "Ver fluxo de caixa"
+    },
+    {
+      "severity": "oportunidade",
+      "title": "Oportunidade de margem no Frango Honey Butter",
+      "description": "O Frango Honey Butter tem alta procura e margem abaixo da média. Um reajuste de cerca de R$ 4 no preço pode gerar aproximadamente R$ 640 a mais por mês.",
+      "action": "Ver cardápio"
+    },
+    {
+      "severity": "positivo",
+      "title": "Ponto de equilíbrio atingido",
+      "description": "Desde o dia 19, suas contas fixas do mês já estão cobertas. As próximas vendas são lucro."
+    }
+  ]
+}

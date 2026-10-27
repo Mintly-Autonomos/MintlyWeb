@@ -1,0 +1,175 @@
+{
+  "receitaMes": 58400,
+  "receitaDeliveryMes": 26280,
+  "taxaIfoodPct": 23,
+  "canalDelivery": {
+    "Taxa iFood": 1,
+    "CMV / Insumos": 0.45,
+    "Taxas de cartão": 0.35,
+    "Marketing": 0.6
+  },
+  "categorias": [
+    {
+      "categoria": "CMV / Insumos",
+      "tipo": "Variável",
+      "icon": "shopping_basket",
+      "nota": "Frango, óleo, molhos e embalagens",
+      "subitens": [
+        {
+          "nome": "Frango",
+          "valorMesAtual": 12500,
+          "valorMesAnterior": 12200,
+          "mediaUlt3Meses": 12300,
+          "tipo": "variavel"
+        },
+        {
+          "nome": "Óleo",
+          "valorMesAtual": 2800,
+          "valorMesAnterior": 2700,
+          "mediaUlt3Meses": 2720,
+          "tipo": "variavel"
+        },
+        {
+          "nome": "Molhos e temperos",
+          "valorMesAtual": 2100,
+          "valorMesAnterior": 2050,
+          "mediaUlt3Meses": 2060,
+          "tipo": "variavel"
+        },
+        {
+          "nome": "Embalagens",
+          "valorMesAtual": 2400,
+          "valorMesAnterior": 1500,
+          "mediaUlt3Meses": 1500,
+          "tipo": "variavel"
+        },
+        {
+          "nome": "Bebidas para revenda",
+          "valorMesAtual": 1224,
+          "valorMesAnterior": 1180,
+          "mediaUlt3Meses": 1200,
+          "tipo": "variavel"
+        }
+      ]
+    },
+    {
+      "categoria": "Pró-labore família",
+      "tipo": "Fixo",
+      "icon": "groups",
+      "nota": "Retirada da família pelo trabalho no negócio",
+      "subitens": [
+        {
+          "nome": "Retirada família",
+          "valorMesAtual": 8000,
+          "valorMesAnterior": 8000,
+          "mediaUlt3Meses": 8000,
+          "tipo": "fixo"
+        }
+      ]
+    },
+    {
+      "categoria": "Taxa iFood",
+      "tipo": "Variável",
+      "icon": "delivery_dining",
+      "nota": "Comissão de ~23% sobre o delivery",
+      "subitens": [
+        {
+          "nome": "Comissão iFood",
+          "valorMesAtual": 6044,
+          "valorMesAnterior": 5200,
+          "mediaUlt3Meses": 5350,
+          "tipo": "variavel"
+        }
+      ]
+    },
+    {
+      "categoria": "Aluguel",
+      "tipo": "Fixo",
+      "icon": "storefront",
+      "nota": "Ponto comercial",
+      "subitens": [
+        {
+          "nome": "Aluguel do ponto",
+          "valorMesAtual": 6000,
+          "valorMesAnterior": 6000,
+          "mediaUlt3Meses": 6000,
+          "tipo": "fixo"
+        }
+      ]
+    },
+    {
+      "categoria": "Utilidades",
+      "tipo": "Misto",
+      "icon": "bolt",
+      "nota": "Luz, gás e água",
+      "subitens": [
+        {
+          "nome": "Luz",
+          "valorMesAtual": 900,
+          "valorMesAnterior": 870,
+          "mediaUlt3Meses": 880,
+          "tipo": "variavel"
+        },
+        {
+          "nome": "Gás",
+          "valorMesAtual": 700,
+          "valorMesAnterior": 480,
+          "mediaUlt3Meses": 450,
+          "tipo": "variavel"
+        },
+        {
+          "nome": "Água",
+          "valorMesAtual": 400,
+          "valorMesAnterior": 390,
+          "mediaUlt3Meses": 395,
+          "tipo": "fixo"
+        }
+      ]
+    },
+    {
+      "categoria": "Taxas de cartão",
+      "tipo": "Variável",
+      "icon": "credit_card",
+      "nota": "Maquininha e antecipação",
+      "subitens": [
+        {
+          "nome": "Maquininha e antecipação",
+          "valorMesAtual": 1200,
+          "valorMesAnterior": 1160,
+          "mediaUlt3Meses": 1170,
+          "tipo": "variavel"
+        }
+      ]
+    },
+    {
+      "categoria": "Contador / software",
+      "tipo": "Fixo",
+      "icon": "description",
+      "nota": "Contabilidade e sistemas",
+      "subitens": [
+        {
+          "nome": "Contabilidade e sistemas",
+          "valorMesAtual": 1200,
+          "valorMesAnterior": 1200,
+          "mediaUlt3Meses": 1200,
+          "tipo": "fixo"
+        }
+      ]
+    },
+    {
+      "categoria": "Marketing",
+      "tipo": "Variável",
+      "icon": "campaign",
+      "nota": "Anúncios e redes sociais",
+      "subitens": [
+        {
+          "nome": "Anúncios e redes sociais",
+          "valorMesAtual": 1000,
+          "valorMesAnterior": 950,
+          "mediaUlt3Meses": 960,
+          "tipo": "variavel"
+        }
+      ]
+    }
+  ]
+}

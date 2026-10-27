@@ -1,0 +1,422 @@
+<div class="space-y-6">
+  <!-- 1 — Mês -->
+  <div class="flex flex-wrap items-center gap-2">
+    <div
+      class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
+    >
+      @for (m of monthOpts; track m.key) {
+        <button
+          type="button"
+          (click)="setMonth(m.key)"
+          [attr.aria-pressed]="monthSel() === m.key"
+          [class]="
+            'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
+            (monthSel() === m.key
+              ? 'bg-mint-soft text-ocean'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+          "
+        >
+          {{ m.label }}
+        </button>
+      }
+    </div>
+    @if (monthSel() === 'personalizado') {
+      <div
+        class="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-border bg-card"
+      >
+        <input
+          type="month"
+          [value]="customMonth()"
+          (change)="setCustomMonth($any($event.target).value)"
+          aria-label="Mês de referência"
+          class="bg-transparent outline-none text-[12.5px]"
+        />
+      </div>
+    }
+    @if (data(); as d) {
+      <div class="ml-auto text-[12px] text-muted-foreground">
+        Referência: {{ fmtMonthLong(d.referenceMonth) }}
+      </div>
+    }
+  </div>
+
+  @if (data(); as d) {
+    <!-- 2 — KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+      <app-stat-card
+        label="Total de despesas"
+        [value]="fmtBRL(d.total.current)"
+        [delta]="{
+          value: pctFmt(Math.abs((d.total.deltaPrevious ?? 0) * 100)),
+          up: (d.total.deltaPrevious ?? 0) >= 0,
+          note: 'vs. mês anterior',
+        }"
+        icon="trending_down"
+        [status]="(d.total.deltaPrevious ?? 0) >= 0 ? 'warning' : 'positive'"
+        [spark]="historySpark()"
+      />
+      <app-stat-card
+        label="CMV"
+        [value]="pctFmt((d.cmv.pctOfRevenue ?? 0) * 100)"
+        icon="shopping_basket"
+        status="warning"
+        [subtext]="fmtBRL(d.cmv.amount)"
+      >
+        <app-hint
+          slot="hint"
+          text="Custo dos ingredientes sobre a receita. Ideal entre 28% e 35%."
+        />
+        <app-bullet
+          slot="footer"
+          [value]="(d.cmv.pctOfRevenue ?? 0) * 100"
+          [min]="d.cmv.target.min * 100"
+          [max]="d.cmv.target.max * 100"
+          [label]="
+            'Alvo ' +
+            Math.round(d.cmv.target.min * 100) +
+            '–' +
+            Math.round(d.cmv.target.max * 100) +
+            '%'
+          "
+        />
+      </app-stat-card>
+      <app-stat-card
+        label="Prime Cost"
+        [value]="pctFmt((d.primeCost.pctOfRevenue ?? 0) * 100)"
+        icon="restaurant_menu"
+        status="warning"
+        [subtext]="fmtBRL(d.primeCost.cmv + d.primeCost.labor) + ' de CMV + pró-labore'"
+      >
+        <app-hint
+          slot="hint"
+          text="Soma do custo dos ingredientes com a mão de obra (aqui, o pró-labore da família). É o maior custo controlável de um restaurante."
+        />
+        <app-bullet
+          slot="footer"
+          [value]="(d.primeCost.pctOfRevenue ?? 0) * 100"
+          [min]="0"
+          [max]="d.primeCost.targetMax * 100"
+          [label]="'Alvo ≤ ' + Math.round(d.primeCost.targetMax * 100) + '%'"
+        />
+      </app-stat-card>
+      <app-stat-card
+        label="Taxa de plataforma"
+        [value]="fmtBRL(d.platformFee.amount)"
+        [delta]="{
+          value: pctFmt(Math.abs((d.platformFee.deltaPrevious ?? 0) * 100)),
+          up: (d.platformFee.deltaPrevious ?? 0) >= 0,
+          note: 'vs. mês anterior',
+        }"
+        icon="delivery_dining"
+        status="warning"
+      >
+        <app-hint
+          slot="hint"
+          text="Comissão que as plataformas (iFood, Rappi...) cobram sobre as vendas por delivery."
+        />
+        @if (d.platformFee.pctOfDelivery; as pct) {
+          <app-chip slot="badge" tone="warning" icon="percent"
+            >{{ pctFmt(pct * 100) }} do delivery</app-chip
+          >
+        }
+      </app-stat-card>
+    </div>
+
+    <!-- 3 — Fique de olho -->
+    <section>
+      <app-section-header
+        title="Fique de olho"
+        description="Gastos que fugiram do padrão dos últimos meses"
+      />
+      @if (d.anomalies.length) {
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          @for (a of d.anomalies; track a.itemKey + (a.subitemKey ?? '')) {
+            <app-insight-card
+              severity="atencao"
+              [title]="a.name + ' acima do normal'"
+              [description]="
+                'Você gastou cerca de ' +
+                fmtBRL(a.excess) +
+                ' a mais com ' +
+                a.name.toLowerCase() +
+                ' do que a média dos últimos meses (+' +
+                (a.pctAbove * 100).toFixed(0) +
+                '%). Vale checar preço ou consumo em ' +
+                a.categoryName +
+                '.'
+              "
+              action="Ver detalhes"
+              (actionClick)="abrirAlerta(a.itemKey, a.subitemKey)"
+            />
+          }
+        </div>
+      } @else {
+        <app-insight-card
+          severity="positivo"
+          title="Nenhum gasto fora do padrão este mês"
+          description="Todas as categorias ficaram dentro da média dos últimos meses."
+        />
+      }
+    </section>
+
+    <!-- 4 — Para onde está indo seu dinheiro -->
+    <div id="custos-onde" class="m3-card rounded-2xl p-5 scroll-mt-24">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 class="text-[15px] font-bold tracking-tight inline-flex items-center gap-1.5">
+            Para onde está indo seu dinheiro
+            <app-hint
+              text="As maiores despesas primeiro. Clique em uma categoria para ver os itens e o que mudou em relação ao passado."
+            />
+          </h3>
+          <p class="text-[12.5px] text-muted-foreground mt-0.5">
+            Clique numa categoria para abrir os itens ·
+            {{ compare() === 'anterior' ? 'vs. mês anterior' : 'vs. média 3 meses' }}
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <app-toggle-group
+            ariaLabel="Base de comparação"
+            [value]="compare()"
+            [options]="compareOpts"
+            (valueChange)="compare.set($any($event))"
+          />
+          <app-toggle-group
+            ariaLabel="Formato do valor"
+            [value]="valueMode()"
+            [options]="valueModeOpts"
+            (valueChange)="valueMode.set($any($event))"
+          />
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <app-toggle-group
+          ariaLabel="Fixos ou variáveis"
+          [value]="lente()"
+          [options]="lenteOpts"
+          (valueChange)="lente.set($any($event))"
+        />
+        <app-toggle-group
+          ariaLabel="Canal"
+          [value]="canal()"
+          [options]="canalOpts"
+          (valueChange)="setCanal($any($event))"
+        />
+      </div>
+
+      @if (lente() === 'variaveis' && !loading()) {
+        <p class="mt-3 text-[12.5px] text-muted-foreground leading-relaxed">
+          Estes são os custos que você consegue ajustar num mês fraco:
+          <strong class="text-foreground">{{ fmtBRL(d.byBehavior.variable) }}</strong>
+          ({{ pctFmt((d.byBehavior.variable / (d.total.current || 1)) * 100) }} do total).
+        </p>
+      }
+      @if (canal() !== 'geral' && !loading()) {
+        <p class="mt-3 text-[12.5px] text-muted-foreground leading-relaxed">
+          Mostrando a parcela de custo atribuível ao
+          {{ canal() === 'salao' ? 'salão' : 'delivery' }}.
+          @if (d.sharedExcluded) {
+            {{ fmtBRL(d.sharedExcluded) }} de despesas "da casa" ficaram de fora deste filtro.
+          }
+        </p>
+      }
+
+      <div class="mt-4 space-y-2">
+        @for (linha of linhas(); track linha.key) {
+          <div
+            [class]="
+              'rounded-xl border transition-colors ' +
+              (openCat() === linha.key
+                ? 'border-mint bg-mint-soft/30'
+                : 'border-border hover:bg-muted/60')
+            "
+          >
+            <button
+              type="button"
+              (click)="toggleCat(linha.key)"
+              [attr.aria-expanded]="openCat() === linha.key"
+              class="w-full flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3 text-left cursor-pointer rounded-xl"
+            >
+              <span
+                class="h-9 w-9 rounded-xl grid place-items-center bg-muted text-muted-foreground shrink-0"
+              >
+                <app-icon [name]="iconForExpense(linha)" [style]="{ fontSize: '18px' }" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="flex items-center gap-2">
+                  <span class="text-[13.5px] font-semibold truncate">{{ linha.name }}</span>
+                  @if (temAlerta(linha)) {
+                    <app-chip tone="warning" icon="warning">alerta</app-chip>
+                  }
+                </span>
+                <span class="mt-1.5 block h-2 rounded-full bg-muted overflow-hidden">
+                  <span
+                    class="block h-full rounded-full bg-ocean transition-all duration-300"
+                    [style.width.%]="(linha.metric / maxMetric()) * 100"
+                  ></span>
+                </span>
+                <span class="block text-[11.5px] text-muted-foreground mt-1">{{
+                  linha.behavior === CategoryBehavior.Fixed
+                    ? 'Fixo'
+                    : linha.behavior === CategoryBehavior.Mixed
+                      ? 'Misto'
+                      : 'Variável'
+                }}</span>
+              </span>
+              <span class="text-[14px] font-bold tabular-nums w-[112px] text-right">
+                {{ valueMode() === 'brl' ? fmtBRL(linha.amount) : pctFmt(linha.metric) }}
+              </span>
+              <span class="w-[74px] text-right">
+                @if (deltaOf(itemDelta(linha)); as delta) {
+                  @if (delta.novo) {
+                    <span class="text-[11.5px] text-muted-foreground">novo</span>
+                  } @else if (delta.neutral) {
+                    <span class="text-[11.5px] text-muted-foreground">estável</span>
+                  } @else {
+                    <span
+                      [class]="
+                        'inline-flex items-center gap-1 text-[11.5px] font-semibold tabular-nums ' +
+                        (delta.up ? 'text-warning' : 'text-success')
+                      "
+                    >
+                      <app-icon
+                        [name]="delta.up ? 'arrow_upward' : 'arrow_downward'"
+                        [style]="{ fontSize: '13px' }"
+                      />
+                      {{ delta.text }}
+                    </span>
+                  }
+                }
+              </span>
+              <app-icon
+                [name]="openCat() === linha.key ? 'expand_less' : 'expand_more'"
+                className="text-muted-foreground"
+                [style]="{ fontSize: '20px' }"
+              />
+            </button>
+            @if (openCat() === linha.key) {
+              <div class="px-3.5 pb-3.5 space-y-2">
+                @for (sub of linha.subitems; track sub.key) {
+                  <div
+                    [class]="
+                      'flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl px-3 py-2.5 border transition-shadow ' +
+                      (isAnomalo(sub)
+                        ? 'border-warning/40 bg-warning/10'
+                        : 'border-border bg-muted/40') +
+                      (subDestaque() === sub.key ? ' ring-2 ring-warning/60' : '')
+                    "
+                  >
+                    <span class="text-[13px] font-medium min-w-0 truncate">{{ sub.name }}</span>
+                    @if (isAnomalo(sub)) {
+                      <app-chip
+                        tone="warning"
+                        icon="warning"
+                        [title]="'Este item está bem acima da média dos últimos meses — vale investigar.'"
+                      >
+                        fora do padrão
+                      </app-chip>
+                    }
+                    <span class="ml-auto text-[13px] font-semibold tabular-nums">{{
+                      fmtBRL(sub.amount)
+                    }}</span>
+                    <span class="inline-flex items-center gap-1">
+                      @if (deltaOf(subDelta(sub)); as delta) {
+                        @if (delta.novo) {
+                          <span class="text-[11.5px] text-muted-foreground">novo</span>
+                        } @else if (delta.neutral) {
+                          <span class="text-[11.5px] text-muted-foreground">estável</span>
+                        } @else {
+                          <span
+                            [class]="
+                              'inline-flex items-center gap-1 text-[11.5px] font-semibold tabular-nums ' +
+                              (delta.up ? 'text-warning' : 'text-success')
+                            "
+                          >
+                            <app-icon
+                              [name]="delta.up ? 'arrow_upward' : 'arrow_downward'"
+                              [style]="{ fontSize: '13px' }"
+                            />
+                            {{ delta.text }}
+                          </span>
+                        }
+                      }
+                      <app-hint
+                        text="Comparado com o período escolhido acima. Verde = caiu, âmbar = subiu."
+                      />
+                    </span>
+                  </div>
+                }
+                <div class="flex items-start gap-1.5 text-[11.5px] text-muted-foreground pt-1">
+                  <app-icon
+                    name="info"
+                    className="shrink-0 mt-0.5"
+                    [style]="{ fontSize: '14px' }"
+                  />
+                  <span
+                    >As setas mostram quanto cada item mudou em relação ao
+                    {{
+                      compare() === 'anterior' ? 'mês anterior' : 'média dos últimos 3 meses'
+                    }}.</span
+                  >
+                </div>
+              </div>
+            }
+          </div>
+        }
+        @if (linhas().length === 0) {
+          <p class="text-[13px] text-muted-foreground py-6 text-center">
+            Nenhuma categoria neste filtro.
+          </p>
+        }
+      </div>
+
+      @if (linhas().length > 0) {
+        <div class="mt-4 flex items-center justify-between text-[12.5px] text-muted-foreground">
+          <span>{{ linhas().length }} categorias</span>
+          <span class="tabular-nums font-semibold text-foreground">{{
+            fmtBRL(totalLinhas())
+          }}</span>
+        </div>
+      }
+    </div>
+
+    <!-- 5 — Evolução -->
+    <app-chart-card
+      title="Evolução das despesas"
+      description="Últimos 6 meses"
+      [loading]="loading()"
+      [height]="420"
+    >
+      <span slot="title-extra">
+        <app-hint text="Acompanhe se os custos estão subindo mês a mês e em qual categoria." />
+      </span>
+      <div
+        slot="action"
+        class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
+      >
+        @for (m of ['total', 'categoria']; track m) {
+          <button
+            type="button"
+            (click)="trendMode.set($any(m))"
+            [attr.aria-pressed]="trendMode() === m"
+            [class]="
+              'h-7 px-3 rounded-full text-[12px] font-semibold transition-colors duration-150 cursor-pointer ' +
+              (trendMode() === m
+                ? 'bg-mint-soft text-ocean'
+                : 'text-muted-foreground hover:bg-muted')
+            "
+          >
+            {{ m === 'total' ? 'Total' : 'Por categoria' }}
+          </button>
+        }
+      </div>
+      <app-line-chart
+        [data]="trendMode() === 'total' ? trendDataTotal() : trendDataCategoria()"
+        categoryKey="mes"
+        [series]="trendMode() === 'total' ? trendSeriesTotal : trendSeriesCategoria()"
+        [valueFormatter]="abrev"
+      />
+    </app-chart-card>
+  }
+</div>
