@@ -242,6 +242,38 @@ export interface ImportMovementsResult {
   failedRows: { row: number; title: string; error: string }[];
 }
 
+const normalizeName = (name: string): string => name.trim().toLowerCase();
+
+/**
+ * Número como o brasileiro digita: "1.234,50", "R$ 1.234,50", "184,5", "1234.5". Vírgula é o
+ * decimal; ponto só é decimal quando não parece separador de milhar ("1.234" = 1234, "1.5" = 1,5).
+ * Texto que não é número devolve 0 (a prévia recusa: "valor deve ser maior que zero").
+ */
+export function parseNumberBR(text: string): number {
+  let t = text.replace(/R\$|\s/g, '');
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  const parsed = Number(t);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * Data da planilha -> "AAAA-MM-DD". Aceita ISO e DD/MM/AAAA (também com "-" ou "."); devolve null
+ * quando não é uma data de calendário real (ex.: "31/02/2026", "ontem").
+ */
+export function normalizeDate(text: string): string | null {
+  const t = text.trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t) ?? /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(t);
+  if (!m) return null;
+  const iso = /^\d{4}/.test(t);
+  const [y, mo, d] = iso ? [+m[1], +m[2], +m[3]] : [+m[3], +m[2], +m[1]];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) {
+    return null;
+  }
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
 function delay(ms = 350): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -435,7 +467,10 @@ export class MovimentacoesService {
    */
   async confirmImport(
     items: ImportMovementItem[],
-    lookup: { categoryIdByName: Record<string, string>; accountIdByName: Record<string, string> },
+    lookup: {
+      categories: { id: string; name: string; type: MovType }[];
+      accounts: { id: string; name: string }[];
+    },
   ): Promise<ImportMovementsResult> {
     if (environment.useMocks) {
       const result = await this.fetchConfirmMock(items);
@@ -445,9 +480,21 @@ export class MovimentacoesService {
 
     const inserted: Movement[] = [];
     const failedRows: { row: number; title: string; error: string }[] = [];
+    // A prévia aceita nome de categoria/conta sem diferenciar caixa e espaços; a gravação tem que
+    // achar pelo mesmo critério, senão a linha passa na prévia e falha na hora de gravar.
+    // A categoria também casa pelo TIPO da linha: o mesmo nome pode existir em receita e em
+    // despesa, e a API recusa categoria de tipo diferente do lançamento.
+    const categories = new Map(
+      lookup.categories.map((c) => [`${c.type}|${normalizeName(c.name)}`, c.id]),
+    );
+    const accounts = new Map(lookup.accounts.map((a) => [normalizeName(a.name), a.id]));
+    // Linhas idênticas dentro do mesmo arquivo são vendas repetidas de propósito (ex.: duas
+    // "Venda balcão" de mesmo valor no dia): só a 1ª passa pela trava de duplicidade da API; as
+    // seguintes são confirmadas. A 1ª continua protegida contra reenvio em menos de 2 minutos.
+    const seen = new Set<string>();
     for (const item of items) {
-      const categoryId = lookup.categoryIdByName[item.categoryName];
-      const accountId = lookup.accountIdByName[item.accountName];
+      const categoryId = categories.get(`${item.type}|${normalizeName(item.categoryName)}`);
+      const accountId = accounts.get(normalizeName(item.accountName));
       if (!categoryId || !accountId) {
         failedRows.push({
           row: item.row,
@@ -456,6 +503,9 @@ export class MovimentacoesService {
         });
         continue;
       }
+      const key = [accountId, normalizeName(item.title), item.value, item.date].join('|');
+      const repeated = seen.has(key);
+      seen.add(key);
       try {
         const body = {
           direction: DIRECTION_TO_LIB[item.type],
@@ -467,16 +517,30 @@ export class MovimentacoesService {
           paymentMethod: PAYMENT_TO_LIB[item.paymentMethod ?? 'Dinheiro'],
           status: fromMovStatus(item.status),
           ...(item.notes ? { description: item.notes } : {}),
+          ...(repeated ? { confirmDuplicate: true } : {}),
         } satisfies RegisterMovementRequest;
         const response = await this.call((headers) => this.movementClient.register(body, headers));
         if (response.payload) inserted.push(toMovement(response.payload));
       } catch (err) {
-        const message = this.statusOf(err) === 409 ? 'Possível duplicata.' : 'Falha ao gravar.';
-        failedRows.push({ row: item.row, title: item.title, error: message });
+        failedRows.push({ row: item.row, title: item.title, error: this.importFailure(err) });
       }
     }
     await this.refresh();
     return { insertedCount: inserted.length, items: inserted, failedRows };
+  }
+
+  /** Motivo da falha de uma linha, em linguagem de gente: usa o que a API respondeu quando há. */
+  private importFailure(err: unknown): string {
+    const status = this.statusOf(err);
+    const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data
+      ?.message;
+    if (status === 409 && /duplicad/i.test(apiMessage ?? '')) {
+      return 'Possível duplicata (lançamento igual há menos de 2 minutos).';
+    }
+    if (status === 400) {
+      return 'A API recusou os dados: confira data, valor e se a categoria é do mesmo tipo da linha.';
+    }
+    return apiMessage ?? 'Falha ao gravar.';
   }
 
   /**
@@ -486,9 +550,15 @@ export class MovimentacoesService {
    * se a categoria/conta existe de verdade é revalidado na tela, contra os cadastros atuais.
    */
   private async fetchPreview(file: File): Promise<ImportMovementsPreview> {
-    const buffer = await file.arrayBuffer();
+    const formatoMsg =
+      'Não foi possível ler o arquivo. Envie uma planilha .xlsx (baixe o modelo e preencha).';
+    if (!/\.xlsx$/i.test(file.name)) throw new Error(formatoMsg);
     const workbook = new Workbook();
-    await workbook.xlsx.load(buffer);
+    try {
+      await workbook.xlsx.load(await file.arrayBuffer());
+    } catch {
+      throw new Error(formatoMsg);
+    }
     const sheet = workbook.getWorksheet('Movimentações') ?? workbook.worksheets[0];
     if (!sheet) {
       throw new Error('Não foi possível ler nenhuma aba no arquivo enviado.');
@@ -514,11 +584,8 @@ export class MovimentacoesService {
       if (value instanceof Date) return value.toISOString().slice(0, 10);
       return cellText(value);
     };
-    const cellNumber = (value: unknown): number => {
-      if (typeof value === 'number') return value;
-      const parsed = parseFloat(cellText(value).replace(',', '.'));
-      return isNaN(parsed) ? 0 : parsed;
-    };
+    const cellNumber = (value: unknown): number =>
+      typeof value === 'number' ? value : parseNumberBR(cellText(value));
 
     const items: ImportMovementItem[] = [];
     sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
@@ -526,7 +593,8 @@ export class MovimentacoesService {
       const tipoRaw = cellText(row.getCell(1).value).toLowerCase();
       const title = cellText(row.getCell(2).value);
       const value = cellNumber(row.getCell(3).value);
-      const date = cellDate(row.getCell(4).value);
+      const dateRaw = cellDate(row.getCell(4).value);
+      const date = normalizeDate(dateRaw) ?? dateRaw;
       const categoryName = cellText(row.getCell(5).value);
       const accountName = cellText(row.getCell(6).value);
       const paymentRaw = cellText(row.getCell(7).value);
@@ -541,7 +609,10 @@ export class MovimentacoesService {
       if (!type) errors.push(`tipo "${tipoRaw || '(vazio)'}" inválido (use receita ou despesa)`);
       if (!title) errors.push('título vazio');
       if (!(value > 0)) errors.push('valor deve ser maior que zero');
-      if (!date) errors.push('data vazia');
+      if (!dateRaw) errors.push('data vazia');
+      else if (normalizeDate(dateRaw) === null) {
+        errors.push(`data "${dateRaw}" inválida (use AAAA-MM-DD ou DD/MM/AAAA)`);
+      }
       if (!categoryName) errors.push('categoria vazia');
       if (!accountName) errors.push('conta vazia');
 
