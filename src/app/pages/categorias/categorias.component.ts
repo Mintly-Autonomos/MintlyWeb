@@ -223,7 +223,7 @@ export class CategoriasComponent implements OnInit {
   }
 
   behaviorLabel(b: Behavior): string {
-    return b === 'fixed' ? 'Fixo' : 'Variável';
+    return b === 'fixed' ? 'Fixo' : b === 'mixed' ? 'Misto' : 'Variável';
   }
   natureLabel(n: Nature): string {
     return n === 'operational' ? 'Operacional' : 'Não operacional';
@@ -233,6 +233,7 @@ export class CategoriasComponent implements OnInit {
     { value: 'all', label: 'Todos' },
     { value: 'fixed', label: 'Fixo' },
     { value: 'variable', label: 'Variável' },
+    { value: 'mixed', label: 'Misto' },
   ];
   protected natureOpts = [
     { value: 'all', label: 'Todas' },

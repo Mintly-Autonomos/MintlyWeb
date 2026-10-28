@@ -150,7 +150,13 @@
                 </td>
                 <td class="px-4 py-3 hidden sm:table-cell">
                   <app-chip
-                    [tone]="c.behavior === 'fixed' ? 'ocean' : 'neutral'"
+                    [tone]="
+                      c.behavior === 'fixed'
+                        ? 'ocean'
+                        : c.behavior === 'mixed'
+                          ? 'warning'
+                          : 'neutral'
+                    "
                     [label]="behaviorLabel(c.behavior)"
                   />
                 </td>
@@ -249,7 +255,7 @@
       <!-- Behavior -->
       <div>
         <div class="text-[13px] font-medium mb-2">Comportamento</div>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-3 gap-2">
           <button
             type="button"
             (click)="setField('behavior', 'variable')"
@@ -273,6 +279,18 @@
             "
           >
             <app-icon name="lock_clock" [style]="{ fontSize: '17px' }" /><span>Fixo</span>
+          </button>
+          <button
+            type="button"
+            (click)="setField('behavior', 'mixed')"
+            [class]="
+              'h-11 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 cursor-pointer transition ' +
+              (form().behavior === 'mixed'
+                ? 'border-warning bg-warning/10 text-warning'
+                : 'border-border hover:bg-muted')
+            "
+          >
+            <app-icon name="tune" [style]="{ fontSize: '17px' }" /><span>Misto</span>
           </button>
         </div>
       </div>
