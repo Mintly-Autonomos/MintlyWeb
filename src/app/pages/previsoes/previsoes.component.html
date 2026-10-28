@@ -24,33 +24,23 @@
     <app-chip tone="ocean" icon="auto_graph">Camada preditiva</app-chip>
   </div>
 
-  <!-- Tabs -->
-  <div class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card h-10">
-    <button
-      type="button"
-      (click)="setTab('simular')"
-      [attr.aria-pressed]="tab() === 'simular'"
-      [class]="
-        'h-8 px-4 rounded-full text-[13px] font-semibold transition-colors cursor-pointer ' +
-        (tab() === 'simular' ? 'bg-mint-soft text-ocean' : 'text-muted-foreground hover:bg-muted')
-      "
-    >
-      Simular meu negócio
-    </button>
-    <button
-      type="button"
-      (click)="setTab('cardapio')"
-      [attr.aria-pressed]="tab() === 'cardapio'"
-      [class]="
-        'h-8 px-4 rounded-full text-[13px] font-semibold transition-colors cursor-pointer ' +
-        (tab() === 'cardapio' ? 'bg-mint-soft text-ocean' : 'text-muted-foreground hover:bg-muted')
-      "
-    >
-      Meu cardápio
-    </button>
-  </div>
-
-  @if (tab() === 'simular') {
+  @if (!temDados()) {
+    <div class="rounded-2xl border border-border bg-card">
+      <app-empty-state
+        icon="auto_graph"
+        title="Ainda não há lançamentos para projetar"
+        description="A previsão usa o que você já lançou em Movimentações (inclusive o que ainda vai cair na conta) e o ritmo dos últimos 30 dias. Registre entradas e saídas para ver o caixa dos próximos dias."
+        [hasAction]="true"
+      >
+        <a
+          routerLink="/movimentacoes"
+          class="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95"
+        >
+          Ir para Movimentações
+        </a>
+      </app-empty-state>
+    </div>
+  } @else {
     <div class="space-y-8">
       <!-- Selo de status -->
       <div
@@ -105,9 +95,9 @@
           </div>
           <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <app-icon name="query_stats" [style]="{ fontSize: '14px' }" />
-            Estimativa: média móvel + tendência de 6 meses
+            Estimativa: o que já está lançado + ritmo dos últimos 30 dias
             <app-hint
-              text="Estimativa: média móvel + tendência dos últimos 6 meses. A faixa é a margem de incerteza."
+              text="Estimativa: lançamentos já registrados (a receber e a pagar, no dia do vencimento) mais o ritmo médio dos últimos 30 dias. A faixa é a margem de incerteza."
             />
           </span>
         </div>
@@ -146,28 +136,30 @@
                     <app-icon name="shopping_bag" [style]="{ fontSize: '18px' }" />
                   </span>
                   <div class="text-[13.5px] font-semibold leading-snug">
-                    Quantos frangos a mais ou a menos por dia?
+                    Quanto você vende a mais ou a menos?
                   </div>
                 </div>
                 <div class="mt-4 flex items-center gap-3">
                   <input
                     type="range"
-                    min="-10"
-                    max="10"
+                    min="-30"
+                    max="30"
                     step="1"
                     [value]="alavancas().volume"
                     (input)="setLever('volume', { volume: $any($event.target).valueAsNumber })"
                     class="flex-1 accent-mint"
                     [attr.aria-label]="
-                      'Quantos frangos a mais ou a menos por dia — ' + volumeFmt(alavancas().volume)
+                      'Quanto você vende a mais ou a menos — ' + pctAlavanca(alavancas().volume)
                     "
                   />
                   <span
                     class="shrink-0 min-w-[104px] text-right tabular-nums text-[13.5px] font-bold text-ocean"
-                    >{{ volumeFmt(alavancas().volume) }}</span
+                    >{{ pctAlavanca(alavancas().volume) }}</span
                   >
                 </div>
-                <div class="mt-2 text-[11.5px] text-muted-foreground">hoje: ~{{ 35 }}/dia</div>
+                <div class="mt-2 text-[11.5px] text-muted-foreground">
+                  sobre o ritmo dos últimos 30 dias
+                </div>
               </div>
             }
             @if (leverAtiva() === 'preco') {
@@ -179,28 +171,28 @@
                     <app-icon name="sell" [style]="{ fontSize: '18px' }" />
                   </span>
                   <div class="text-[13.5px] font-semibold leading-snug">
-                    Qual seria o preço médio do prato?
+                    Quanto os preços mudariam?
                   </div>
                 </div>
                 <div class="mt-4 flex items-center gap-3">
                   <input
                     type="range"
-                    min="30"
-                    max="46"
+                    min="-20"
+                    max="20"
                     step="1"
                     [value]="alavancas().preco"
                     (input)="setLever('preco', { preco: $any($event.target).valueAsNumber })"
                     class="flex-1 accent-mint"
                     [attr.aria-label]="
-                      'Qual seria o preço médio do prato — ' + fmtBRL(alavancas().preco)
+                      'Quanto os preços mudariam — ' + pctAlavanca(alavancas().preco)
                     "
                   />
                   <span
                     class="shrink-0 min-w-[104px] text-right tabular-nums text-[13.5px] font-bold text-ocean"
-                    >{{ fmtBRL(alavancas().preco) }}</span
+                    >{{ pctAlavanca(alavancas().preco) }}</span
                   >
                 </div>
-                <div class="mt-2 text-[11.5px] text-muted-foreground">hoje: {{ fmtBRL(38) }}</div>
+                <div class="mt-2 text-[11.5px] text-muted-foreground">sobre os preços de hoje</div>
               </div>
             }
             @if (leverAtiva() === 'custo') {
@@ -218,23 +210,25 @@
                 <div class="mt-4 flex items-center gap-3">
                   <input
                     type="range"
-                    min="-300"
-                    max="500"
-                    step="50"
+                    min="-30"
+                    max="30"
+                    step="1"
                     [value]="alavancas().custo"
                     (input)="setLever('custo', { custo: $any($event.target).valueAsNumber })"
                     class="flex-1 accent-mint"
                     [attr.aria-label]="
                       'Quanto o custo dos ingredientes pode subir ou cair — ' +
-                      custoFmt(alavancas().custo)
+                      pctAlavanca(alavancas().custo)
                     "
                   />
                   <span
                     class="shrink-0 min-w-[104px] text-right tabular-nums text-[13.5px] font-bold text-ocean"
-                    >{{ custoFmt(alavancas().custo) }}</span
+                    >{{ pctAlavanca(alavancas().custo) }}</span
                   >
                 </div>
-                <div class="mt-2 text-[11.5px] text-muted-foreground">no mês inteiro</div>
+                <div class="mt-2 text-[11.5px] text-muted-foreground">
+                  sobre os custos que variam com as vendas
+                </div>
               </div>
             }
             @if (leverAtiva() === 'cenario') {
@@ -272,6 +266,14 @@
                   }
                 </div>
               </div>
+            }
+
+            @if (semRitmo()) {
+              <p class="text-[12px] text-warning leading-relaxed">
+                Ainda não há vendas recebidas nos últimos 30 dias para servir de base. Registre
+                vendas como recebidas em Movimentações para o simulador conseguir ajustar o
+                resultado.
+              </p>
             }
 
             <!-- Resposta em destaque -->
@@ -599,74 +601,8 @@
       </section>
 
       <p class="text-[11.5px] text-muted-foreground leading-relaxed pb-2">
-        As previsões usam seu histórico para estimar tendências. São estimativas, não garantias.
-        Caixa de hoje considerado: {{ fmtBRL(caixaHoje) }}.
-      </p>
-    </div>
-  } @else {
-    <!-- Meu cardápio -->
-    <div class="space-y-6">
-      @for (q of quadranteKeys; track q) {
-        @if (cardapioPorQuadrante()[q].length > 0) {
-          <div class="m3-card rounded-2xl p-5">
-            <div class="flex items-start gap-3 mb-4">
-              <span class="text-[22px] leading-none">{{ quadrantes[q].emoji }}</span>
-              <div>
-                <div class="flex items-center gap-2">
-                  <h3 class="text-[15px] font-bold tracking-tight">{{ quadrantes[q].label }}</h3>
-                  <app-chip [tone]="quadrantes[q].tone"
-                    >{{ cardapioPorQuadrante()[q].length }} itens</app-chip
-                  >
-                </div>
-                <p class="text-[12.5px] text-muted-foreground mt-1 max-w-[640px]">
-                  {{ quadrantes[q].explicacao }}
-                </p>
-                <p class="text-[12.5px] font-medium mt-1 max-w-[640px]">
-                  {{ quadrantes[q].recomendacao }}
-                </p>
-              </div>
-            </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-[13px]">
-                <thead>
-                  <tr class="text-left text-[11.5px] text-muted-foreground border-b border-border">
-                    <th class="py-2 pr-3 font-semibold">Item</th>
-                    <th class="py-2 pr-3 font-semibold">Categoria</th>
-                    <th class="py-2 pr-3 font-semibold text-right">Qtd. vendida</th>
-                    <th class="py-2 pr-3 font-semibold text-right">Preço</th>
-                    <th class="py-2 pr-3 font-semibold text-right">Margem</th>
-                    <th class="py-2 font-semibold text-right">Margem %</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                  @for (item of cardapioPorQuadrante()[q]; track item.nome) {
-                    <tr
-                      [id]="'cardapio-item-' + item.nome"
-                      [class]="
-                        item.nome === highlightItem()
-                          ? 'bg-warning/10 outline outline-2 outline-warning/50 -outline-offset-2'
-                          : ''
-                      "
-                    >
-                      <td class="py-2 pr-3 font-medium">{{ item.nome }}</td>
-                      <td class="py-2 pr-3 text-muted-foreground">{{ item.categoria }}</td>
-                      <td class="py-2 pr-3 text-right tabular-nums">{{ item.qtdVendida }}</td>
-                      <td class="py-2 pr-3 text-right tabular-nums">{{ fmtBRL(item.preco) }}</td>
-                      <td class="py-2 pr-3 text-right tabular-nums">{{ fmtBRL(item.margem) }}</td>
-                      <td class="py-2 text-right tabular-nums font-semibold">
-                        {{ item.margemPct.toFixed(0) }}%
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
-        }
-      }
-      <p class="text-[11.5px] text-muted-foreground leading-relaxed pb-2">
-        Análise de cardápio baseada na metodologia de menu engineering (Kasavana & Smith, 1982). As
-        simulações de preço são estimativas e assumem que a procura não muda.
+        As previsões usam o que você já lançou e o ritmo recente para estimar o futuro. São
+        estimativas, não garantias. Caixa de hoje considerado: {{ fmtBRL(caixaHoje()) }}.
       </p>
     </div>
   }
