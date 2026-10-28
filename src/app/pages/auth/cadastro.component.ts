@@ -1,12 +1,12 @@
 import { Component, signal, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { AVATAR_MAX_BYTES, AVATAR_MIME_TYPES } from 'mintly-lib';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { AuthService } from '../../services/auth.service';
 import { passwordRules } from '../../shared/password-rules';
+import { readAvatarFile } from '../../shared/avatar-file';
 
 @Component({
   selector: 'app-cadastro',
@@ -321,23 +321,12 @@ export class CadastroComponent {
     input.value = ''; // permite escolher o mesmo arquivo de novo depois de remover
     if (!file) return;
 
-    if (!(AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
-      this.avatarError.set('Formato não aceito. Use JPG, PNG ou WebP.');
-      return;
-    }
-    if (file.size > AVATAR_MAX_BYTES) {
-      this.avatarError.set(
-        `Imagem muito grande (${(file.size / 1024 / 1024).toFixed(1)}MB). Máximo de 1MB.`,
-      );
-      return;
-    }
-
-    this.avatarError.set(null);
-    const reader = new FileReader();
-    reader.onload = () => this.avatarPreview.set(reader.result as string);
-    reader.onerror = () =>
-      this.avatarError.set('Não foi possível ler a imagem. Tente outro arquivo.');
-    reader.readAsDataURL(file);
+    readAvatarFile(file)
+      .then((dataUrl) => {
+        this.avatarError.set(null);
+        this.avatarPreview.set(dataUrl);
+      })
+      .catch((err: Error) => this.avatarError.set(err.message));
   }
 
   removeAvatar(): void {
