@@ -237,12 +237,12 @@
             />
             <p class="mt-2 text-sm font-medium">Arraste o arquivo aqui</p>
             <p class="text-[12px] text-muted-foreground mt-1">
-              ou clique para selecionar um .csv/.xlsx preenchido com o modelo
+              ou clique para selecionar uma planilha .xlsx preenchida com o modelo
             </p>
             <label class="mt-3 inline-block">
               <input
                 type="file"
-                accept=".csv,.xlsx,.xls"
+                accept=".xlsx"
                 class="hidden"
                 (change)="onImportFilePicked($event)"
               />
@@ -646,6 +646,11 @@
         @if (importExcludedCount() > 0) {
           <app-chip tone="warning" icon="visibility_off"
             >{{ importExcludedCount() }} de fora</app-chip
+          >
+        }
+        @if (importDuplicateCount() > 0) {
+          <app-chip tone="warning" icon="content_copy"
+            >{{ importDuplicateCount() }} parecem já lançadas (desmarcadas)</app-chip
           >
         }
         <span class="text-muted-foreground">de {{ importRows().length }} linhas no total</span>

@@ -56,6 +56,8 @@ interface EditableImportRow {
   included: boolean;
   valid: boolean;
   error: string | null;
+  /** Parece já lançada (mesma conta, título, valor e data): vem desmarcada, mas dá para incluir. */
+  possibleDuplicate?: boolean;
 }
 
 interface MovForm {
@@ -133,6 +135,9 @@ export class MovimentacoesComponent implements OnInit {
     this.importRows().filter((r) => !r.included || !r.valid),
   );
   protected importExcludedCount = computed(() => this.importExcludedRows().length);
+  protected importDuplicateCount = computed(
+    () => this.importRows().filter((r) => r.possibleDuplicate).length,
+  );
 
   // ── Filters ───────────────────────────────────────────────────────────
   protected query = signal('');
@@ -606,15 +611,42 @@ export class MovimentacoesComponent implements OnInit {
           if (!item.valid && revalidated.valid) {
             return { ...revalidated, valid: false, included: false, error: item.error };
           }
-          return revalidated;
+          return this.flagPossibleDuplicate(revalidated);
         }),
       );
       this.importPreviewOpen.set(true);
     } catch (err) {
-      this.toast.error(this.errMsg(err));
+      // Erros de leitura da planilha já vêm com texto próprio (sem resposta da API).
+      this.toast.error(
+        err instanceof Error && !('response' in err) ? err.message : this.errMsg(err),
+      );
     } finally {
       this.importing.set(false);
     }
+  }
+
+  /**
+   * Reenviar a mesma planilha duplicaria tudo (a API só barra lançamento igual em menos de 2
+   * minutos). Linha igual a uma já lançada — mesma conta, título, valor, data e tipo — vem
+   * desmarcada; quem quiser mesmo, marca.
+   */
+  private flagPossibleDuplicate(row: EditableImportRow): EditableImportRow {
+    if (!row.valid) return row;
+    const norm = (t: string) => t.trim().toLowerCase();
+    const account = this.contasSvc.accounts().find((a) => norm(a.name) === norm(row.accountName));
+    const exists =
+      !!account &&
+      this.svc
+        .movements()
+        .some(
+          (m) =>
+            m.accountId === account.id &&
+            m.type === row.type &&
+            m.value === row.value &&
+            m.date === row.date &&
+            norm(m.title) === norm(row.title),
+        );
+    return exists ? { ...row, possibleDuplicate: true, included: false } : row;
   }
 
   closeImportPreview(): void {
@@ -629,10 +661,16 @@ export class MovimentacoesComponent implements OnInit {
     if (!row.title.trim()) errors.push('título vazio');
     if (!(row.value > 0)) errors.push('valor deve ser maior que zero');
     if (!row.date) errors.push('data vazia');
-    const categoryOk = this.allActiveCategories().some(
+    const sameName = this.allActiveCategories().filter(
       (c) => c.name.trim().toLowerCase() === row.categoryName.trim().toLowerCase(),
     );
-    if (!categoryOk) errors.push(`categoria "${row.categoryName}" não encontrada`);
+    if (sameName.length === 0) {
+      errors.push(`categoria "${row.categoryName}" não encontrada`);
+    } else if (!sameName.some((c) => c.type === row.type)) {
+      // A API recusa categoria de tipo diferente do lançamento.
+      const doTipo = row.type === 'income' ? 'despesa' : 'receita';
+      errors.push(`categoria "${row.categoryName}" é de ${doTipo}, mas a linha é do outro tipo`);
+    }
     const accountOk = this.accounts().some(
       (a) => a.name.trim().toLowerCase() === row.accountName.trim().toLowerCase(),
     );
@@ -712,11 +750,12 @@ export class MovimentacoesComponent implements OnInit {
     if (items.length === 0) return;
     this.confirmingImport.set(true);
     try {
-      const categoryIdByName: Record<string, string> = {};
-      for (const c of this.categoriasSvc.categories()) categoryIdByName[c.name] = c.id;
-      const accountIdByName: Record<string, string> = {};
-      for (const a of this.contasSvc.accounts()) accountIdByName[a.name] = a.id;
-      const result = await this.svc.confirmImport(items, { categoryIdByName, accountIdByName });
+      const result = await this.svc.confirmImport(items, {
+        categories: this.categoriasSvc
+          .categories()
+          .map((c) => ({ id: c.id, name: c.name, type: c.type })),
+        accounts: this.contasSvc.accounts().map((a) => ({ id: a.id, name: a.name })),
+      });
       this.closeImportPreview();
       this.importResult.set(result);
       this.closeModal();
