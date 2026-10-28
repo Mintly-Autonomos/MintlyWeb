@@ -19,7 +19,10 @@ import { AuthService } from '../../services/auth.service';
       @if (!sent()) {
         <form (ngSubmit)="onSubmit()" class="space-y-4">
           @if (error()) {
-            <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20">
+            <div
+              role="alert"
+              class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20"
+            >
               <app-icon
                 name="error"
                 [style]="{ fontSize: '20px' }"
@@ -34,6 +37,7 @@ import { AuthService } from '../../services/auth.service';
               [(ngModel)]="email"
               name="email"
               placeholder="voce@restaurante.com"
+              autocomplete="email"
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
           </app-form-field>
@@ -95,8 +99,11 @@ export class EsqueciSenhaComponent {
   protected error = signal<string | null>(null);
 
   async onSubmit(): Promise<void> {
-    if (!this.email) return;
     this.error.set(null);
+    if (!/.+@.+\..+/.test(this.email.trim())) {
+      this.error.set('Informe um e-mail válido para receber o link.');
+      return;
+    }
     this.loading.set(true);
     try {
       await this.auth.forgotPassword(this.email.trim());

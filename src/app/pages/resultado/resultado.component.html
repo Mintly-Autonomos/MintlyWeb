@@ -92,7 +92,7 @@
         [value]="fmtBRL(d.current.grossMargin)"
         icon="restaurant_menu"
         status="positive"
-        [subtext]="pctFmt((d.current.grossMargin / d.current.grossRevenue) * 100) + ' da receita'"
+        [subtext]="pctFmt(pctDaReceita(d.current.grossMargin)) + ' da receita'"
         [delta]="{ value: pctFmt((d.deltas.grossMargin ?? 0) * 100), up: true }"
       >
         <app-hint slot="hint" text="Receita líquida menos o custo dos ingredientes (CMV)." />
@@ -102,9 +102,7 @@
         [value]="fmtBRL(d.current.operatingExpenses)"
         icon="receipt_long"
         status="warning"
-        [subtext]="
-          pctFmt((d.current.operatingExpenses / d.current.grossRevenue) * 100) + ' da receita'
-        "
+        [subtext]="pctFmt(pctDaReceita(d.current.operatingExpenses)) + ' da receita'"
         [delta]="{ value: pctFmt((d.deltas.operatingExpenses ?? 0) * 100), up: true }"
       />
       <app-stat-card

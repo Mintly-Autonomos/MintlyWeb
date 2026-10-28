@@ -338,13 +338,17 @@
               class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition cursor-pointer"
             >
               @if (form().type === 'income') {
-                <option value="received">Recebido</option>
-                <option value="pending">Pendente</option>
-                <option value="cancelled">Cancelado</option>
+                <option value="received" [selected]="form().status === 'received'">Recebido</option>
+                <option value="pending" [selected]="form().status === 'pending'">Pendente</option>
+                <option value="cancelled" [selected]="form().status === 'cancelled'">
+                  Cancelado
+                </option>
               } @else {
-                <option value="paid">Pago</option>
-                <option value="pending">Pendente</option>
-                <option value="cancelled">Cancelado</option>
+                <option value="paid" [selected]="form().status === 'paid'">Pago</option>
+                <option value="pending" [selected]="form().status === 'pending'">Pendente</option>
+                <option value="cancelled" [selected]="form().status === 'cancelled'">
+                  Cancelado
+                </option>
               }
             </select>
           </label>
@@ -366,7 +370,7 @@
             >
               <option value="">Selecione…</option>
               @for (a of accounts(); track a.id) {
-                <option [value]="a.id">{{ a.name }}</option>
+                <option [value]="a.id" [selected]="form().accountId === a.id">{{ a.name }}</option>
               }
             </select>
           </label>
@@ -384,7 +388,7 @@
             >
               <option value="">Selecione…</option>
               @for (c of categories(); track c.id) {
-                <option [value]="c.id">{{ c.name }}</option>
+                <option [value]="c.id" [selected]="form().categoryId === c.id">{{ c.name }}</option>
               }
             </select>
           </label>
@@ -400,7 +404,7 @@
           >
             <option value="">Selecione…</option>
             @for (pm of paymentMethods; track pm) {
-              <option [value]="pm">{{ pm }}</option>
+              <option [value]="pm" [selected]="form().paymentMethod === pm">{{ pm }}</option>
             }
           </select>
         </label>
@@ -450,7 +454,7 @@
               (click)="downloadTemplate()"
               class="h-10 px-4 rounded-xl border-2 border-mint bg-card text-mint text-sm font-medium hover:bg-mint-soft transition cursor-pointer flex items-center gap-2"
             >
-              <app-icon name="download" [style]="{ fontSize: '16px' }" />Baixar arquivo
+              <app-icon name="download" [style]="{ fontSize: '16px' }" />Baixar modelo
             </button>
           }
         </div>

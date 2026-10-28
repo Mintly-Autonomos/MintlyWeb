@@ -7,6 +7,7 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 import { AuthService } from '../../services/auth.service';
 import { passwordRules } from '../../shared/password-rules';
 import { readAvatarFile } from '../../shared/avatar-file';
+import { maskPhoneBR } from '../../shared/format';
 
 @Component({
   selector: 'app-cadastro',
@@ -54,7 +55,10 @@ import { readAvatarFile } from '../../shared/avatar-file';
 
       <form (ngSubmit)="onSubmit()" class="space-y-4">
         @if (error()) {
-          <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20">
+          <div
+            role="alert"
+            class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20"
+          >
             <app-icon
               name="error"
               [style]="{ fontSize: '20px' }"
@@ -139,11 +143,15 @@ import { readAvatarFile } from '../../shared/avatar-file';
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
           </app-form-field>
-          <app-form-field label="Telefone" icon="phone">
+          <app-form-field label="Telefone" icon="phone" [error]="phoneError()">
             <input
-              [(ngModel)]="phone"
+              [ngModel]="phone"
+              (ngModelChange)="onPhone($event)"
+              (blur)="phoneTouched = true"
               name="phone"
-              placeholder="Ex.: 11999999999"
+              type="tel"
+              inputmode="tel"
+              placeholder="Ex.: (11) 99999-9999"
               autocomplete="tel"
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
@@ -154,6 +162,7 @@ import { readAvatarFile } from '../../shared/avatar-file';
               [(ngModel)]="email"
               name="email"
               placeholder="voce@restaurante.com"
+              autocomplete="email"
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
           </app-form-field>
@@ -165,12 +174,14 @@ import { readAvatarFile } from '../../shared/avatar-file';
               [type]="showPwd() ? 'text' : 'password'"
               [(ngModel)]="password"
               name="password"
+              autocomplete="new-password"
               placeholder="Mínimo 8 caracteres"
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
             <button
               fieldSuffix
               type="button"
+              [attr.aria-label]="showPwd() ? 'Ocultar senha' : 'Mostrar senha'"
               (click)="showPwd.set(!showPwd())"
               class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
             >
@@ -196,11 +207,12 @@ import { readAvatarFile } from '../../shared/avatar-file';
               </div>
             }
           </div>
-          <app-form-field label="Confirmar senha" icon="lock">
+          <app-form-field label="Confirmar senha" icon="lock" [error]="confirmError()">
             <input
               type="password"
               [(ngModel)]="confirm"
               name="confirm"
+              autocomplete="new-password"
               placeholder="Repita a senha"
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
@@ -302,6 +314,22 @@ export class CadastroComponent {
   }
 
   /** Telefone BR: aceita só os dígitos e exige 10 (fixo) ou 11 (celular c/ 9). */
+  protected phoneTouched = false;
+
+  protected onPhone(value: string): void {
+    this.phone = maskPhoneBR(value);
+  }
+
+  protected phoneError(): string {
+    return this.phoneTouched && this.phone && !this.phoneValid()
+      ? 'Informe DDD + número (10 ou 11 dígitos).'
+      : '';
+  }
+
+  protected confirmError(): string {
+    return this.confirm && this.confirm !== this.password ? 'As senhas não conferem.' : '';
+  }
+
   protected phoneValid(): boolean {
     const digits = this.phone.replace(/\D/g, '');
     return digits.length === 10 || digits.length === 11;
@@ -346,7 +374,7 @@ export class CadastroComponent {
       const email = this.email.trim();
       await this.auth.signup({
         name: this.name.trim(),
-        phone: this.phone.trim(),
+        phone: this.phone.replace(/\D/g, ''),
         avatar: this.avatarPreview() ?? undefined,
         email,
         password: this.password,
@@ -362,9 +390,11 @@ export class CadastroComponent {
   }
 
   private errMsg(err: unknown): string {
-    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
+    const res = (err as { response?: { data?: { message?: string } } })?.response;
+    if (!res)
+      return 'Não conseguimos falar com o servidor. Verifique sua internet e tente novamente.';
     return (
-      data?.message ?? 'Não conseguimos criar sua conta. Verifique os dados e tente novamente.'
+      res.data?.message ?? 'Não conseguimos criar sua conta. Verifique os dados e tente novamente.'
     );
   }
 }

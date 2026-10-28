@@ -8,6 +8,7 @@ import {
   formatDiaLongo,
   MAX_HORIZONTE_DIAS,
 } from '../../services/fluxo-caixa.service';
+import { AuthService } from '../../services/auth.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { HintComponent } from '../../shared/hint.component';
@@ -94,6 +95,8 @@ const STATUS_META: Record<
 })
 export class FluxoCaixaComponent implements OnInit {
   private svc = inject(FluxoCaixaService);
+  private auth = inject(AuthService);
+  protected empresa = computed(() => this.auth.currentUser()?.empresa?.trim() ?? '');
   private toast = inject(ToastService);
 
   protected horizons = HORIZONS;

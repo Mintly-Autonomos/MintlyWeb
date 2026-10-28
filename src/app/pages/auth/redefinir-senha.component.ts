@@ -18,7 +18,10 @@ import { passwordRules } from '../../shared/password-rules';
     >
       <form (ngSubmit)="onSubmit()" class="space-y-4">
         @if (error()) {
-          <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20">
+          <div
+            role="alert"
+            class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20"
+          >
             <app-icon
               name="error"
               [style]="{ fontSize: '20px' }"
@@ -32,12 +35,14 @@ import { passwordRules } from '../../shared/password-rules';
             [type]="show() ? 'text' : 'password'"
             [(ngModel)]="password"
             name="password"
+            autocomplete="new-password"
             placeholder="Mínimo 8 caracteres"
             class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
           />
           <button
             fieldSuffix
             type="button"
+            [attr.aria-label]="show() ? 'Ocultar senha' : 'Mostrar senha'"
             (click)="show.set(!show())"
             class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
           >
@@ -68,6 +73,7 @@ import { passwordRules } from '../../shared/password-rules';
             type="password"
             [(ngModel)]="confirm"
             name="confirm"
+            autocomplete="new-password"
             placeholder="Repita a senha"
             class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
           />
