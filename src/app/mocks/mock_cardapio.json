@@ -1,0 +1,59 @@
+[
+  {
+    "id": "prato-frango-original",
+    "name": "Frango Original",
+    "category": "Frango",
+    "price": 36,
+    "diasSemRevisar": 30
+  },
+  {
+    "id": "prato-yangnyeom",
+    "name": "Frango Yangnyeom (agridoce apimentado)",
+    "category": "Frango",
+    "price": 38,
+    "diasSemRevisar": 45
+  },
+  {
+    "id": "prato-soy-garlic",
+    "name": "Frango Soy Garlic (shoyu e alho)",
+    "category": "Frango",
+    "price": 40,
+    "diasSemRevisar": 60
+  },
+  {
+    "id": "prato-honey-butter",
+    "name": "Frango Honey Butter",
+    "category": "Frango",
+    "price": 42,
+    "diasSemRevisar": 90
+  },
+  {
+    "id": "prato-cheese-powder",
+    "name": "Frango Cheese Powder",
+    "category": "Frango",
+    "price": 68,
+    "diasSemRevisar": 190
+  },
+  {
+    "id": "prato-combo-casal",
+    "name": "Combo Casal (balde + 2 bebidas)",
+    "category": "Combos",
+    "price": 79,
+    "diasSemRevisar": 75
+  },
+  {
+    "id": "prato-bingsu",
+    "name": "Bingsu de morango",
+    "category": "Sobremesas",
+    "price": 32,
+    "diasSemRevisar": 175
+  },
+  {
+    "id": "prato-cerveja",
+    "name": "Cerveja",
+    "category": "Bebidas",
+    "price": 14,
+    "diasSemRevisar": 20
+  },
+  { "id": "prato-soju", "name": "Soju", "category": "Bebidas", "price": 25, "diasSemRevisar": 50 }
+]

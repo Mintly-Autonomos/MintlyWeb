@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   PrevisoesService,
   Horizonte,
@@ -15,6 +15,8 @@ import {
   isDefault,
   simular,
 } from '../../services/previsoes.service';
+import { CardapioService, Prato } from '../../services/cardapio.service';
+import { diasSemRevisao, precisaRevisar, tempoLabel } from '../../services/cardapio.builder';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -75,6 +77,26 @@ export class PrevisoesComponent implements OnInit {
   private svc = inject(PrevisoesService);
   private toast = inject(ToastService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private cardapio = inject(CardapioService);
+
+  // ── Meu cardápio ──
+  protected tab = signal<'simular' | 'cardapio'>('simular');
+  protected highlightItem = signal<string | null>(null);
+  protected adding = signal(false);
+  protected editingId = signal<string | null>(null);
+  protected busyId = signal<string | null>(null);
+  protected novoNome = signal('');
+  protected novoPreco = signal('');
+  protected novaCategoria = signal('');
+  protected precoEditado = signal('');
+  protected categorias = this.cardapio.categorias;
+  protected cardapioLoading = this.cardapio.loading;
+  protected pratos = computed(() =>
+    [...this.cardapio.pratos()].sort(
+      (a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'pt-BR'),
+    ),
+  );
   protected horizonte = signal<Horizonte>(30);
   protected metric = signal<SimMetric>('caixa');
   protected alavancas = signal<Alavancas>(ALAVANCAS_ZERO);
@@ -240,6 +262,129 @@ export class PrevisoesComponent implements OnInit {
 
   ngOnInit(): void {
     this.svc.refresh().catch(() => this.toast.error('Não foi possível carregar as previsões.'));
+    this.cardapio
+      .refresh()
+      .catch(() => this.toast.error('Não foi possível carregar o cardápio.'))
+      .finally(() => this.focusFromQuery());
+
+    // Vindo do sino ("Rever preço"): abre o cardápio já no prato.
+    const params = this.route.snapshot.queryParamMap;
+    if (params.get('tab') === 'cardapio') this.tab.set('cardapio');
+    this.highlightItem.set(params.get('item'));
+  }
+
+  private focusFromQuery(): void {
+    const item = this.highlightItem();
+    if (!item || this.tab() !== 'cardapio') return;
+    setTimeout(
+      () =>
+        document
+          .getElementById('cardapio-item-' + item)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      250,
+    );
+  }
+
+  setTab(t: 'simular' | 'cardapio'): void {
+    this.tab.set(t);
+  }
+
+  protected revisar(p: Prato): boolean {
+    return precisaRevisar(p, new Date());
+  }
+
+  protected revisadoLabel(p: Prato): string {
+    return tempoLabel(diasSemRevisao(p, new Date()));
+  }
+
+  private num(value: string): number {
+    return Number(value.replace(',', '.'));
+  }
+
+  toggleAdd(): void {
+    this.adding.update((v) => !v);
+  }
+
+  async addPrato(): Promise<void> {
+    const name = this.novoNome().trim();
+    const price = this.num(this.novoPreco());
+    if (!name || !(price >= 0) || this.novoPreco().trim() === '') {
+      this.toast.error('Informe o nome e o preço do prato.');
+      return;
+    }
+    this.busyId.set('novo');
+    try {
+      await this.cardapio.create({
+        name,
+        price,
+        category: this.novaCategoria().trim() || undefined,
+      });
+      this.novoNome.set('');
+      this.novoPreco.set('');
+      this.novaCategoria.set('');
+      this.adding.set(false);
+      this.toast.success('Prato adicionado ao cardápio.');
+    } catch (err) {
+      this.toast.error(this.cardapio.errorMessage(err));
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  startEditPrice(p: Prato): void {
+    this.editingId.set(p.id);
+    this.precoEditado.set(String(p.price).replace('.', ','));
+  }
+
+  cancelEdit(): void {
+    this.editingId.set(null);
+  }
+
+  async savePrice(p: Prato): Promise<void> {
+    const price = this.num(this.precoEditado());
+    if (!(price >= 0) || this.precoEditado().trim() === '') {
+      this.toast.error('Informe um preço válido.');
+      return;
+    }
+    this.busyId.set(p.id);
+    try {
+      await this.cardapio.changePrice(p.id, price);
+      this.editingId.set(null);
+      this.toast.success(
+        price === p.price ? `Preço de ${p.name} mantido.` : `Preço de ${p.name} atualizado.`,
+      );
+    } catch (err) {
+      this.toast.error(this.cardapio.errorMessage(err));
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  async keepPrice(p: Prato): Promise<void> {
+    this.busyId.set(p.id);
+    try {
+      await this.cardapio.keepPrice(p.id);
+      this.toast.success(`Certo! Só voltamos a avisar sobre ${p.name} daqui a uns 5 meses e meio.`);
+    } catch (err) {
+      this.toast.error(this.cardapio.errorMessage(err));
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  async toggleActive(p: Prato): Promise<void> {
+    this.busyId.set(p.id);
+    try {
+      await this.cardapio.setActive(p.id, !p.active);
+    } catch (err) {
+      this.toast.error(this.cardapio.errorMessage(err));
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  inputValue(event: Event): string {
+    return (event.target as HTMLInputElement).value;
   }
 
   setHorizonte(h: Horizonte): void {

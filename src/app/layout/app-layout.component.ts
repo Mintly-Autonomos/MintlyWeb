@@ -109,11 +109,11 @@ const NAV = [
                 class="h-10 w-10 rounded-full border border-border grid place-items-center hover:bg-muted transition relative cursor-pointer"
               >
                 <app-icon name="notifications" [style]="{ fontSize: '20px' }" />
-                @if (notifications.unreadCount() > 0) {
+                @if (notifications.count() > 0) {
                   <span
                     class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-mint text-primary-foreground text-[10px] font-bold grid place-items-center ring-2 ring-background"
                   >
-                    {{ notifications.unreadCount() > 9 ? '9+' : notifications.unreadCount() }}
+                    {{ notifications.count() > 9 ? '9+' : notifications.count() }}
                   </span>
                 }
               </button>
@@ -128,15 +128,6 @@ const NAV = [
                     class="px-4 py-3 border-b border-border flex items-center justify-between shrink-0"
                   >
                     <span class="font-semibold text-[14px]">Notificações</span>
-                    @if (notifications.unreadCount() > 0) {
-                      <button
-                        type="button"
-                        (click)="notifications.markAllAsRead()"
-                        class="text-[12px] font-medium text-ocean hover:underline cursor-pointer"
-                      >
-                        Marcar todas como lidas
-                      </button>
-                    }
                   </div>
                   <div class="overflow-y-auto flex-1">
                     @if (notifications.notifications().length === 0) {
@@ -146,10 +137,7 @@ const NAV = [
                     } @else {
                       @for (n of notifications.notifications(); track n.id) {
                         <div
-                          [class]="
-                            'px-4 py-3 border-b border-border/60 last:border-0 transition-colors ' +
-                            (n.read ? 'opacity-60' : 'bg-mint-soft/20')
-                          "
+                          class="px-4 py-3 border-b border-border/60 last:border-0 transition-colors bg-mint-soft/20"
                         >
                           <div class="flex items-start gap-2.5">
                             <span
@@ -172,15 +160,13 @@ const NAV = [
                                 >
                                   {{ n.actionLabel }}
                                 </button>
-                                @if (!n.read) {
-                                  <button
-                                    type="button"
-                                    (click)="notifications.markAsRead(n.id)"
-                                    class="h-7 px-2.5 rounded-lg text-[11.5px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
-                                  >
-                                    Marcar como lida
-                                  </button>
-                                }
+                                <button
+                                  type="button"
+                                  (click)="dismissNotification(n)"
+                                  class="h-7 px-2.5 rounded-lg text-[11.5px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                                >
+                                  {{ n.dismissLabel }}
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -335,9 +321,20 @@ export class AppLayoutComponent implements OnInit {
   }
 
   goToNotification(n: AppNotification): void {
-    this.notifications.markAsRead(n.id);
     this.notificationsOpen.set(false);
-    this.router.navigate([n.actionRoute], { queryParams: n.actionQueryParams ?? {} });
+    this.router.navigate([n.actionRoute], { queryParams: n.actionQueryParams });
+  }
+
+  /** "Não quero mudar": mantém o preço e o aviso some (só volta daqui a ~5,5 meses). */
+  async dismissNotification(n: AppNotification): Promise<void> {
+    try {
+      await this.notifications.keepPrice(n);
+      this.toast.info(
+        `Certo! Só voltamos a avisar sobre ${n.itemName} daqui a uns 5 meses e meio.`,
+      );
+    } catch {
+      this.toast.error('Não foi possível registrar agora. Tente novamente.');
+    }
   }
 
   // Usa o usuário autenticado; mantém "Ana Costa" como fallback enquanto não há dados.
