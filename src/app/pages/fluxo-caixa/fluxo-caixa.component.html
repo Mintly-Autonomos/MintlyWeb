@@ -38,7 +38,9 @@
           {{ customAplicado() ? 'Até ' + formatDia(customAplicado()!) : 'Personalizado' }}
         </button>
       </div>
-      <div class="ml-auto text-[12px] text-muted-foreground">Cantina da Ana</div>
+      @if (empresa()) {
+        <div class="ml-auto text-[12px] text-muted-foreground">{{ empresa() }}</div>
+      }
     </div>
 
     @if (customOpen()) {

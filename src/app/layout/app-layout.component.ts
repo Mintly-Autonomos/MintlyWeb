@@ -16,7 +16,7 @@ const NAV = [
   { to: '/resultado', label: 'Resultado', icon: 'savings' },
   { to: '/previsoes', label: 'Previsões', icon: 'auto_graph' },
   { to: '/movimentacoes', label: 'Movimentações', icon: 'swap_horiz' },
-  { to: '/', label: 'Contas Financeiras', icon: 'account_balance' },
+  { to: '/contas', label: 'Contas Financeiras', icon: 'account_balance' },
   { to: '/categorias', label: 'Categorias', icon: 'category' },
 ] as const;
 
@@ -45,7 +45,7 @@ const NAV = [
             <a
               [routerLink]="item.to"
               routerLinkActive="bg-mint-soft text-ocean"
-              [routerLinkActiveOptions]="{ exact: item.to === '/' }"
+              [routerLinkActiveOptions]="{ exact: true }"
               #rla="routerLinkActive"
               class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-foreground/75 hover:bg-muted hover:text-foreground"
             >
@@ -342,11 +342,11 @@ export class AppLayoutComponent implements OnInit {
 
   // Usa o usuário autenticado; mantém "Ana Costa" como fallback enquanto não há dados.
   get userName(): string {
-    return this.auth.currentUser()?.nome?.trim() || 'Ana Costa';
+    return this.auth.currentUser()?.nome?.trim() || 'Minha conta';
   }
   // Dinâmico: vem do usuário autenticado quando disponível; senão, fallback.
   get userBusiness(): string {
-    return this.auth.currentUser()?.empresa?.trim() || 'Cantina da Ana';
+    return this.auth.currentUser()?.empresa?.trim() || 'Meu negócio';
   }
   get userInitials(): string {
     const parts = this.userName.split(/\s+/).filter(Boolean);
@@ -359,7 +359,7 @@ export class AppLayoutComponent implements OnInit {
   }
 
   private readonly titles: Record<string, { title: string; sub: string }> = {
-    '/': {
+    '/contas': {
       title: 'Contas Financeiras',
       sub: 'Gerencie onde o dinheiro do seu negócio entra e sai.',
     },
@@ -372,11 +372,16 @@ export class AppLayoutComponent implements OnInit {
 
   private router = inject(Router);
 
+  /** Caminho atual sem query/fragmento ('/movimentacoes?x=1' → '/movimentacoes'). */
+  private path(): string {
+    return this.router.url.split(/[?#]/)[0];
+  }
+
   get pageTitle(): string {
-    return this.titles[this.router.url]?.title ?? 'Mintly';
+    return this.titles[this.path()]?.title ?? 'Mintly';
   }
   get pageSub(): string {
-    return this.titles[this.router.url]?.sub ?? '';
+    return this.titles[this.path()]?.sub ?? '';
   }
   fillVar(active: boolean): string {
     return active ? "'FILL' 1" : '';

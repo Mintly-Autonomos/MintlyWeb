@@ -44,7 +44,7 @@
     <!-- 2 — KPIs -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
       <app-stat-card
-        label="Total de custos e despesas"
+        label="Custos e despesas"
         [value]="fmtBRL(d.total.current)"
         [delta]="{
           value: pctFmt(Math.abs((d.total.deltaPrevious ?? 0) * 100)),

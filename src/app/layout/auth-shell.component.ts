@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, Input, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
@@ -34,8 +35,15 @@ export class AuthShellComponent {
 @Component({
   selector: 'app-auth-card',
   standalone: true,
-  imports: [LogoComponent, IconComponent],
+  imports: [LogoComponent, IconComponent, NgTemplateOutlet],
   template: `
+    <!--
+      O conteúdo projetado precisa de UM único <ng-content> por slot: com um por layout (wide/normal),
+      o Angular só projeta no último e o outro layout fica sem corpo/rodapé. Por isso os slots vivem
+      em <ng-template> e cada layout os renderiza via ngTemplateOutlet.
+    -->
+    <ng-template #body><ng-content /></ng-template>
+    <ng-template #footer><ng-content select="[slot=footer]" /></ng-template>
     @if (wide) {
       <main class="min-h-screen grid place-items-center px-4 py-10">
         <div class="w-full max-w-[560px]">
@@ -48,12 +56,12 @@ export class AuthShellComponent {
               <p class="text-sm text-muted-foreground mt-1.5 leading-relaxed">{{ subtitle }}</p>
             }
             <div class="mt-7">
-              <ng-content />
+              <ng-container [ngTemplateOutlet]="body" />
             </div>
           </div>
           @if (hasFooter) {
             <div class="mt-6 text-center text-sm text-muted-foreground">
-              <ng-content select="[slot=footer]" />
+              <ng-container [ngTemplateOutlet]="footer" />
             </div>
           }
         </div>
@@ -71,11 +79,11 @@ export class AuthShellComponent {
                 <p class="text-sm text-muted-foreground mt-2 leading-relaxed">{{ subtitle }}</p>
               }
               <div class="mt-8">
-                <ng-content />
+                <ng-container [ngTemplateOutlet]="body" />
               </div>
               @if (hasFooter) {
                 <div class="mt-7 text-sm text-muted-foreground">
-                  <ng-content select="[slot=footer]" />
+                  <ng-container [ngTemplateOutlet]="footer" />
                 </div>
               }
             </div>

@@ -253,9 +253,15 @@ export class ResultadoComponent implements OnInit {
     return (d.valor / total) * 100;
   }
 
+  /** % de uma parte sobre a receita bruta; 0 quando ainda não há receita (evita NaN). */
+  protected pctDaReceita(part: number): number {
+    const rev = this.data()?.current.grossRevenue ?? 0;
+    return rev > 0 ? (part / rev) * 100 : 0;
+  }
+
   breakEvenPct(): number {
     const d = this.data();
-    if (!d || !d.breakEven.breakEvenRevenue) return 0;
+    if (!d || !d.breakEven.breakEvenRevenue || !d.current.grossRevenue) return 0;
     return Math.min(100, (d.breakEven.breakEvenRevenue / d.current.grossRevenue) * 100);
   }
 

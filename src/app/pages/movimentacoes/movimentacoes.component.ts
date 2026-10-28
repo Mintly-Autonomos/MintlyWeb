@@ -308,12 +308,17 @@ export class MovimentacoesComponent implements OnInit {
   /** Switches the movement type, keeping the status valid for the new type. */
   setType(type: MovType): void {
     this.form.update((f) => {
-      const valid: MovStatus[] =
-        type === 'income' ? ['received', 'pending', 'cancelled'] : ['paid', 'pending', 'cancelled'];
+      const settled: MovStatus = type === 'income' ? 'received' : 'paid';
+      const valid: MovStatus[] = [settled, 'pending', 'cancelled'];
       return {
         ...f,
         type,
-        status: valid.includes(f.status) ? f.status : 'pending',
+        // receita <-> despesa: "recebido"/"pago" são o mesmo estado liquidado.
+        status: valid.includes(f.status)
+          ? f.status
+          : f.status === 'received' || f.status === 'paid'
+            ? settled
+            : 'pending',
         // categoria trocou de universo (receita/despesa) — evita mandar um id incompatível.
         categoryId: null,
       };
@@ -326,6 +331,14 @@ export class MovimentacoesComponent implements OnInit {
   }
 
   // ── CRUD ──────────────────────────────────────────────────────────────
+  /** Conta padrão (ou a única ativa) — já vem selecionada no formulário. */
+  private defaultAccountId(): string | null {
+    const active = this.accounts();
+    return (
+      (active.find((a) => a.isDefault) ?? (active.length === 1 ? active[0] : undefined))?.id ?? null
+    );
+  }
+
   openCreate(): void {
     this.form.set({
       type: 'income',
@@ -333,9 +346,9 @@ export class MovimentacoesComponent implements OnInit {
       value: '',
       date: isoToday(),
       categoryId: null,
-      accountId: null,
+      accountId: this.defaultAccountId(),
       paymentMethod: '',
-      status: 'pending',
+      status: 'received',
       notes: '',
     });
     this.importMode.set(false);

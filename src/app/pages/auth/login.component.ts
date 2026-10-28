@@ -18,7 +18,10 @@ import { AuthService } from '../../services/auth.service';
     >
       <form (ngSubmit)="onSubmit()" class="space-y-4">
         @if (error()) {
-          <div class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20">
+          <div
+            role="alert"
+            class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20"
+          >
             <app-icon
               name="error"
               [style]="{ fontSize: '20px' }"
@@ -44,13 +47,14 @@ import { AuthService } from '../../services/auth.service';
             [type]="showPwd() ? 'text' : 'password'"
             [(ngModel)]="password"
             name="password"
-            placeholder="••••••••"
+            placeholder="Sua senha"
             autocomplete="current-password"
             class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
           />
           <button
             fieldSuffix
             type="button"
+            [attr.aria-label]="showPwd() ? 'Ocultar senha' : 'Mostrar senha'"
             (click)="showPwd.set(!showPwd())"
             class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
           >
@@ -135,7 +139,7 @@ export class LoginComponent {
   private auth = inject(AuthService);
   protected email = '';
   protected password = '';
-  protected remember = true;
+  protected remember = false;
   protected showPwd = signal(false);
   protected loading = signal(false);
   protected error = signal<string | null>(null);
