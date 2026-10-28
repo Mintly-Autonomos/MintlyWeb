@@ -51,6 +51,7 @@ function fakeToken(prefix: string): string {
 export class AuthService {
   private router = inject(Router);
   private authClient = inject(MintlyClientService).client.authClient;
+  private personClient = inject(MintlyClientService).client.personClient;
 
   // "Manter conectado" => localStorage (persiste); senão => sessionStorage (só a aba).
   private remember = localStorage.getItem(REMEMBER_KEY) === '1';
@@ -85,6 +86,60 @@ export class AuthService {
 
   getAccessToken(): string | null {
     return this._accessToken();
+  }
+
+  /** Troca a foto de perfil (data URL já validada). Em 401 renova o token e tenta de novo. */
+  async updateAvatar(dataUrl: string): Promise<void> {
+    if (environment.useMocks) {
+      await delay(300);
+      this.setMockAvatar(dataUrl);
+    } else {
+      await this.authed((headers) =>
+        this.personClient.updateMyAvatar({ avatar: dataUrl }, headers),
+      );
+    }
+    this.applyAvatar(dataUrl);
+  }
+
+  /** Remove a foto de perfil (volta pras iniciais). */
+  async removeAvatar(): Promise<void> {
+    if (environment.useMocks) {
+      await delay(300);
+      this.setMockAvatar(undefined);
+    } else {
+      await this.authed((headers) => this.personClient.removeMyAvatar(headers));
+    }
+    this.applyAvatar(undefined);
+  }
+
+  private async authed<T>(fn: (headers: Headers) => Promise<T>): Promise<T> {
+    const headers = (): Headers => ({
+      env: environment.mintlyEnv,
+      authorization: `Bearer ${this._accessToken()}`,
+    });
+    try {
+      return await fn(headers());
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401 && (await this.refresh())) return await fn(headers());
+      throw err;
+    }
+  }
+
+  private setMockAvatar(avatar: string | undefined): void {
+    const email = this._user()?.email.toLowerCase();
+    const mock = registeredUsers.find((u) => u.email.toLowerCase() === email);
+    if (mock) mock.avatar = avatar;
+  }
+
+  private applyAvatar(avatarDataUrl: string | undefined): void {
+    this._user.update((u) => (u ? { ...u, avatarDataUrl } : u));
+    try {
+      if (avatarDataUrl) this.write(AVATAR_KEY, avatarDataUrl);
+      else this.remove(AVATAR_KEY);
+    } catch {
+      /* sem cota: a foto vale só nesta sessão */
+    }
   }
 
   async login(email: string, password: string, remember = true): Promise<void> {

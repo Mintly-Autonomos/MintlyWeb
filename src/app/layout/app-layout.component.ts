@@ -1,10 +1,12 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, ElementRef, OnInit, signal, inject, viewChild } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
 import { AuthService } from '../services/auth.service';
 import { NotificationsService, AppNotification } from '../services/notifications.service';
 import { LogoComponent } from '../shared/logo.component';
 import { IconComponent } from '../shared/icon.component';
+import { ToastService } from '../shared/toast.service';
+import { AVATAR_ACCEPT, readAvatarFile } from '../shared/avatar-file';
 
 const NAV = [
   { to: '/visao-geral', label: 'Visão Geral', icon: 'space_dashboard' },
@@ -189,30 +191,82 @@ const NAV = [
                 </div>
               }
             </div>
-            <a
-              routerLink="/auth/logout"
-              title="Sair da conta"
-              class="flex items-center gap-2.5 pl-2 pr-3 h-10 rounded-full bg-card border border-border hover:bg-muted transition no-underline"
-            >
-              @if (userAvatar; as avatar) {
-                <img [src]="avatar" alt="" class="h-7 w-7 rounded-full object-cover shrink-0" />
-              } @else {
+            <div class="relative">
+              <button
+                type="button"
+                (click)="userMenuOpen.set(!userMenuOpen())"
+                aria-label="Menu da conta"
+                aria-haspopup="menu"
+                [attr.aria-expanded]="userMenuOpen()"
+                [disabled]="avatarBusy()"
+                class="flex items-center gap-2.5 pl-2 pr-3 h-10 rounded-full bg-card border border-border hover:bg-muted transition cursor-pointer disabled:opacity-60"
+              >
+                @if (userAvatar; as avatar) {
+                  <img [src]="avatar" alt="" class="h-7 w-7 rounded-full object-cover shrink-0" />
+                } @else {
+                  <div
+                    class="h-7 w-7 rounded-full bg-ocean text-white grid place-items-center text-xs font-semibold shrink-0"
+                  >
+                    {{ userInitials }}
+                  </div>
+                }
+                <div class="hidden md:block leading-tight text-left">
+                  <div class="text-xs font-semibold">{{ userName }}</div>
+                  <div class="text-[10px] text-muted-foreground">{{ userBusiness }}</div>
+                </div>
+                <app-icon
+                  name="expand_more"
+                  [style]="{ fontSize: '18px' }"
+                  className="text-muted-foreground"
+                />
+              </button>
+
+              @if (userMenuOpen()) {
+                <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+                <div class="fixed inset-0 z-30" (click)="userMenuOpen.set(false)"></div>
                 <div
-                  class="h-7 w-7 rounded-full bg-ocean text-white grid place-items-center text-xs font-semibold shrink-0"
+                  role="menu"
+                  class="absolute right-0 top-[calc(100%+8px)] z-40 w-[240px] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden py-1.5"
                 >
-                  {{ userInitials }}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    (click)="pickAvatar()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-[13.5px] hover:bg-muted text-left cursor-pointer"
+                  >
+                    <app-icon name="photo_camera" [style]="{ fontSize: '19px' }" />
+                    {{ userAvatar ? 'Trocar foto' : 'Adicionar foto' }}
+                  </button>
+                  @if (userAvatar) {
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="removeAvatar()"
+                      class="w-full flex items-center gap-3 px-4 py-2.5 text-[13.5px] hover:bg-muted text-left cursor-pointer"
+                    >
+                      <app-icon name="delete" [style]="{ fontSize: '19px' }" />
+                      Remover foto
+                    </button>
+                  }
+                  <div class="my-1.5 border-t border-border"></div>
+                  <a
+                    routerLink="/auth/logout"
+                    role="menuitem"
+                    class="flex items-center gap-3 px-4 py-2.5 text-[13.5px] hover:bg-muted no-underline text-foreground"
+                  >
+                    <app-icon name="logout" [style]="{ fontSize: '19px' }" />
+                    Sair da conta
+                  </a>
                 </div>
               }
-              <div class="hidden md:block leading-tight">
-                <div class="text-xs font-semibold">{{ userName }}</div>
-                <div class="text-[10px] text-muted-foreground">{{ userBusiness }}</div>
-              </div>
-              <app-icon
-                name="logout"
-                [style]="{ fontSize: '18px' }"
-                className="text-muted-foreground ml-1"
+              <input
+                #avatarInput
+                type="file"
+                class="hidden"
+                [accept]="avatarAccept"
+                (change)="onAvatarFile($event)"
               />
-            </a>
+            </div>
           </div>
         </header>
 
@@ -228,12 +282,56 @@ export class AppLayoutComponent implements OnInit {
   private auth = inject(AuthService);
   protected notifications = inject(NotificationsService);
   protected navItems = NAV;
+  private toast = inject(ToastService);
   protected notificationsOpen = signal(false);
+  protected userMenuOpen = signal(false);
+  protected avatarBusy = signal(false);
+  protected readonly avatarAccept = AVATAR_ACCEPT;
+  private avatarInput = viewChild<ElementRef<HTMLInputElement>>('avatarInput');
 
   ngOnInit(): void {
     this.notifications.refresh().catch(() => {
       // Silencioso: notificações são um extra, não deve travar o layout se falhar.
     });
+  }
+
+  pickAvatar(): void {
+    this.userMenuOpen.set(false);
+    this.avatarInput()?.nativeElement.click();
+  }
+
+  async onAvatarFile(ev: Event): Promise<void> {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // permite escolher o mesmo arquivo de novo
+    if (!file) return;
+    this.avatarBusy.set(true);
+    try {
+      await this.auth.updateAvatar(await readAvatarFile(file));
+      this.toast.success('Foto de perfil atualizada.');
+    } catch (err) {
+      this.toast.error(this.avatarErrorMessage(err, 'Não foi possível atualizar a foto.'));
+    } finally {
+      this.avatarBusy.set(false);
+    }
+  }
+
+  async removeAvatar(): Promise<void> {
+    this.userMenuOpen.set(false);
+    this.avatarBusy.set(true);
+    try {
+      await this.auth.removeAvatar();
+      this.toast.success('Foto removida.');
+    } catch (err) {
+      this.toast.error(this.avatarErrorMessage(err, 'Não foi possível remover a foto.'));
+    } finally {
+      this.avatarBusy.set(false);
+    }
+  }
+
+  private avatarErrorMessage(err: unknown, fallback: string): string {
+    const api = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+    return api ?? (err instanceof Error && !('response' in err) ? err.message : fallback);
   }
 
   goToNotification(n: AppNotification): void {
@@ -255,7 +353,7 @@ export class AppLayoutComponent implements OnInit {
     const initials = (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '');
     return initials.toUpperCase() || 'AC';
   }
-  /** Foto cadastrada no signup, se houver (ver TODO(débito técnico) em AuthService.saveAvatar). */
+  /** Foto de perfil (vem do servidor no login; troca/remoção pelo menu da conta). */
   get userAvatar(): string | null {
     return this.auth.currentUser()?.avatarDataUrl ?? null;
   }
