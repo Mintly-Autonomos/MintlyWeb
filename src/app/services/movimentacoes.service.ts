@@ -347,10 +347,8 @@ export class MovimentacoesService {
       ...(input.channel ? { channel: CHANNEL_TO_LIB[input.channel] } : {}),
       ...(input.notes ? { description: input.notes } : {}),
       ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
-      // TODO: RegisterMovementRequest (mintly-lib 2.17.0-preview) ainda não declara `dueDate`,
-      // mas a API aceita — enviar com cast até o tipo da lib ser corrigido (guia-front.md §2).
       ...(input.dueDate ? { dueDate: input.dueDate } : {}),
-    } as unknown as RegisterMovementRequest;
+    } satisfies RegisterMovementRequest;
     try {
       await this.call((headers) => this.movementClient.register(body, headers));
     } catch (err) {
@@ -392,7 +390,8 @@ export class MovimentacoesService {
       description: input.notes ?? undefined,
       subcategoryId: input.subcategoryId ?? null,
       channel: input.channel ? CHANNEL_TO_LIB[input.channel] : null,
-    } as unknown as UpdateMovementRequest;
+      ...(input.dueDate ? { dueDate: input.dueDate } : {}),
+    } satisfies UpdateMovementRequest;
     await this.call((headers) => this.movementClient.updateMovement(id, body, headers));
     await this.refresh();
   }
@@ -464,7 +463,7 @@ export class MovimentacoesService {
           paymentMethod: PAYMENT_TO_LIB[item.paymentMethod ?? 'Dinheiro'],
           status: fromMovStatus(item.status),
           ...(item.notes ? { description: item.notes } : {}),
-        } as unknown as RegisterMovementRequest;
+        } satisfies RegisterMovementRequest;
         const response = await this.call((headers) => this.movementClient.register(body, headers));
         if (response.payload) inserted.push(toMovement(response.payload));
       } catch (err) {
