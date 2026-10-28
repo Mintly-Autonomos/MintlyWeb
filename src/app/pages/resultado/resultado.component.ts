@@ -179,7 +179,7 @@ export class ResultadoComponent implements OnInit {
       { label: 'Receita bruta', value: d.current.grossRevenue, kind: 'start' },
       { label: 'Impostos', value: -d.current.taxes, kind: 'down' },
       { label: 'CMV', value: -d.current.cmv, kind: 'down' },
-      { label: 'Despesas', value: -d.current.operatingExpenses, kind: 'down' },
+      { label: 'Desp. operacionais', value: -d.current.operatingExpenses, kind: 'down' },
       { label: 'Resultado', value: d.current.netProfit, kind: 'end' },
     ];
   });

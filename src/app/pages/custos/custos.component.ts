@@ -116,7 +116,7 @@ export class CustosComponent implements OnInit {
   ];
 
   protected trendSeriesTotal: LineSeries[] = [
-    { key: 'total', name: 'Total de despesas', color: 'var(--ocean)' },
+    { key: 'total', name: 'Total de custos e despesas', color: 'var(--ocean)' },
   ];
 
   /** Linha a linha, já filtrada pelo "lente" (fixo/variável — misto entra como fixo, N4/§351). */
