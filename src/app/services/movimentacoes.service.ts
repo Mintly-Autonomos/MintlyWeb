@@ -41,6 +41,8 @@ export interface Movement {
   /** Quando o dinheiro de fato mexeu (fatia 2) — leitura: settledAt ?? dueDate ?? date. */
   settledAt: string | null;
   value: number;
+  /** Valor líquido (bruto menos taxa de plataforma). Ausente nos dados antigos/mock: vale o bruto. */
+  net?: number;
   categoryId: string | null;
   /** Subitem da categoria (fatia 5) — precisa ser da categoria escolhida e estar ativa. */
   subcategoryId: string | null;
@@ -157,6 +159,7 @@ function toMovement(raw: FinancialMovement): Movement {
     dueDate?: unknown;
     settledAt?: unknown;
     grossValue: number;
+    netValue?: number;
     account?: { _id: string };
     category?: { _id: string };
     subcategory?: { _id: string };
@@ -174,6 +177,7 @@ function toMovement(raw: FinancialMovement): Movement {
     dueDate: toISODateOrNull(r.dueDate),
     settledAt: toISODateOrNull(r.settledAt),
     value: r.grossValue,
+    net: r.netValue ?? r.grossValue,
     categoryId: r.category?._id ?? null,
     subcategoryId: r.subcategory?._id ?? null,
     accountId: r.account?._id ?? null,

@@ -1,5 +1,8 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ReceitasService, PeriodKey, FAIXAS, DIAS_SEMANA } from '../../services/receitas.service';
+import { hoje } from '../../services/receitas.builder';
+import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { HintComponent } from '../../shared/hint.component';
@@ -23,6 +26,8 @@ const PAY_COLORS = ['var(--mint)', 'var(--ocean)', 'var(--warning)'];
   selector: 'app-receitas',
   standalone: true,
   imports: [
+    RouterLink,
+    EmptyStateComponent,
     IconComponent,
     ChipComponent,
     HintComponent,
@@ -42,8 +47,8 @@ export class ReceitasComponent implements OnInit {
 
   protected periods = PERIODS;
   protected period = signal<PeriodKey>('Este mês');
-  protected customFrom = signal('2026-07-01');
-  protected customTo = signal('2026-07-07');
+  protected customFrom = signal(`${hoje().slice(0, 8)}01`);
+  protected customTo = signal(hoje());
   protected rankMode = signal<'receita' | 'qtd'>('receita');
   protected trendMode = signal<'total' | 'canal'>('total');
 
