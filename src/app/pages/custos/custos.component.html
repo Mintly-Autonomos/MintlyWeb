@@ -44,7 +44,7 @@
     <!-- 2 — KPIs -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
       <app-stat-card
-        label="Total de despesas"
+        label="Total de custos e despesas"
         [value]="fmtBRL(d.total.current)"
         [delta]="{
           value: pctFmt(Math.abs((d.total.deltaPrevious ?? 0) * 100)),
@@ -166,7 +166,7 @@
           <h3 class="text-[15px] font-bold tracking-tight inline-flex items-center gap-1.5">
             Para onde está indo seu dinheiro
             <app-hint
-              text="As maiores despesas primeiro. Clique em uma categoria para ver os itens e o que mudou em relação ao passado."
+              text="As maiores categorias primeiro. Clique em uma categoria para ver os itens e o que mudou em relação ao passado."
             />
           </h3>
           <p class="text-[12.5px] text-muted-foreground mt-0.5">
@@ -383,7 +383,7 @@
 
     <!-- 5 — Evolução -->
     <app-chart-card
-      title="Evolução das despesas"
+      title="Evolução de custos e despesas"
       description="Últimos 6 meses"
       [loading]="loading()"
       [height]="420"

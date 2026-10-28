@@ -184,8 +184,13 @@ export class VisaoGeralComponent implements OnInit {
   protected mainSeries: AreaSeries[] = [
     { key: 'receita', name: 'Receita', color: 'var(--ocean)' },
     { key: 'receitaProj', name: 'Receita (projeção)', color: 'var(--ocean)', dashed: true },
-    { key: 'despesa', name: 'Despesa', color: 'var(--warning)' },
-    { key: 'despesaProj', name: 'Despesa (projeção)', color: 'var(--warning)', dashed: true },
+    { key: 'despesa', name: 'Custos e despesas', color: 'var(--warning)' },
+    {
+      key: 'despesaProj',
+      name: 'Custos e despesas (projeção)',
+      color: 'var(--warning)',
+      dashed: true,
+    },
   ];
 
   protected waterfall = computed<WaterfallRow[]>(() => {
@@ -196,7 +201,7 @@ export class VisaoGeralComponent implements OnInit {
       { label: 'Receita Bruta', value: w.grossRevenue, kind: 'start' },
       { label: 'Impostos', value: -w.taxes, kind: 'down' },
       { label: 'CMV', value: -w.cmv, kind: 'down' },
-      { label: 'Despesas', value: -w.operatingExpenses, kind: 'down' },
+      { label: 'Desp. operacionais', value: -w.operatingExpenses, kind: 'down' },
       { label: 'Lucro Líquido', value: w.netProfit, kind: 'end' },
     ];
   });
