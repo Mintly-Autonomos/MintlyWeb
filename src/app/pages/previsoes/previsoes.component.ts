@@ -1,14 +1,9 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   PrevisoesService,
   Horizonte,
   METRICAS,
-  gerarInsights,
-  CARDAPIO,
-  QUADRANTES,
-  Quadrante,
-  quadranteDe,
   ALAVANCAS_ZERO,
   AJUSTES_ZERO,
   Alavancas,
@@ -19,9 +14,8 @@ import {
   alavancaNoNormal,
   isDefault,
   simular,
-  REF,
-  CAIXA_HOJE,
 } from '../../services/previsoes.service';
+import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { HintComponent } from '../../shared/hint.component';
@@ -33,8 +27,6 @@ import { formatBRL } from '../../shared/format';
 
 const abrev = (v: number) =>
   Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v));
-
-type Tab = 'simular' | 'cardapio';
 
 interface InsightUI {
   id: string;
@@ -68,6 +60,8 @@ const SEV_META: Record<string, { text: string; bg: string; ring: string; label: 
   selector: 'app-previsoes',
   standalone: true,
   imports: [
+    RouterLink,
+    EmptyStateComponent,
     IconComponent,
     ChipComponent,
     HintComponent,
@@ -81,10 +75,6 @@ export class PrevisoesComponent implements OnInit {
   private svc = inject(PrevisoesService);
   private toast = inject(ToastService);
   private router = inject(Router);
-  private route = inject(ActivatedRoute);
-  protected highlightItem = signal<string | null>(null);
-
-  protected tab = signal<Tab>('simular');
   protected horizonte = signal<Horizonte>(30);
   protected metric = signal<SimMetric>('caixa');
   protected alavancas = signal<Alavancas>(ALAVANCAS_ZERO);
@@ -94,10 +84,14 @@ export class PrevisoesComponent implements OnInit {
   protected fmtBRL = formatBRL;
   protected abrev = abrev;
   protected readonly Math = Math;
-  protected caixaHoje = CAIXA_HOJE;
+  protected dados = this.svc.base;
+  protected caixaHoje = computed(() => this.dados().caixaHoje);
+  protected temDados = computed(() => this.dados().temDados);
+  /** Sem venda à vista recente não há ritmo para o simulador escalar. */
+  protected semRitmo = computed(
+    () => this.dados().receitaDia === 0 && this.dados().custoVarDia === 0,
+  );
   protected metricas = METRICAS;
-  protected quadrantes = QUADRANTES;
-  protected cardapio = CARDAPIO;
   protected sevMeta = SEV_META;
 
   protected horizonteOpts: Horizonte[] = [30, 60, 90];
@@ -114,12 +108,12 @@ export class PrevisoesComponent implements OnInit {
   ];
 
   protected ajustes = computed(() => ajustesDe(this.alavancas(), this.leverAtiva()));
-  protected sim = computed(() => simular(this.ajustes(), this.horizonte()));
-  protected base = computed(() => simular(AJUSTES_ZERO, this.horizonte()));
+  protected sim = computed(() => simular(this.ajustes(), this.horizonte(), this.dados()));
+  protected base = computed(() => simular(AJUSTES_ZERO, this.horizonte(), this.dados()));
   protected alterado = computed(() => !isDefault(this.ajustes()));
 
-  protected lucroMes = computed(() => simular(this.ajustes(), 30).resultado.lucro);
-  protected lucroMesBase = computed(() => simular(AJUSTES_ZERO, 30).resultado.lucro);
+  protected lucroMes = computed(() => simular(this.ajustes(), 30, this.dados()).resultado.lucro);
+  protected lucroMesBase = computed(() => simular(AJUSTES_ZERO, 30, this.dados()).resultado.lucro);
 
   protected pontos = computed(() =>
     this.metric() === 'caixa' ? this.sim().pontos : this.sim().pontosLucro,
@@ -192,87 +186,60 @@ export class PrevisoesComponent implements OnInit {
 
   protected insights = computed<InsightUI[]>(() => {
     const r = this.sim().resultado;
-    return [
+    const caixaBaixo = r.caixaMinimo < 3000;
+    const lista: InsightUI[] = [
       {
         id: 'caixa',
-        sev: r.caixaMinimo < 3000 ? 'risco' : 'positivo',
-        icon: r.caixaMinimo < 3000 ? 'report' : 'check_circle',
-        titulo:
-          r.caixaMinimo < 3000
-            ? `Caixa apertado por volta do dia ${r.caixaMinimoLabel.slice(0, 2)}`
-            : 'Caixa segue positivo no período',
+        sev: caixaBaixo ? 'risco' : 'positivo',
+        icon: caixaBaixo ? 'report' : 'check_circle',
+        titulo: caixaBaixo
+          ? `Caixa apertado por volta do dia ${r.caixaMinimoLabel.slice(0, 2)}`
+          : 'Caixa segue positivo no período',
         frase: `Saldo mais baixo: ${formatBRL(Math.round(r.caixaMinimo))}.`,
         acao: 'Ver fluxo de caixa',
         onAction: () => this.router.navigate(['/fluxo-de-caixa']),
         regra: 'Regra: saldo projetado mínimo abaixo de R$ 3.000 no horizonte selecionado.',
       },
-      {
-        id: 'bebidas',
+    ];
+    if (r.receita > 0 && r.margem < 15) {
+      lista.push({
+        id: 'preco',
         sev: 'oportunidade',
         icon: 'lightbulb',
-        titulo: 'Dá para subir o preço',
-        frase: 'Veja o mês com o prato a R$ 41.',
+        titulo: 'Um reajuste pequeno no preço ajuda',
+        frase: 'Veja o mês com os preços 5% maiores.',
         acao: 'Simular isso',
-        onAction: () => this.aplicarSugestao('preco', { preco: 41 }),
-        regra: 'Regra: margem acima da média e volume abaixo da média (quadrante Potencial).',
-      },
-      {
+        onAction: () => this.aplicarSugestao('preco', { preco: 5 }),
+        regra: 'Regra: margem prevista abaixo de 15% da receita.',
+      });
+    }
+    if (r.receita > 0 && r.custoVariavel / r.receita > 0.4) {
+      lista.push({
         id: 'insumos',
         sev: 'atencao',
         icon: 'warning',
-        titulo: 'Ingredientes em alta',
-        frase: 'Veja o mês com R$ 200 a mais de custo.',
+        titulo: 'Custos que variam com as vendas pesam na receita',
+        frase: 'Veja o mês com esses custos 5% menores.',
         acao: 'Simular isso',
-        onAction: () => this.aplicarSugestao('custo', { custo: 200 }),
-        regra: 'Regra: subcategoria com alta acima de 5% em 3 meses consecutivos.',
-      },
-      {
-        id: 'volume',
-        sev: 'positivo',
-        icon: 'trending_up',
-        titulo: 'Fim de semana puxa as vendas',
-        frase: 'Veja o mês com 5 frangos a mais por dia.',
-        acao: 'Simular isso',
-        onAction: () => this.aplicarSugestao('volume', { volume: 5 }),
-        regra: 'Regra: dias com peso acima de 15% do faturamento semanal (média de 8 semanas).',
-      },
-    ];
+        onAction: () => this.aplicarSugestao('custo', { custo: -5 }),
+        regra: 'Regra: custos variáveis acima de 40% da receita prevista.',
+      });
+    }
+    lista.push({
+      id: 'volume',
+      sev: 'positivo',
+      icon: 'trending_up',
+      titulo: 'Vender um pouco mais muda o resultado',
+      frase: 'Veja o mês com 10% mais vendas.',
+      acao: 'Simular isso',
+      onAction: () => this.aplicarSugestao('volume', { volume: 10 }),
+      regra: 'Regra: simulação de +10% nas vendas sobre o ritmo dos últimos 30 dias.',
+    });
+    return lista.slice(0, 4);
   });
-
-  protected cardapioPorQuadrante = computed(() => {
-    const groups: Record<Quadrante, typeof CARDAPIO> = {
-      estrela: [],
-      cavalo: [],
-      quebraCabeca: [],
-      repensar: [],
-    };
-    for (const item of this.cardapio) groups[quadranteDe(item)].push(item);
-    return groups;
-  });
-
-  protected quadranteKeys: Quadrante[] = ['estrela', 'cavalo', 'quebraCabeca', 'repensar'];
 
   ngOnInit(): void {
     this.svc.refresh().catch(() => this.toast.error('Não foi possível carregar as previsões.'));
-    gerarInsights(this.horizonte());
-
-    const params = this.route.snapshot.queryParamMap;
-    if (params.get('tab') === 'cardapio') this.tab.set('cardapio');
-    const item = params.get('item');
-    if (item) {
-      this.highlightItem.set(item);
-      setTimeout(
-        () =>
-          document
-            .getElementById('cardapio-item-' + item)
-            ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
-        250,
-      );
-    }
-  }
-
-  setTab(t: Tab): void {
-    this.tab.set(t);
   }
 
   setHorizonte(h: Horizonte): void {
@@ -302,7 +269,7 @@ export class PrevisoesComponent implements OnInit {
       ...(k === 'volume'
         ? { volume: 0 }
         : k === 'preco'
-          ? { preco: REF.precoMedio }
+          ? { preco: 0 }
           : k === 'custo'
             ? { custo: 0 }
             : { cenario: 'normal' as Cenario }),
@@ -313,12 +280,9 @@ export class PrevisoesComponent implements OnInit {
     return alavancaNoNormal(this.alavancas(), k);
   }
 
-  volumeFmt(v: number): string {
-    return v === 0 ? 'igual a hoje' : `${v > 0 ? '+' : '−'}${Math.abs(v)} por dia`;
-  }
-
-  custoFmt(v: number): string {
-    return v === 0 ? 'igual a hoje' : `${v > 0 ? '+' : '−'}${formatBRL(Math.abs(v))} no mês`;
+  /** "+10%" / "−5%" / "igual a hoje" — as três alavancas são percentuais sobre o ritmo atual. */
+  pctAlavanca(v: number): string {
+    return v === 0 ? 'igual a hoje' : `${v > 0 ? '+' : '−'}${Math.abs(v)}%`;
   }
 
   kpiInfo(
