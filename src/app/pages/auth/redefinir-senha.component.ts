@@ -69,7 +69,7 @@ import { passwordRules } from '../../shared/password-rules';
               type="button"
               [attr.aria-label]="show() ? 'Ocultar senha' : 'Mostrar senha'"
               (click)="show.set(!show())"
-              class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
+              class="relative h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer before:absolute before:-inset-1 before:content-['']"
             >
               <app-icon
                 [name]="show() ? 'visibility_off' : 'visibility'"

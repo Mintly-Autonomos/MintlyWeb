@@ -195,7 +195,7 @@ import { maskPhoneBR } from '../../shared/format';
               type="button"
               [attr.aria-label]="showPwd() ? 'Ocultar senha' : 'Mostrar senha'"
               (click)="showPwd.set(!showPwd())"
-              class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
+              class="relative h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer before:absolute before:-inset-1 before:content-['']"
             >
               <app-icon
                 [name]="showPwd() ? 'visibility_off' : 'visibility'"
