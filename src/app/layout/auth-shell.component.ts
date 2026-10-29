@@ -45,7 +45,7 @@ export class AuthShellComponent {
     <ng-template #body><ng-content /></ng-template>
     <ng-template #footer><ng-content select="[slot=footer]" /></ng-template>
     @if (wide) {
-      <main class="min-h-screen grid place-items-center px-4 py-10">
+      <main class="min-h-screen grid grid-cols-1 place-items-center px-4 py-10">
         <div class="w-full max-w-[560px]">
           <div class="mb-10">
             <app-logo
@@ -72,7 +72,7 @@ export class AuthShellComponent {
         </div>
       </main>
     } @else {
-      <main class="min-h-screen grid lg:grid-cols-[1.05fr_1fr]">
+      <main class="min-h-screen grid grid-cols-1 lg:grid-cols-[1.05fr_1fr]">
         <div class="flex flex-col px-6 md:px-12 lg:px-16 py-12 xl:py-16">
           <div class="mb-10">
             <app-logo
@@ -102,9 +102,7 @@ export class AuthShellComponent {
             class="pt-8 mt-8 border-t border-border flex items-center gap-2 text-[12px] text-muted-foreground"
           >
             <app-icon name="lock" [style]="{ fontSize: '16px' }" className="text-mint" />
-            <span class="truncate"
-              >Conexão segura. Seus dados são protegidos por criptografia.</span
-            >
+            <span>Conexão segura. Seus dados são protegidos por criptografia.</span>
           </div>
         </div>
 
