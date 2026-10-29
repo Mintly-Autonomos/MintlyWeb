@@ -7,12 +7,20 @@
         Registre e acompanhe suas receitas e despesas.
       </p>
     </div>
-    <button
-      (click)="openCreate()"
-      class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0"
-    >
-      <app-icon name="add" [style]="{ fontSize: '20px' }" /><span>Nova movimentação</span>
-    </button>
+    <div class="flex gap-2 shrink-0">
+      <button
+        (click)="openCreate('expense')"
+        class="flex items-center gap-2 h-10 px-4 rounded-xl border border-border bg-card text-foreground text-sm font-medium hover:bg-muted transition cursor-pointer"
+      >
+        <app-icon name="trending_down" [style]="{ fontSize: '20px' }" /><span>Nova saída</span>
+      </button>
+      <button
+        (click)="openCreate('income')"
+        class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer"
+      >
+        <app-icon name="trending_up" [style]="{ fontSize: '20px' }" /><span>Nova entrada</span>
+      </button>
+    </div>
   </div>
 
   <!-- Summary -->
@@ -177,7 +185,20 @@
 <!-- ─── Movement Modal (create / edit) ─── -->
 @if (creating() || editing()) {
   <app-modal
-    [title]="editing() ? 'Editar movimentação' : 'Nova movimentação'"
+    [title]="
+      editing()
+        ? 'Editar movimentação'
+        : form().type === 'income'
+          ? 'Nova entrada financeira'
+          : 'Nova saída financeira'
+    "
+    [subtitle]="
+      importMode()
+        ? ''
+        : form().type === 'income'
+          ? 'Registre uma venda, recebimento ou crédito na sua operação.'
+          : 'Registre uma compra, despesa ou pagamento.'
+    "
     size="lg"
     (closed)="closeModal()"
   >
@@ -262,118 +283,109 @@
         </button>
       </div>
     } @else {
-      <div class="space-y-4">
-        <!-- Type -->
+      <div class="space-y-5">
+        <!-- Tipo -->
         @if (!editing()) {
-          <div class="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              (click)="setType('income')"
-              [class]="
-                'h-12 rounded-xl border font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition ' +
-                (form().type === 'income'
-                  ? 'border-success bg-success/10 text-success'
-                  : 'border-border hover:bg-muted')
-              "
-            >
-              <app-icon name="trending_up" [style]="{ fontSize: '18px' }" /><span>Receita</span>
-            </button>
-            <button
-              type="button"
-              (click)="setType('expense')"
-              [class]="
-                'h-12 rounded-xl border font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition ' +
-                (form().type === 'expense'
-                  ? 'border-error bg-error/10 text-error'
-                  : 'border-border hover:bg-muted')
-              "
-            >
-              <app-icon name="trending_down" [style]="{ fontSize: '18px' }" /><span>Despesa</span>
-            </button>
+          <div class="grid grid-cols-2 gap-2">
+            @for (t of tipoOpts; track t.value) {
+              <button
+                type="button"
+                (click)="setType(t.value)"
+                [class]="
+                  'flex items-center gap-2.5 p-3.5 rounded-xl border text-left transition cursor-pointer ' +
+                  (form().type === t.value
+                    ? t.value === 'income'
+                      ? 'border-success bg-mint-soft'
+                      : 'border-error bg-error/10'
+                    : 'border-border bg-card hover:bg-muted')
+                "
+              >
+                <app-icon
+                  [name]="t.icon"
+                  [style]="{ fontSize: '22px' }"
+                  [className]="t.value === 'income' ? 'text-success' : 'text-error'"
+                />
+                <div class="min-w-0">
+                  <div class="text-[14px] font-semibold">{{ t.label }}</div>
+                  <div class="text-[11px] text-muted-foreground truncate">{{ t.desc }}</div>
+                </div>
+                @if (form().type === t.value) {
+                  <app-icon
+                    name="check_circle"
+                    [style]="{ fontSize: '18px' }"
+                    className="ml-auto text-mint"
+                  />
+                }
+              </button>
+            }
           </div>
         }
 
-        <!-- Title + Value row -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Título</span>
-            <input
-              [value]="form().title"
-              (input)="setFormField('title', $any($event.target).value)"
-              type="text"
-              placeholder="Ex.: Venda de almoço"
-              class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
-            />
-          </label>
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Valor (R$)</span>
-            <input
-              [value]="form().value"
-              (input)="setFormField('value', $any($event.target).value)"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0,00"
-              class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
-            />
-          </label>
-        </div>
+        <!-- Título -->
+        <label class="block">
+          <span class="text-[13px] font-medium block mb-1.5">Título</span>
+          <input
+            [value]="form().title"
+            (input)="setFormField('title', $any($event.target).value.slice(0, TITLE_MAX))"
+            type="text"
+            [maxLength]="TITLE_MAX"
+            [placeholder]="
+              form().type === 'income' ? 'Ex.: Venda almoço sábado' : 'Ex.: Pedido iFood noite'
+            "
+            class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
+          />
+          @if (titleError) {
+            <p class="text-error text-[12px] mt-1">{{ titleError }}</p>
+          } @else {
+            <p class="text-muted-foreground text-[12px] mt-1">
+              {{ form().title.trim().length }}/{{ TITLE_MAX }} caracteres · identificação principal
+              da movimentação
+            </p>
+          }
+        </label>
 
-        <!-- Date + Status -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- Valor + Data -->
+        <div class="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4">
           <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Data</span>
+            <span class="text-[13px] font-medium block mb-1.5">Valor bruto</span>
+            <div class="relative">
+              <span
+                class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-muted-foreground"
+                >R$</span
+              >
+              <input
+                [value]="form().value"
+                (input)="setFormField('value', $any($event.target).value)"
+                type="text"
+                inputmode="decimal"
+                placeholder="0,00"
+                class="w-full h-12 rounded-xl border border-border bg-card pl-10 pr-3.5 text-[16px] font-semibold tabular-nums outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
+              />
+            </div>
+            @if (amountError) {
+              <p class="text-error text-[12px] mt-1">{{ amountError }}</p>
+            } @else {
+              <p class="text-muted-foreground text-[12px] mt-1">
+                Use ponto ou vírgula para os centavos.
+              </p>
+            }
+          </label>
+          <label class="block">
+            <span class="text-[13px] font-medium block mb-1.5">Data da movimentação</span>
             <input
               [value]="form().date"
               (input)="setFormField('date', $any($event.target).value)"
               type="date"
               class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition"
             />
-          </label>
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Status</span>
-            <select
-              [value]="form().status"
-              (change)="setFormField('status', $any($event.target).value)"
-              class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition cursor-pointer"
-            >
-              @if (form().type === 'income') {
-                <option value="received" [selected]="form().status === 'received'">Recebido</option>
-                <option value="pending" [selected]="form().status === 'pending'">Pendente</option>
-                <option value="cancelled" [selected]="form().status === 'cancelled'">
-                  Cancelado
-                </option>
-              } @else {
-                <option value="paid" [selected]="form().status === 'paid'">Pago</option>
-                <option value="pending" [selected]="form().status === 'pending'">Pendente</option>
-                <option value="cancelled" [selected]="form().status === 'cancelled'">
-                  Cancelado
-                </option>
-              }
-            </select>
+            @if (dateError) {
+              <p class="text-error text-[12px] mt-1">{{ dateError }}</p>
+            }
           </label>
         </div>
 
-        <!-- Account + Category -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Conta</span>
-            <select
-              [value]="form().accountId ?? ''"
-              (change)="
-                setFormField(
-                  'accountId',
-                  $any($event.target).value ? $any($event.target).value : null
-                )
-              "
-              class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition cursor-pointer"
-            >
-              <option value="">Selecione…</option>
-              @for (a of accounts(); track a.id) {
-                <option [value]="a.id" [selected]="form().accountId === a.id">{{ a.name }}</option>
-              }
-            </select>
-          </label>
+        <!-- Categoria + Conta -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label class="block">
             <span class="text-[13px] font-medium block mb-1.5">Categoria</span>
             <select
@@ -391,45 +403,141 @@
                 <option [value]="c.id" [selected]="form().categoryId === c.id">{{ c.name }}</option>
               }
             </select>
+            <p class="text-muted-foreground text-[12px] mt-1">
+              {{
+                form().type === 'income'
+                  ? 'Receita: de onde vem o dinheiro.'
+                  : 'Despesa: para onde vai o dinheiro.'
+              }}
+            </p>
+          </label>
+          <label class="block">
+            <span class="text-[13px] font-medium block mb-1.5">Conta financeira</span>
+            <select
+              [value]="form().accountId ?? ''"
+              (change)="
+                setFormField(
+                  'accountId',
+                  $any($event.target).value ? $any($event.target).value : null
+                )
+              "
+              class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition cursor-pointer"
+            >
+              <option value="">Selecione…</option>
+              @for (a of accounts(); track a.id) {
+                <option [value]="a.id" [selected]="form().accountId === a.id">{{ a.name }}</option>
+              }
+            </select>
+            <p class="text-muted-foreground text-[12px] mt-1">
+              {{
+                isPlatformAccount
+                  ? 'Plataformas calculam taxa e prazo automaticamente.'
+                  : 'Conta ativa onde a movimentação acontece.'
+              }}
+            </p>
           </label>
         </div>
 
-        <!-- Payment method -->
-        <label class="block">
-          <span class="text-[13px] font-medium block mb-1.5">Forma de pagamento</span>
-          <select
-            [value]="form().paymentMethod"
-            (change)="setFormField('paymentMethod', $any($event.target).value)"
-            class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition cursor-pointer"
-          >
-            <option value="">Selecione…</option>
+        <!-- Forma de pagamento -->
+        <div>
+          <div class="text-[12px] font-semibold text-foreground/80 mb-1.5">Forma de pagamento</div>
+          <div class="flex gap-2 flex-wrap">
             @for (pm of paymentMethods; track pm) {
-              <option [value]="pm" [selected]="form().paymentMethod === pm">{{ pm }}</option>
+              <button
+                type="button"
+                (click)="setFormField('paymentMethod', pm)"
+                [attr.aria-pressed]="form().paymentMethod === pm"
+                [class]="
+                  'inline-flex items-center gap-2 h-10 px-3.5 rounded-full border text-[13px] font-semibold transition cursor-pointer ' +
+                  (form().paymentMethod === pm
+                    ? 'border-mint bg-mint-soft text-ocean'
+                    : 'border-border bg-card hover:bg-muted text-foreground/80')
+                "
+              >
+                <app-icon [name]="paymentIcons[pm] ?? 'payments'" [style]="{ fontSize: '16px' }" />
+                {{ pm }}
+              </button>
             }
-          </select>
-        </label>
+          </div>
+        </div>
 
-        <!-- Platform fee (if applicable) -->
+        <!-- Cálculo automático da plataforma -->
         @if (isPlatformAccount && form().type === 'income' && (parseFloat(form().value) || 0) > 0) {
-          <div class="p-3 rounded-xl bg-ocean-soft border border-ocean/20 text-[13px] space-y-1">
-            <div class="font-medium text-ocean">Cálculo de taxa da plataforma</div>
-            <div class="flex justify-between text-muted-foreground">
-              <span>Valor bruto:</span
-              ><span class="font-medium text-foreground">{{
-                fmtBRL(parseFloat(form().value) || 0)
-              }}</span>
+          <div class="p-4 rounded-2xl border border-ocean/30 bg-ocean-soft">
+            <div class="flex items-center gap-2 text-ocean">
+              <app-icon name="auto_awesome" [style]="{ fontSize: '18px' }" />
+              <div class="text-[13px] font-semibold">Cálculo automático da plataforma</div>
             </div>
-            <div class="flex justify-between text-muted-foreground">
-              <span>Taxa estimada:</span
-              ><span class="font-medium text-error">− {{ fmtBRL(platformFee) }}</span>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+              <div class="p-3 rounded-xl bg-card border border-border min-w-0">
+                <div class="text-[11px] text-muted-foreground font-medium truncate">
+                  Valor bruto
+                </div>
+                <div class="text-[15px] font-bold tabular-nums truncate">
+                  {{ fmtBRL(parseFloat(form().value) || 0) }}
+                </div>
+              </div>
+              <div class="p-3 rounded-xl bg-card border border-border min-w-0">
+                <div class="text-[11px] text-muted-foreground font-medium truncate">
+                  Taxa ({{ platformRate }}%)
+                </div>
+                <div class="text-[15px] font-bold tabular-nums truncate text-warning">
+                  − {{ fmtBRL(platformFee) }}
+                </div>
+              </div>
+              <div class="p-3 rounded-xl bg-card border border-border min-w-0">
+                <div class="text-[11px] text-muted-foreground font-medium truncate">
+                  Valor líquido
+                </div>
+                <div class="text-[15px] font-bold tabular-nums truncate text-success">
+                  {{ fmtBRL(netValue) }}
+                </div>
+              </div>
+              <div class="p-3 rounded-xl bg-card border border-border min-w-0">
+                <div class="text-[11px] text-muted-foreground font-medium truncate">
+                  Previsão de repasse
+                </div>
+                <div class="text-[15px] font-bold tabular-nums truncate text-ocean">
+                  {{ settlementDate ? fmtShort(settlementDate) : '—' }}
+                </div>
+              </div>
             </div>
-            <div class="flex justify-between border-t border-ocean/20 pt-1 font-semibold">
-              <span>Valor líquido:</span><span class="text-success">{{ fmtBRL(netValue) }}</span>
-            </div>
+            @if (settlementDays) {
+              <div class="text-[11px] text-muted-foreground mt-2">
+                O valor líquido é o que efetivamente entra na sua conta após
+                {{ settlementDays }} dias.
+              </div>
+            }
           </div>
         }
 
-        <!-- Notes -->
+        <!-- Status -->
+        <div>
+          <div class="text-[12px] font-semibold text-foreground/80 mb-1.5">Status</div>
+          <div class="grid grid-cols-3 gap-2">
+            @for (st of statusCards; track st.value) {
+              <button
+                type="button"
+                (click)="setFormField('status', st.value)"
+                [attr.aria-pressed]="form().status === st.value"
+                [class]="
+                  'flex items-center gap-2 p-3 rounded-xl border text-left transition cursor-pointer ' +
+                  (form().status === st.value
+                    ? 'border-mint bg-mint-soft'
+                    : 'border-border bg-card hover:bg-muted')
+                "
+              >
+                <app-icon [name]="st.icon" [style]="{ fontSize: '18px' }" />
+                <div class="min-w-0">
+                  <div class="text-[13px] font-semibold">{{ st.label }}</div>
+                  <div class="text-[11px] text-muted-foreground truncate">{{ st.impact }}</div>
+                </div>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Observações -->
         <label class="block">
           <span class="text-[13px] font-medium block mb-1.5"
             >Observações <span class="text-muted-foreground">(opcional)</span></span
@@ -437,10 +545,13 @@
           <textarea
             [value]="form().notes"
             (input)="setFormField('notes', $any($event.target).value)"
-            rows="2"
-            placeholder="Informações adicionais…"
+            rows="3"
+            placeholder="Adicione detalhes adicionais…"
             class="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition resize-none placeholder:text-muted-foreground"
           ></textarea>
+          <p class="text-muted-foreground text-[12px] mt-1">
+            Anotações internas, número do pedido, etc.
+          </p>
         </label>
       </div>
     }
@@ -482,7 +593,7 @@
               [disabled]="!formValid"
               class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 disabled:opacity-50 transition cursor-pointer"
             >
-              {{ editing() ? 'Salvar alterações' : 'Registrar' }}
+              {{ editing() ? 'Salvar alterações' : 'Registrar movimentação' }}
             </button>
           }
         </div>

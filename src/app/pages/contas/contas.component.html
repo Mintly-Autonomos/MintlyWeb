@@ -65,11 +65,29 @@
   </app-filter-bar>
 
   <!-- Account cards grid -->
-  @if (sorted().length === 0) {
+  @if (accounts().length === 0) {
+    <div class="m3-card">
+      <app-empty-state
+        icon="account_balance"
+        title="Você ainda não tem contas"
+        description="Comece adicionando o banco, caixa físico ou plataforma onde o dinheiro do seu negócio entra. Isso permite acompanhar saldos reais e organizar suas movimentações."
+        [hasAction]="true"
+      >
+        <button
+          (click)="openCreate()"
+          class="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer"
+        >
+          <app-icon name="add" [style]="{ fontSize: '20px' }" /><span
+            >Adicionar primeira conta</span
+          >
+        </button>
+      </app-empty-state>
+    </div>
+  } @else if (sorted().length === 0) {
     <app-empty-state
-      icon="account_balance_wallet"
+      icon="search_off"
       title="Nenhuma conta encontrada"
-      description="Tente ajustar os filtros ou crie uma nova conta."
+      description="Ajuste os filtros ou tente outro termo de busca."
     />
   } @else {
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Workbook } from 'exceljs';
 import {
+  parseNumberBR,
   MovimentacoesService,
   Movement,
   MovType,
@@ -174,7 +175,8 @@ export class MovimentacoesComponent implements OnInit {
   protected fmtBRL = formatBRL;
   protected fmtDate = fmtDateTime;
   protected fmtShort = fmtShortDate;
-  readonly parseFloat = parseFloat;
+  // O formulário aceita "12,50" e "1.234,50" (o parseFloat nativo leria 12 e 1,234).
+  readonly parseFloat = parseNumberBR;
 
   // ── Options ───────────────────────────────────────────────────────────
   protected typeOpts = [
@@ -275,7 +277,7 @@ export class MovimentacoesComponent implements OnInit {
   }
 
   get platformFee(): number {
-    const val = parseFloat(this.form().value) || 0;
+    const val = parseNumberBR(this.form().value) || 0;
     const id = this.form().accountId;
     if (!id || !this.isPlatformAccount) return 0;
     const acc = this.contasSvc.accounts().find((x) => x.id === id);
@@ -283,15 +285,83 @@ export class MovimentacoesComponent implements OnInit {
     return val * (rate / 100);
   }
 
+  protected readonly TITLE_MAX = 120;
+
+  protected readonly tipoOpts: { value: MovType; label: string; desc: string; icon: string }[] = [
+    { value: 'income', label: 'Entrada', desc: 'Aumenta o caixa do negócio', icon: 'trending_up' },
+    { value: 'expense', label: 'Saída', desc: 'Reduz o caixa do negócio', icon: 'trending_down' },
+  ];
+
+  protected readonly paymentIcons: Record<string, string> = {
+    Dinheiro: 'payments',
+    PIX: 'bolt',
+    Débito: 'credit_card',
+    Crédito: 'credit_score',
+    Transferência: 'compare_arrows',
+    Boleto: 'receipt_long',
+    'Carteira Digital': 'account_balance_wallet',
+  };
+
+  /** Status do formulário: liquidado (Recebido/Pago, pelo tipo), Pendente e Cancelado, com o impacto no saldo. */
+  protected get statusCards(): { value: MovStatus; label: string; icon: string; impact: string }[] {
+    const settled: MovStatus = this.form().type === 'income' ? 'received' : 'paid';
+    return [
+      {
+        value: settled,
+        label: settled === 'received' ? 'Recebido' : 'Pago',
+        icon: 'check_circle',
+        impact: 'Afeta saldo disponível',
+      },
+      { value: 'pending', label: 'Pendente', icon: 'schedule', impact: 'Afeta saldo previsto' },
+      { value: 'cancelled', label: 'Cancelado', icon: 'cancel', impact: 'Sem impacto no saldo' },
+    ];
+  }
+
+  protected get titleError(): string {
+    const t = this.form().title;
+    return t.length > 0 && !t.trim() ? 'Informe um título para a movimentação.' : '';
+  }
+
+  protected get amountError(): string {
+    const v = this.form().value;
+    return v.trim() !== '' && !(parseNumberBR(v) > 0) ? 'Informe um valor maior que zero.' : '';
+  }
+
+  protected get dateError(): string {
+    return this.form().date ? '' : 'Selecione uma data.';
+  }
+
+  /** Previsão de repasse: data do lançamento + prazo da conta de plataforma (só em entradas). */
+  protected get settlementDate(): string | null {
+    const f = this.form();
+    if (f.type !== 'income' || !this.isPlatformAccount || !f.date) return null;
+    const days = this.contasSvc.accounts().find((a) => a.id === f.accountId)?.settlementDays;
+    if (!days) return null;
+    const [y, m, d] = f.date.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + days);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  }
+
+  protected get platformRate(): number {
+    const acc = this.contasSvc.accounts().find((x) => x.id === this.form().accountId);
+    return acc?.taxPct ?? FEE_RATES[acc?.name ?? ''] ?? 0;
+  }
+
+  protected get settlementDays(): number {
+    return (
+      this.contasSvc.accounts().find((x) => x.id === this.form().accountId)?.settlementDays ?? 0
+    );
+  }
+
   get netValue(): number {
-    return (parseFloat(this.form().value) || 0) - this.platformFee;
+    return (parseNumberBR(this.form().value) || 0) - this.platformFee;
   }
 
   get formValid(): boolean {
     const f = this.form();
     return (
       !!f.title.trim() &&
-      (parseFloat(f.value) || 0) > 0 &&
+      (parseNumberBR(f.value) || 0) > 0 &&
       !!f.date &&
       !!f.accountId &&
       !!f.categoryId &&
@@ -344,16 +414,16 @@ export class MovimentacoesComponent implements OnInit {
     );
   }
 
-  openCreate(): void {
+  openCreate(type: MovType = 'income'): void {
     this.form.set({
-      type: 'income',
+      type,
       title: '',
       value: '',
       date: isoToday(),
       categoryId: null,
       accountId: this.defaultAccountId(),
       paymentMethod: '',
-      status: 'received',
+      status: type === 'income' ? 'received' : 'paid',
       notes: '',
     });
     this.importMode.set(false);
@@ -779,7 +849,7 @@ export class MovimentacoesComponent implements OnInit {
       if (e) {
         await this.svc.update(e.id, {
           title: f.title.trim(),
-          value: parseFloat(f.value) || 0,
+          value: parseNumberBR(f.value) || 0,
           date: f.date,
           categoryId: f.categoryId!,
           accountId: f.accountId!,
@@ -793,7 +863,7 @@ export class MovimentacoesComponent implements OnInit {
           {
             type: f.type,
             title: f.title.trim(),
-            value: parseFloat(f.value) || 0,
+            value: parseNumberBR(f.value) || 0,
             date: f.date,
             categoryId: f.categoryId!,
             accountId: f.accountId!,
