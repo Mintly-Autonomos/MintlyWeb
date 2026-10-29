@@ -2,6 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Workbook } from 'exceljs';
 import {
+  IMPORT_MOVEMENTS_MAX_ROWS,
   MovementDirection,
   MovementStatus,
   MovementChannel,
@@ -10,6 +11,7 @@ import {
 import type {
   FinancialMovement,
   Headers,
+  ImportMovementRow,
   RegisterMovementRequest,
   UpdateMovementRequest,
 } from 'mintly-lib';
@@ -240,6 +242,8 @@ export interface ImportMovementsResult {
   items: Movement[];
   /** Linhas que falharam ao gravar no back mesmo após a prévia validar o formato (ex.: duplicata). */
   failedRows: { row: number; title: string; error: string }[];
+  /** A API já tinha recebido esta importação: devolveu o resultado de antes sem gravar de novo. */
+  replayed?: boolean;
 }
 
 const normalizeName = (name: string): string => name.trim().toLowerCase();
@@ -285,6 +289,8 @@ export class MovimentacoesService {
   private movementClient = inject(MintlyClientService).client.financialMovementClient;
 
   /** Seed do modo mock (`environment.useMocks: true`, só local) — sem efeito quando false. */
+  /** Chaves de idempotência de importações ainda sem resposta (conteúdo do lote -> chave). */
+  private importKeys = new Map<string, string>();
   private mockStore: Movement[] = (mockMovements as Movement[]).map((m) => ({ ...m }));
 
   readonly movements = signal<Movement[]>([]);
@@ -461,8 +467,9 @@ export class MovimentacoesService {
 
   /**
    * Grava de fato as linhas informadas (já filtradas/editadas na tela — inclusive linhas que o
-   * usuário corrigiu na hora, sem precisar reenviar a planilha). Em modo real, cada linha vira
-   * uma chamada de `register()`; linha que falhar (ex.: duplicata) entra em `failedRows` e não
+   * usuário corrigiu na hora, sem precisar reenviar a planilha). Em modo real, tudo vai junto para
+   * `POST /financial-movements/import` (em lotes de até `IMPORT_MOVEMENTS_MAX_ROWS`) e a API
+   * devolve o resultado de cada linha: a que falhar (ex.: duplicata) entra em `failedRows` e não
    * interrompe as demais. Categoria/conta são resolvidas pelo nome contra os cadastros atuais.
    */
   async confirmImport(
@@ -492,6 +499,7 @@ export class MovimentacoesService {
     // "Venda balcão" de mesmo valor no dia): só a 1ª passa pela trava de duplicidade da API; as
     // seguintes são confirmadas. A 1ª continua protegida contra reenvio em menos de 2 minutos.
     const seen = new Set<string>();
+    const rows: ImportMovementRow[] = [];
     for (const item of items) {
       const categoryId = categories.get(`${item.type}|${normalizeName(item.categoryName)}`);
       const accountId = accounts.get(normalizeName(item.accountName));
@@ -506,41 +514,73 @@ export class MovimentacoesService {
       const key = [accountId, normalizeName(item.title), item.value, item.date].join('|');
       const repeated = seen.has(key);
       seen.add(key);
-      try {
-        const body = {
-          direction: DIRECTION_TO_LIB[item.type],
-          title: item.title,
-          grossValue: item.value,
-          date: item.date,
-          accountId,
-          categoryId,
-          paymentMethod: PAYMENT_TO_LIB[item.paymentMethod ?? 'Dinheiro'],
-          status: fromMovStatus(item.status),
-          ...(item.notes ? { description: item.notes } : {}),
-          ...(repeated ? { confirmDuplicate: true } : {}),
-        } satisfies RegisterMovementRequest;
-        const response = await this.call((headers) => this.movementClient.register(body, headers));
-        if (response.payload) inserted.push(toMovement(response.payload));
-      } catch (err) {
-        failedRows.push({ row: item.row, title: item.title, error: this.importFailure(err) });
+      rows.push({
+        row: item.row,
+        direction: DIRECTION_TO_LIB[item.type],
+        title: item.title,
+        grossValue: item.value,
+        date: item.date,
+        accountId,
+        categoryId,
+        paymentMethod: PAYMENT_TO_LIB[item.paymentMethod ?? 'Dinheiro'],
+        status: fromMovStatus(item.status),
+        ...(item.notes ? { description: item.notes } : {}),
+        ...(repeated ? { confirmDuplicate: true } : {}),
+      });
+    }
+
+    const titles = new Map(items.map((i) => [i.row, i.title]));
+    let replayed = false;
+    for (let from = 0; from < rows.length; from += IMPORT_MOVEMENTS_MAX_ROWS) {
+      const chunk = rows.slice(from, from + IMPORT_MOVEMENTS_MAX_ROWS);
+      const idempotencyKey = this.importKeyFor(chunk);
+      const response = await this.call((headers) =>
+        this.movementClient.importMovements({ idempotencyKey, rows: chunk }, headers),
+      );
+      const result = response.payload;
+      if (!result) throw new Error('A API não devolveu o resultado da importação.');
+      // Chegou resposta: a próxima importação desse mesmo conteúdo é uma nova, não um reenvio.
+      this.importKeys.delete(JSON.stringify(chunk));
+      replayed ||= result.replayed;
+      for (const r of result.results) {
+        if (r.status === 'created' && r.movement) {
+          inserted.push(toMovement(r.movement));
+        } else {
+          failedRows.push({
+            row: r.row,
+            title: titles.get(r.row) ?? '',
+            error: this.importFailure(r.error),
+          });
+        }
       }
     }
+    failedRows.sort((a, b) => a.row - b.row);
     await this.refresh();
-    return { insertedCount: inserted.length, items: inserted, failedRows };
+    return { insertedCount: inserted.length, items: inserted, failedRows, replayed };
   }
 
-  /** Motivo da falha de uma linha, em linguagem de gente: usa o que a API respondeu quando há. */
-  private importFailure(err: unknown): string {
-    const status = this.statusOf(err);
-    const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data
-      ?.message;
-    if (status === 409 && /duplicad/i.test(apiMessage ?? '')) {
-      return 'Possível duplicata (lançamento igual há menos de 2 minutos).';
+  /**
+   * Chave de idempotência da importação. É a mesma enquanto o pedido não obtiver resposta (ex.: a
+   * rede caiu e a pessoa clica de novo): a API reconhece e devolve o resultado em vez de gravar
+   * tudo outra vez. Depois de uma resposta a chave é descartada, então importar de propósito o
+   * mesmo arquivo de novo (ex.: depois de apagar os lançamentos) funciona.
+   */
+  private importKeyFor(chunk: ImportMovementRow[]): string {
+    const fingerprint = JSON.stringify(chunk);
+    let key = this.importKeys.get(fingerprint);
+    if (!key) {
+      key = `imp-${globalThis.crypto.randomUUID()}`;
+      this.importKeys.set(fingerprint, key);
     }
-    if (status === 400) {
+    return key;
+  }
+
+  /** Motivo da falha de uma linha, em linguagem de gente: usa o que a API respondeu. */
+  private importFailure(error: { code: string; message: string } | undefined): string {
+    if (error?.code === 'VALIDATION_ERROR') {
       return 'A API recusou os dados: confira data, valor e se a categoria é do mesmo tipo da linha.';
     }
-    return apiMessage ?? 'Falha ao gravar.';
+    return error?.message || 'Falha ao gravar.';
   }
 
   /**

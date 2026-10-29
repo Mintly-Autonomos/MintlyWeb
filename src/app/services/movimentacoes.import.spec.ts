@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Workbook } from 'exceljs';
+import { IMPORT_MOVEMENTS_MAX_ROWS } from 'mintly-lib';
 import {
   MovimentacoesService,
   ImportMovementItem,
@@ -139,7 +140,7 @@ describe('Importar em massa — leitura da planilha', () => {
 
 describe('Importar em massa — gravação', () => {
   let svc: MovimentacoesService;
-  let register: ReturnType<typeof vi.fn>;
+  let importMovements: ReturnType<typeof vi.fn>;
 
   const item = (over: Partial<ImportMovementItem> = {}): ImportMovementItem => ({
     row: 2,
@@ -157,12 +158,39 @@ describe('Importar em massa — gravação', () => {
     ...over,
   });
 
+  /** A API de mentira grava todas as linhas, a menos que o teste diga o contrário. */
+  const created = (row: { row: number; title: string }) => ({
+    row: row.row,
+    status: 'created',
+    movement: {
+      _id: 'm' + row.row,
+      title: row.title,
+      direction: 'in',
+      status: 'settled',
+      date: '2026-10-28T00:00:00.000Z',
+      grossValue: 10,
+      account: { _id: 'acc1' },
+      category: { _id: 'catR' },
+      paymentMethod: 'pix',
+      audit: {},
+    },
+  });
+  const okResponse = (body: { rows: { row: number; title: string }[] }, replayed = false) => ({
+    payload: {
+      replayed,
+      total: body.rows.length,
+      created: body.rows.length,
+      failed: 0,
+      results: body.rows.map(created),
+    },
+  });
+
   beforeEach(() => {
     TestBed.configureTestingModule({ providers: [provideRouter([])] });
     svc = TestBed.inject(MovimentacoesService);
-    register = vi.fn().mockResolvedValue({ payload: undefined });
+    importMovements = vi.fn().mockImplementation(async (body) => okResponse(body));
     (svc as unknown as { movementClient: unknown }).movementClient = {
-      register,
+      importMovements,
       list: vi.fn().mockResolvedValue({ payload: [] }),
     };
     (svc as unknown as { call: unknown }).call = (fn: (h: unknown) => Promise<unknown>) => fn({});
@@ -179,16 +207,21 @@ describe('Importar em massa — gravação', () => {
     accounts: [{ id: 'acc1', name: 'Caixa' }],
   };
 
-  it('grava cada linha com o id de categoria e conta', async () => {
-    const result = await svc.confirmImport([item()], lookup);
-    expect(register).toHaveBeenCalledTimes(1);
-    expect(register.mock.calls[0][0]).toMatchObject({
+  const sentRows = (call = 0) => importMovements.mock.calls[call][0].rows;
+
+  it('manda todas as linhas num único pedido, com o id de categoria e conta', async () => {
+    const result = await svc.confirmImport([item({ row: 2 }), item({ row: 3, value: 11 })], lookup);
+    expect(importMovements).toHaveBeenCalledTimes(1);
+    expect(sentRows()).toHaveLength(2);
+    expect(sentRows()[0]).toMatchObject({
+      row: 2,
       accountId: 'acc1',
       categoryId: 'catR',
       grossValue: 10,
       date: '2026-10-28',
     });
-    expect(register.mock.calls[0][0].confirmDuplicate).toBeUndefined();
+    expect(sentRows()[0].confirmDuplicate).toBeUndefined();
+    expect(result.insertedCount).toBe(2);
     expect(result.failedRows).toEqual([]);
   });
 
@@ -197,7 +230,7 @@ describe('Importar em massa — gravação', () => {
       [item({ categoryName: 'venda balcão ', accountName: ' CAIXA' })],
       lookup,
     );
-    expect(register).toHaveBeenCalledTimes(1);
+    expect(sentRows()).toHaveLength(1);
     expect(result.failedRows).toEqual([]);
   });
 
@@ -209,24 +242,24 @@ describe('Importar em massa — gravação', () => {
       ],
       lookup,
     );
-    expect(register.mock.calls[0][0].categoryId).toBe('catRX');
-    expect(register.mock.calls[1][0].categoryId).toBe('catDX');
+    expect(sentRows()[0].categoryId).toBe('catRX');
+    expect(sentRows()[1].categoryId).toBe('catDX');
   });
 
-  it('categoria só existe no outro tipo: a linha falha sem chamar a API', async () => {
+  it('categoria só existe no outro tipo: a linha falha sem ir para a API', async () => {
     const result = await svc.confirmImport(
       [item({ type: 'expense', categoryName: 'Venda Balcão' })],
       lookup,
     );
-    expect(register).not.toHaveBeenCalled();
+    expect(importMovements).not.toHaveBeenCalled();
     expect(result.failedRows[0].error).toMatch(/categoria ou conta/i);
   });
 
   it('linhas idênticas no mesmo arquivo: só a 1ª passa pela trava de duplicidade', async () => {
     await svc.confirmImport([item({ row: 2 }), item({ row: 3 }), item({ row: 4 })], lookup);
-    expect(register.mock.calls[0][0].confirmDuplicate).toBeUndefined();
-    expect(register.mock.calls[1][0].confirmDuplicate).toBe(true);
-    expect(register.mock.calls[2][0].confirmDuplicate).toBe(true);
+    expect(sentRows()[0].confirmDuplicate).toBeUndefined();
+    expect(sentRows()[1].confirmDuplicate).toBe(true);
+    expect(sentRows()[2].confirmDuplicate).toBe(true);
   });
 
   it('linhas que só parecem iguais (valor ou data diferentes) não são forçadas', async () => {
@@ -234,41 +267,110 @@ describe('Importar em massa — gravação', () => {
       [item({ row: 2 }), item({ row: 3, value: 11 }), item({ row: 4, date: '2026-10-29' })],
       lookup,
     );
-    expect(register.mock.calls.every(([b]) => b.confirmDuplicate === undefined)).toBe(true);
+    expect(
+      sentRows().every((r: { confirmDuplicate?: boolean }) => r.confirmDuplicate === undefined),
+    ).toBe(true);
   });
 
-  it('uma linha com falha não interrompe as demais', async () => {
-    register.mockRejectedValueOnce({
-      response: {
-        status: 409,
-        data: { message: 'Possível movimentação duplicada nos últimos 2 minutos.' },
+  it('uma linha com falha não interrompe as demais e mostra o motivo da API', async () => {
+    importMovements.mockImplementationOnce(async (body) => ({
+      payload: {
+        replayed: false,
+        total: 3,
+        created: 1,
+        failed: 2,
+        results: [
+          {
+            row: 2,
+            status: 'failed',
+            error: {
+              code: 'CONFLICT',
+              message: 'Conta inativa não pode receber lançamentos financeiros.',
+            },
+          },
+          created(body.rows[1]),
+          {
+            row: 4,
+            status: 'failed',
+            error: { code: 'VALIDATION_ERROR', message: 'Dados inválidos (date: Data inválida).' },
+          },
+        ],
       },
-    });
-    const result = await svc.confirmImport([item({ row: 2 }), item({ row: 3, value: 99 })], lookup);
-    expect(register).toHaveBeenCalledTimes(2);
-    expect(result.failedRows).toHaveLength(1);
-    expect(result.failedRows[0]).toMatchObject({ row: 2, title: 'Venda' });
-    expect(result.failedRows[0].error).toMatch(/duplicata/i);
-  });
-
-  it('mostra o motivo real da falha (conta inativa, dados recusados)', async () => {
-    register
-      .mockRejectedValueOnce({
-        response: {
-          status: 409,
-          data: { message: 'Conta inativa não pode receber lançamentos financeiros.' },
-        },
-      })
-      .mockRejectedValueOnce({ response: { status: 400, data: { message: 'Validation failed' } } })
-      .mockRejectedValueOnce(new Error('rede'));
+    }));
     const result = await svc.confirmImport(
       [item({ row: 2, value: 1 }), item({ row: 3, value: 2 }), item({ row: 4, value: 3 })],
       lookup,
     );
-    const [inativa, recusada, outra] = result.failedRows.map((f) => f.error);
-    expect(inativa).toBe('Conta inativa não pode receber lançamentos financeiros.');
-    expect(recusada).toMatch(/data, valor e se a categoria/);
-    expect(outra).toBe('Falha ao gravar.');
+    expect(result.insertedCount).toBe(1);
+    expect(result.failedRows.map((f) => f.row)).toEqual([2, 4]);
+    expect(result.failedRows[0]).toMatchObject({ row: 2, title: 'Venda' });
+    expect(result.failedRows[0].error).toBe(
+      'Conta inativa não pode receber lançamentos financeiros.',
+    );
+    expect(result.failedRows[1].error).toMatch(/data, valor e se a categoria/);
+  });
+
+  it('falha sem motivo vira mensagem genérica', async () => {
+    importMovements.mockImplementationOnce(async () => ({
+      payload: {
+        replayed: false,
+        total: 1,
+        created: 0,
+        failed: 1,
+        results: [{ row: 2, status: 'failed' }],
+      },
+    }));
+    const result = await svc.confirmImport([item()], lookup);
+    expect(result.failedRows[0].error).toBe('Falha ao gravar.');
+  });
+
+  it('se o pedido inteiro falhar, o erro sobe para a tela', async () => {
+    importMovements.mockRejectedValueOnce(new Error('rede'));
+    await expect(svc.confirmImport([item()], lookup)).rejects.toThrow('rede');
+  });
+
+  it('reenviar o mesmo lote sem resposta reaproveita a chave de idempotência', async () => {
+    importMovements.mockRejectedValueOnce(new Error('rede'));
+    await expect(svc.confirmImport([item()], lookup)).rejects.toThrow();
+    await svc.confirmImport([item()], lookup);
+    const [first, second] = importMovements.mock.calls.map(([b]) => b.idempotencyKey);
+    expect(second).toBe(first);
+    expect(first).toMatch(/^imp-.{8,}/);
+  });
+
+  it('depois de uma resposta, importar o mesmo conteúdo de novo usa uma chave nova', async () => {
+    await svc.confirmImport([item()], lookup);
+    await svc.confirmImport([item()], lookup);
+    const [first, second] = importMovements.mock.calls.map(([b]) => b.idempotencyKey);
+    expect(second).not.toBe(first);
+  });
+
+  it('conteúdo diferente nunca reaproveita a chave', async () => {
+    importMovements.mockRejectedValueOnce(new Error('rede'));
+    await expect(svc.confirmImport([item({ value: 10 })], lookup)).rejects.toThrow();
+    await svc.confirmImport([item({ value: 99 })], lookup);
+    const [first, second] = importMovements.mock.calls.map(([b]) => b.idempotencyKey);
+    expect(second).not.toBe(first);
+  });
+
+  it('avisa quando a API devolveu uma importação que já tinha sido feita', async () => {
+    importMovements.mockImplementationOnce(async (body) => okResponse(body, true));
+    const result = await svc.confirmImport([item()], lookup);
+    expect(result.replayed).toBe(true);
+  });
+
+  it('divide em pedidos de até o limite da API', async () => {
+    const many = Array.from({ length: IMPORT_MOVEMENTS_MAX_ROWS + 5 }, (_, i) =>
+      item({ row: i + 2, value: i + 1 }),
+    );
+    const result = await svc.confirmImport(many, lookup);
+    expect(importMovements).toHaveBeenCalledTimes(2);
+    expect(sentRows(0)).toHaveLength(IMPORT_MOVEMENTS_MAX_ROWS);
+    expect(sentRows(1)).toHaveLength(5);
+    expect(importMovements.mock.calls[1][0].idempotencyKey).not.toBe(
+      importMovements.mock.calls[0][0].idempotencyKey,
+    );
+    expect(result.insertedCount).toBe(many.length);
   });
 });
 
