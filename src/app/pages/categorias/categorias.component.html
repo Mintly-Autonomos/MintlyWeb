@@ -65,6 +65,7 @@
 
   <!-- Filter bar -->
   <app-filter-bar
+    placeholder="Buscar categoria…"
     [query]="query()"
     (queryChange)="query.set($event)"
     [activeCount]="activeFilters()"
@@ -263,6 +264,10 @@
         />
         @if (nameError) {
           <p class="text-error text-[12px] mt-1">{{ nameError }}</p>
+        } @else {
+          <p class="text-[12px] text-muted-foreground mt-1">
+            Ex.: Bebidas, Marketing, Venda Balcão.
+          </p>
         }
       </label>
 
@@ -307,6 +312,9 @@
             <app-icon name="tune" [style]="{ fontSize: '17px' }" /><span>Misto</span>
           </button>
         </div>
+        <p class="text-[12px] text-muted-foreground mt-2">
+          Fixo: valor previsível. Variável: muda mês a mês.
+        </p>
       </div>
 
       <!-- Nature -->
@@ -338,6 +346,9 @@
             <app-icon name="category" [style]="{ fontSize: '17px' }" /><span>Não operacional</span>
           </button>
         </div>
+        <p class="text-[12px] text-muted-foreground mt-2">
+          Operacional: ligada à atividade-fim do negócio.
+        </p>
       </div>
 
       <!-- Active (edit only) -->

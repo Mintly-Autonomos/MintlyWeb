@@ -45,6 +45,7 @@
 
   <!-- Filter bar -->
   <app-filter-bar
+    placeholder="Buscar conta…"
     [query]="query()"
     (queryChange)="query.set($event)"
     [activeCount]="activeFilters()"

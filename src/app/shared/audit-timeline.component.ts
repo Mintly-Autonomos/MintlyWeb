@@ -12,6 +12,25 @@ export interface AuditEntry {
   icon: string;
 }
 
+/**
+ * Os eventos que a API grava no histórico de contas e categorias vêm como códigos
+ * ('set-default', 'inactivate'…). Aqui viram texto de gente; o que não for código conhecido
+ * (rótulos já em português, ações futuras) passa como veio.
+ */
+const ACTION_LABELS: Record<string, string> = {
+  register: 'Criada',
+  create: 'Criada',
+  update: 'Dados atualizados',
+  inactivate: 'Inativada',
+  reactivate: 'Reativada',
+  'set-default': 'Definida como conta padrão',
+  'unset-default': 'Deixou de ser a conta padrão',
+};
+
+export function auditActionLabel(action: string): string {
+  return ACTION_LABELS[action.trim().toLowerCase()] ?? action;
+}
+
 @Component({
   selector: 'app-audit-timeline',
   standalone: true,
@@ -28,7 +47,7 @@ export interface AuditEntry {
             />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="font-medium">{{ ev.action }}</div>
+            <div class="font-medium">{{ label(ev.action) }}</div>
             @if (ev.detail) {
               <div class="text-muted-foreground text-[12px]">{{ ev.detail }}</div>
             }
@@ -43,5 +62,6 @@ export interface AuditEntry {
 })
 export class AuditTimelineComponent {
   @Input() events: AuditEntry[] = [];
+  protected label = auditActionLabel;
   protected fmtDateTime = fmtDateTime;
 }
