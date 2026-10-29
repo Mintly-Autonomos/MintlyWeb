@@ -123,7 +123,7 @@
     <div class="m3-card overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead>
+          <thead class="max-sm:hidden">
             <tr
               class="border-b border-border text-[12px] text-muted-foreground uppercase tracking-wide"
             >
@@ -137,12 +137,20 @@
           </thead>
           <tbody>
             @for (m of filtered(); track m.id) {
-              <tr class="border-b border-border/50 hover:bg-muted/30 transition group">
-                <td class="px-4 py-3 text-muted-foreground whitespace-nowrap">
+              <tr
+                class="border-b border-border/50 hover:bg-muted/30 transition group max-sm:grid max-sm:grid-cols-[1fr_auto] max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-1 max-sm:px-4 max-sm:py-3"
+              >
+                <td
+                  class="px-4 py-3 text-muted-foreground whitespace-nowrap max-sm:col-start-1 max-sm:row-start-2 max-sm:p-0 max-sm:pl-[42px] max-sm:text-[12px]"
+                >
                   {{ fmtShort(m.date) }}
                 </td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-2.5">
+                <td class="px-4 py-3 max-sm:col-start-1 max-sm:row-start-1 max-sm:p-0">
+                  <button
+                    type="button"
+                    (click)="details.set(m)"
+                    class="flex w-full items-center gap-2.5 text-left cursor-pointer"
+                  >
                     <div
                       [class]="
                         'h-8 w-8 rounded-xl grid place-items-center shrink-0 ' +
@@ -161,25 +169,27 @@
                         {{ categoryName(m.categoryId) }}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 </td>
                 <td class="px-4 py-3 text-muted-foreground hidden md:table-cell">
                   {{ accountName(m.accountId) }}
                 </td>
                 <td
-                  class="px-4 py-3 text-right font-semibold whitespace-nowrap"
+                  class="px-4 py-3 text-right font-semibold whitespace-nowrap max-sm:col-start-2 max-sm:row-start-1 max-sm:p-0"
                   [class]="m.type === 'income' ? 'text-success' : 'text-error'"
                 >
                   {{ m.type === 'income' ? '+' : '-' }}{{ fmtBRL(m.value) }}
                 </td>
-                <td class="px-4 py-3 hidden sm:table-cell">
+                <td
+                  class="px-4 py-3 hidden sm:table-cell max-sm:block max-sm:col-start-2 max-sm:row-start-2 max-sm:justify-self-end max-sm:p-0"
+                >
                   <app-chip
                     [tone]="statusMeta[m.status].tone"
                     [icon]="statusMeta[m.status].icon"
                     [label]="statusMeta[m.status].label"
                   />
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-4 py-3 max-sm:hidden">
                   <div
                     class="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition"
                   >
@@ -333,7 +343,7 @@
                 />
                 <div class="min-w-0">
                   <div class="text-[14px] font-semibold">{{ t.label }}</div>
-                  <div class="text-[11px] text-muted-foreground truncate">{{ t.desc }}</div>
+                  <div class="text-[11px] text-muted-foreground sm:truncate">{{ t.desc }}</div>
                 </div>
                 @if (form().type === t.value) {
                   <app-icon
@@ -556,7 +566,7 @@
                 <app-icon [name]="st.icon" [style]="{ fontSize: '18px' }" />
                 <div class="min-w-0">
                   <div class="text-[13px] font-semibold">{{ st.label }}</div>
-                  <div class="text-[11px] text-muted-foreground truncate">{{ st.impact }}</div>
+                  <div class="text-[11px] text-muted-foreground sm:truncate">{{ st.impact }}</div>
                 </div>
               </button>
             }
@@ -583,19 +593,21 @@
     }
 
     <ng-container ngProjectAs="[slot=footer]">
-      <div class="flex items-center justify-between gap-3 w-full">
-        <div>
-          @if (!importMode() && !editing()) {
+      <div
+        class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 w-full"
+      >
+        @if (!importMode() && !editing()) {
+          <div>
             <button
               type="button"
               (click)="downloadTemplate()"
-              class="h-10 px-4 rounded-xl border-2 border-mint bg-card text-mint text-sm font-medium hover:bg-mint-soft transition cursor-pointer flex items-center gap-2"
+              class="h-10 px-4 w-full sm:w-auto justify-center rounded-xl border-2 border-mint bg-card text-mint text-sm font-medium hover:bg-mint-soft transition cursor-pointer flex items-center gap-2"
             >
               <app-icon name="download" [style]="{ fontSize: '16px' }" />Baixar modelo
             </button>
-          }
-        </div>
-        <div class="flex gap-3">
+          </div>
+        }
+        <div class="flex gap-3 sm:ml-auto [&>button]:flex-1 sm:[&>button]:flex-none">
           <button
             type="button"
             (click)="closeModal()"
@@ -828,7 +840,7 @@
                       [checked]="row.included"
                       [disabled]="!row.valid"
                       (change)="toggleRowIncluded(i, $any($event.target).checked)"
-                      class="cursor-pointer disabled:cursor-not-allowed"
+                      class="h-6 w-6 sm:h-4 sm:w-4 cursor-pointer disabled:cursor-not-allowed"
                       title="Incluir esta linha na importação"
                     />
                   </td>
