@@ -1033,7 +1033,11 @@
         {{ res.insertedCount === 1 ? 'movimentação inserida' : 'movimentações inseridas' }}
       </div>
       <p class="text-[13px] text-muted-foreground">
-        As movimentações importadas já aparecem na sua lista.
+        @if (res.replayed) {
+          Esta importação já tinha sido concluída antes — nada foi gravado de novo.
+        } @else {
+          As movimentações importadas já aparecem na sua lista.
+        }
       </p>
       @if (res.failedRows.length > 0) {
         <div class="text-left rounded-xl border border-warning/30 bg-warning/10 p-3 space-y-1">
