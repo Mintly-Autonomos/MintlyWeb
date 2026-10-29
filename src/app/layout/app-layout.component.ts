@@ -1,4 +1,5 @@
-import { Component, ElementRef, OnInit, signal, inject, viewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, effect, signal, inject, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
 import { AuthService } from '../services/auth.service';
@@ -23,7 +24,18 @@ const NAV = [
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LogoComponent, IconComponent],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    NgTemplateOutlet,
+    LogoComponent,
+    IconComponent,
+  ],
+  host: {
+    '(document:keydown.escape)': 'menuOpen.set(false)',
+    '(window:resize)': 'closeMenuOnDesktop()',
+  },
   template: `
     <div class="min-h-screen w-full flex bg-background text-foreground">
       <!-- Sidebar -->
@@ -34,6 +46,10 @@ const NAV = [
           <app-logo [size]="30" tagline="Gestão para o seu negócio" to="/" />
         </div>
 
+        <ng-container [ngTemplateOutlet]="navContent" />
+      </aside>
+
+      <ng-template #navContent>
         <div
           class="px-3 mt-2 mb-1 text-[11px] uppercase tracking-wider text-muted-foreground/80 font-semibold"
         >
@@ -47,7 +63,8 @@ const NAV = [
               routerLinkActive="bg-mint-soft text-ocean"
               [routerLinkActiveOptions]="{ exact: true }"
               #rla="routerLinkActive"
-              class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-foreground/75 hover:bg-muted hover:text-foreground"
+              (click)="menuOpen.set(false)"
+              class="group flex items-center gap-3 px-3 py-3 md:py-2.5 rounded-xl text-sm font-medium transition-colors text-foreground/75 hover:bg-muted hover:text-foreground"
             >
               <span
                 [class]="
@@ -76,15 +93,66 @@ const NAV = [
             dinheiro.
           </p>
         </div>
-      </aside>
+      </ng-template>
+
+      <!-- Menu no celular: o mesmo menu da barra lateral, em uma gaveta -->
+      @if (menuOpen()) {
+        <div class="fixed inset-0 z-50 md:hidden">
+          <button
+            type="button"
+            aria-label="Fechar menu"
+            (click)="menuOpen.set(false)"
+            class="absolute inset-0 bg-black/50 cursor-default"
+          ></button>
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu principal"
+            class="absolute left-0 top-0 h-full w-[280px] max-w-[85vw] flex flex-col border-r border-border bg-sidebar overflow-y-auto"
+          >
+            <div class="px-6 py-5 flex items-start justify-between gap-2">
+              <app-logo [size]="30" tagline="Gestão para o seu negócio" to="/" />
+              <button
+                type="button"
+                aria-label="Fechar menu"
+                (click)="menuOpen.set(false)"
+                class="h-10 w-10 -mr-3 -mt-1 rounded-full grid place-items-center hover:bg-muted cursor-pointer"
+              >
+                <app-icon name="close" [style]="{ fontSize: '22px' }" />
+              </button>
+            </div>
+            <ng-container [ngTemplateOutlet]="navContent" />
+            <button
+              type="button"
+              (click)="theme.toggleTheme()"
+              class="mx-3 mb-4 flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-medium text-foreground/75 hover:bg-muted cursor-pointer"
+            >
+              <app-icon
+                [name]="theme.isDark() ? 'light_mode' : 'dark_mode'"
+                [style]="{ fontSize: '20px' }"
+              />
+              {{ theme.isDark() ? 'Ativar modo claro' : 'Ativar modo escuro' }}
+            </button>
+          </aside>
+        </div>
+      }
 
       <!-- Main -->
       <div class="flex-1 min-w-0 flex flex-col">
         <header
-          class="sticky top-0 z-20 h-[68px] border-b border-border bg-background/85 backdrop-blur flex items-center px-6 md:px-10 gap-4"
+          class="sticky top-0 z-20 h-[68px] border-b border-border bg-background/85 backdrop-blur flex items-center px-4 md:px-10 gap-3 md:gap-4"
         >
+          <button
+            type="button"
+            (click)="menuOpen.set(true)"
+            aria-label="Abrir menu"
+            [attr.aria-expanded]="menuOpen()"
+            class="md:hidden h-10 w-10 -ml-1 shrink-0 rounded-full border border-border grid place-items-center hover:bg-muted cursor-pointer"
+          >
+            <app-icon name="menu" [style]="{ fontSize: '22px' }" />
+          </button>
           <div class="min-w-0">
-            <h1 class="text-[20px] md:text-[22px] font-bold tracking-tight truncate">
+            <h1 class="text-[18px] sm:text-[20px] md:text-[22px] font-bold tracking-tight truncate">
               {{ pageTitle }}
             </h1>
             <p class="text-[13px] text-muted-foreground truncate">{{ pageSub }}</p>
@@ -92,7 +160,7 @@ const NAV = [
           <div class="ml-auto flex items-center gap-2">
             <button
               (click)="theme.toggleTheme()"
-              class="h-10 w-10 rounded-full border border-border grid place-items-center hover:bg-muted cursor-pointer"
+              class="hidden sm:grid h-10 w-10 rounded-full border border-border place-items-center hover:bg-muted cursor-pointer"
               [attr.aria-label]="theme.isDark() ? 'Ativar modo claro' : 'Ativar modo escuro'"
             >
               <app-icon
@@ -122,7 +190,7 @@ const NAV = [
                 <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
                 <div class="fixed inset-0 z-30" (click)="notificationsOpen.set(false)"></div>
                 <div
-                  class="absolute right-0 top-[calc(100%+8px)] z-40 w-[360px] max-h-[440px] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col"
+                  class="fixed left-3 right-3 top-[76px] md:absolute md:left-auto md:right-0 md:top-[calc(100%+8px)] z-40 md:w-[360px] max-h-[440px] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col"
                 >
                   <div
                     class="px-4 py-3 border-b border-border flex items-center justify-between shrink-0"
@@ -256,7 +324,7 @@ const NAV = [
           </div>
         </header>
 
-        <main class="flex-1 px-6 md:px-10 py-8">
+        <main class="flex-1 px-4 sm:px-6 md:px-10 py-6 md:py-8">
           <router-outlet />
         </main>
       </div>
@@ -270,10 +338,23 @@ export class AppLayoutComponent implements OnInit {
   protected navItems = NAV;
   private toast = inject(ToastService);
   protected notificationsOpen = signal(false);
+  /** Gaveta do menu no celular (abaixo de 768 px a barra lateral não aparece). */
+  protected menuOpen = signal(false);
   protected userMenuOpen = signal(false);
   protected avatarBusy = signal(false);
   protected readonly avatarAccept = AVATAR_ACCEPT;
   private avatarInput = viewChild<ElementRef<HTMLInputElement>>('avatarInput');
+
+  constructor() {
+    // Com a gaveta aberta, a página de trás não rola.
+    effect(() => {
+      document.body.style.overflow = this.menuOpen() ? 'hidden' : '';
+    });
+  }
+
+  protected closeMenuOnDesktop(): void {
+    if (window.innerWidth >= 768) this.menuOpen.set(false);
+  }
 
   ngOnInit(): void {
     this.notifications.refresh().catch(() => {
