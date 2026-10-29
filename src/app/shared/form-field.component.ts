@@ -35,6 +35,8 @@ import { IconComponent } from './icon.component';
       </span>
       @if (error) {
         <p class="text-error text-[12px] mt-1">{{ error }}</p>
+      } @else if (helper) {
+        <p class="text-muted-foreground text-[12px] mt-1">{{ helper }}</p>
       }
     </label>
   `,
@@ -43,6 +45,8 @@ export class FormFieldComponent {
   @Input() label = '';
   @Input() icon = '';
   @Input() error = '';
+  /** Texto de apoio abaixo do campo (some quando há erro). */
+  @Input() helper = '';
 
   get shellClass(): string {
     const base =

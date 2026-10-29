@@ -40,18 +40,19 @@ export const routes: Routes = [
       },
       {
         path: 'token-invalido',
-        title: 'Link inválido',
+        title: 'Link expirado',
         loadComponent: () =>
           import('./pages/auth/token-invalido.component').then((m) => m.TokenInvalidoComponent),
       },
       {
         path: 'bloqueado',
-        title: 'Conta bloqueada',
+        title: 'Acesso bloqueado',
         loadComponent: () =>
           import('./pages/auth/bloqueado.component').then((m) => m.BloqueadoComponent),
       },
       {
         path: 'logout',
+        title: 'Sessão encerrada',
         loadComponent: () => import('./pages/auth/logout.component').then((m) => m.LogoutComponent),
       },
       {
@@ -135,5 +136,9 @@ export const routes: Routes = [
       },
     ],
   },
-  { path: '**', redirectTo: '' },
+  {
+    path: '**',
+    title: 'Página não encontrada',
+    loadComponent: () => import('./pages/not-found.component').then((m) => m.NotFoundComponent),
+  },
 ];

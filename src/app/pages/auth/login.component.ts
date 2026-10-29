@@ -1,15 +1,23 @@
 import { Component, signal, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { AlertComponent } from '../../shared/alert.component';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, RouterLink, AuthCardComponent, IconComponent, FormFieldComponent],
+  imports: [
+    FormsModule,
+    RouterLink,
+    AuthCardComponent,
+    IconComponent,
+    FormFieldComponent,
+    AlertComponent,
+  ],
   template: `
     <app-auth-card
       title="Bem-vindo de volta"
@@ -17,6 +25,11 @@ import { AuthService } from '../../services/auth.service';
       [hasFooter]="true"
     >
       <form (ngSubmit)="onSubmit()" class="space-y-4">
+        @if (resetOk) {
+          <app-alert variant="success" title="Senha redefinida com sucesso">
+            Entre com sua nova senha para continuar.
+          </app-alert>
+        }
         @if (error()) {
           <div
             role="alert"
@@ -137,6 +150,8 @@ import { AuthService } from '../../services/auth.service';
 export class LoginComponent {
   protected router = inject(Router);
   private auth = inject(AuthService);
+  /** Chegou da redefinição de senha (`?reset=ok`). */
+  protected resetOk = inject(ActivatedRoute).snapshot.queryParamMap.get('reset') === 'ok';
   protected email = '';
   protected password = '';
   protected remember = false;
@@ -154,7 +169,12 @@ export class LoginComponent {
     try {
       await this.auth.login(this.email, this.password, this.remember);
       this.router.navigate(['/']);
-    } catch {
+    } catch (err) {
+      // 429: a conta foi bloqueada por excesso de tentativas (a API pausa o acesso por alguns minutos).
+      if ((err as { response?: { status?: number } })?.response?.status === 429) {
+        this.router.navigate(['/auth/bloqueado']);
+        return;
+      }
       this.error.set('Não conseguimos entrar com esses dados. Verifique e tente novamente.');
     } finally {
       this.loading.set(false);
