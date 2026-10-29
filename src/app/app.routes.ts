@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './guards/auth.guard';
+import { subscriptionGuard } from './guards/subscription.guard';
 
 export const routes: Routes = [
   // Auth routes (wrapped in AuthShell)
@@ -58,8 +59,8 @@ export const routes: Routes = [
       {
         path: 'onboarding',
         title: 'Preparando sua conta',
-        // Precisa da sessão: confere a conta e as categorias criadas no cadastro.
-        canActivate: [authGuard],
+        // Precisa da sessão E da assinatura: confere a conta e as categorias criadas no cadastro.
+        canActivate: [authGuard, subscriptionGuard],
         loadComponent: () =>
           import('./pages/auth/onboarding.component').then((m) => m.OnboardingComponent),
       },
@@ -71,10 +72,40 @@ export const routes: Routes = [
     path: 'dev',
     loadComponent: () => import('./pages/dev/dev-home.component').then((m) => m.DevHomeComponent),
   },
-  // App routes (wrapped in AppLayout — protegidas por authGuard)
+  // Assinatura: exige login, mas NÃO a assinatura (é por aqui que quem não tem assina).
+  {
+    path: 'assinatura',
+    canActivate: [authGuard],
+    loadComponent: () => import('./layout/auth-shell.component').then((m) => m.AuthShellComponent),
+    children: [
+      {
+        path: '',
+        title: 'Assinatura',
+        loadComponent: () =>
+          import('./pages/assinatura/assinatura.component').then((m) => m.AssinaturaComponent),
+      },
+      {
+        path: 'retorno',
+        title: 'Confirmando pagamento',
+        loadComponent: () =>
+          import('./pages/assinatura/assinatura-retorno.component').then(
+            (m) => m.AssinaturaRetornoComponent,
+          ),
+      },
+      {
+        path: 'simulador',
+        title: 'Pagamento de teste',
+        loadComponent: () =>
+          import('./pages/assinatura/assinatura-simulador.component').then(
+            (m) => m.AssinaturaSimuladorComponent,
+          ),
+      },
+    ],
+  },
+  // App routes (wrapped in AppLayout — protegidas por authGuard e pela assinatura válida)
   {
     path: '',
-    canActivate: [authGuard],
+    canActivate: [authGuard, subscriptionGuard],
     loadComponent: () => import('./layout/app-layout.component').then((m) => m.AppLayoutComponent),
     children: [
       { path: '', redirectTo: 'visao-geral', pathMatch: 'full' },

@@ -24,7 +24,7 @@ import { maskPhoneBR } from '../../shared/format';
   template: `
     <app-auth-card
       title="Crie sua conta Mintly"
-      subtitle="Comece grátis em menos de 1 minuto. Sem cartão de crédito."
+      subtitle="Crie sua conta em menos de 1 minuto. O Mintly funciona por assinatura: depois do cadastro você escolhe o plano e paga para liberar o acesso."
       [hasFooter]="true"
     >
       <!-- Stepper -->
@@ -77,6 +77,11 @@ import { maskPhoneBR } from '../../shared/format';
         }
 
         @if (step() === 0) {
+          <app-alert variant="info" title="O Mintly é por assinatura">
+            Planos de 1, 3, 6 ou 12 meses, a partir de R$ 150 por mês, com desconto nos planos mais
+            longos. Você cria a conta agora e, em seguida, escolhe o plano e faz o pagamento. O
+            acesso é liberado quando o pagamento é aprovado.
+          </app-alert>
           <div class="flex flex-col items-center gap-2 mb-1">
             <button
               type="button"
@@ -251,7 +256,8 @@ import { maskPhoneBR } from '../../shared/format';
           </app-form-field>
           <app-alert variant="info" title="O que preparamos para você">
             Ao concluir, criamos automaticamente categorias padrão (Venda Balcão, Delivery, CMV,
-            Salários, Aluguel, Impostos) e uma conta financeira inicial.
+            Salários, Aluguel, Impostos) e uma conta financeira inicial. Antes disso, você escolhe o
+            plano e paga a assinatura.
           </app-alert>
           <label class="flex items-start gap-2 cursor-pointer">
             <input
@@ -406,7 +412,8 @@ export class CadastroComponent {
         restaurantName: this.restaurant.trim(),
         termsAccepted: this.terms,
       });
-      this.router.navigate(['/auth/onboarding']);
+      // A assinatura vem antes de tudo: sem ela a API não libera nada. Depois de pagar, segue o onboarding.
+      this.router.navigate(['/assinatura']);
     } catch (err) {
       this.error.set(this.errMsg(err));
     } finally {

@@ -1,8 +1,10 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import type { Headers } from 'mintly-lib';
+import { computeSubscriptionState } from 'mintly-lib';
+import type { Headers, SubscriptionState } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { MintlyClientService } from './mintly-client.service';
+import { apiErrorInfo } from '../shared/api-error';
 import mockAuth from '../mocks/mock_auth.json';
 
 export interface AuthUser {
@@ -22,6 +24,8 @@ interface MockRegisteredUser {
   restaurantName: string;
   restaurantId: string;
   avatar?: string;
+  /** Modo mock: data limite da assinatura (ISO); `null` = nunca assinou. */
+  subscriptionEndsAt?: string | null;
 }
 
 const REMEMBER_KEY = 'mintly-remember';
@@ -29,6 +33,10 @@ const KEYS = {
   access: 'mintly-access-token',
   refresh: 'mintly-refresh-token',
   user: 'mintly-user',
+  /** Data limite da assinatura (ISO). O estado (ativa/vencida) é calculado na hora, não guardado. */
+  subscription: 'mintly-subscription-ends',
+  /** Recém-cadastrado: depois de pagar, ainda falta o onboarding. */
+  pendingOnboarding: 'mintly-pending-onboarding',
 } as const;
 const AVATAR_KEY = 'mintly-avatar';
 
@@ -37,7 +45,13 @@ const AVATAR_KEY = 'mintly-avatar';
  * (Seoul Bird) de `mocks/mock_auth.json`. Ganha uma entrada nova a cada signup feito em modo
  * mock; dura só a sessão da aba. Sem efeito nenhum quando `useMocks` é false (padrão).
  */
-const registeredUsers: MockRegisteredUser[] = [{ ...mockAuth.user }];
+// O usuário de demonstração entra com assinatura ativa (20 dias), para o app abrir direto.
+const registeredUsers: MockRegisteredUser[] = [
+  {
+    ...mockAuth.user,
+    subscriptionEndsAt: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
 
 function delay(ms = 350): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -59,9 +73,49 @@ export class AuthService {
   private _accessToken = signal<string | null>(this.read(KEYS.access));
   private _refreshToken = signal<string | null>(this.read(KEYS.refresh));
   private _user = signal<AuthUser | null>(this.loadStoredUser());
+  private _subscriptionEndsAt = signal<string | null>(this.read(KEYS.subscription));
 
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly currentUser = this._user.asReadonly();
+
+  /**
+   * Estado da assinatura NESTE instante (ativa só enquanto agora < data limite; mesma regra da API,
+   * vinda da lib). Calculado a cada leitura: uma assinatura que vence com o app aberto vira "vencida"
+   * na próxima navegação, sem esperar um novo login.
+   */
+  subscriptionState(): SubscriptionState {
+    return computeSubscriptionState(this._subscriptionEndsAt());
+  }
+
+  hasActiveSubscription(): boolean {
+    return this.subscriptionState().status === 'active';
+  }
+
+  /** Guarda a data limite que a API informou (login, cadastro ou GET /subscription). */
+  setSubscriptionEndsAt(endsAt: string | null): void {
+    this._subscriptionEndsAt.set(endsAt);
+    if (endsAt) this.write(KEYS.subscription, endsAt);
+    else this.remove(KEYS.subscription);
+  }
+
+  /**
+   * A API respondeu 402 SUBSCRIPTION-0001: a assinatura venceu (ou nunca existiu) com o app aberto.
+   * Trata como sem assinatura e leva à tela de assinatura. Devolve true quando era esse erro.
+   */
+  onApiError(err: unknown): boolean {
+    const { status, code } = apiErrorInfo(err);
+    if (status !== 402 || code !== 'SUBSCRIPTION-0001') return false;
+    if (this.hasActiveSubscription()) this.setSubscriptionEndsAt(new Date(0).toISOString());
+    if (!this.router.url.startsWith('/assinatura')) this.router.navigate(['/assinatura']);
+    return true;
+  }
+
+  /** Depois de pagar: quem acabou de se cadastrar segue para o onboarding; os demais, para o app. */
+  consumeNextRouteAfterSubscription(): string {
+    const pending = this.read(KEYS.pendingOnboarding) === '1';
+    this.remove(KEYS.pendingOnboarding);
+    return pending ? '/auth/onboarding' : '/';
+  }
 
   /** Storage ativo conforme a opção "manter conectado". */
   private get store(): Storage {
@@ -159,6 +213,7 @@ export class AuthService {
         restaurantId: match.restaurantId,
         avatarDataUrl: match.avatar,
       });
+      this.setSubscriptionEndsAt(match.subscriptionEndsAt ?? null);
       return;
     }
 
@@ -171,6 +226,7 @@ export class AuthService {
       restaurantId: result.user.restaurantId,
       avatarDataUrl: result.user.person.avatar,
     });
+    this.setSubscriptionEndsAt(result.subscription?.endsAt ?? null);
   }
 
   /** Cadastro inicial (usuário + restaurante). Já autentica com os tokens retornados. */
@@ -200,6 +256,7 @@ export class AuthService {
         restaurantName: input.restaurantName,
         restaurantId,
         avatar: input.avatar,
+        subscriptionEndsAt: null,
       });
       this.persistTokens(fakeToken('mock-access'), fakeToken('mock-refresh'), {
         nome: input.name,
@@ -208,6 +265,8 @@ export class AuthService {
         restaurantId,
         avatarDataUrl: input.avatar,
       });
+      this.setSubscriptionEndsAt(null);
+      this.write(KEYS.pendingOnboarding, '1');
       return;
     }
 
@@ -230,6 +289,9 @@ export class AuthService {
       restaurantId: result.user.restaurantId,
       avatarDataUrl: result.user.person.avatar,
     });
+    // Conta nova nunca tem assinatura: a tela de assinatura vem antes de tudo.
+    this.setSubscriptionEndsAt(result.subscription?.endsAt ?? null);
+    this.write(KEYS.pendingOnboarding, '1');
   }
 
   /** Dispara o e-mail de recuperação. Resposta é sempre genérica (não revela se o e-mail existe). */
@@ -334,6 +396,9 @@ export class AuthService {
     this.remove(KEYS.refresh);
     this.remove(KEYS.user);
     this.remove(AVATAR_KEY);
+    this._subscriptionEndsAt.set(null);
+    this.remove(KEYS.subscription);
+    this.remove(KEYS.pendingOnboarding);
   }
 
   private loadStoredUser(): AuthUser | null {

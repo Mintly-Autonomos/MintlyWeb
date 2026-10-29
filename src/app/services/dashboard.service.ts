@@ -144,6 +144,8 @@ export class DashboardService {
     try {
       return await fn(this.headers);
     } catch (err) {
+      // 402: a assinatura venceu com o app aberto — leva à tela de assinatura.
+      this.auth.onApiError(err);
       if (this.isUnauthorized(err)) {
         const refreshed = await this.auth.refresh();
         if (refreshed) return await fn(this.headers);
