@@ -56,7 +56,9 @@ export const routes: Routes = [
       },
       {
         path: 'onboarding',
-        title: 'Primeiros passos',
+        title: 'Preparando sua conta',
+        // Precisa da sessão: confere a conta e as categorias criadas no cadastro.
+        canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/auth/onboarding.component').then((m) => m.OnboardingComponent),
       },
