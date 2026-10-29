@@ -91,15 +91,29 @@
   </app-filter-bar>
 
   <!-- Table -->
-  @if (filtered().length === 0) {
+  @if (categories().length === 0) {
+    <div class="m3-card">
+      <app-empty-state
+        icon="category"
+        title="Organize seu negócio por categorias"
+        description="Categorias ajudam você a entender de onde vem o dinheiro e para onde ele vai — sem precisar saber contabilidade. Comece criando a primeira."
+        [hasAction]="true"
+      >
+        <button
+          (click)="openCreate()"
+          class="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer"
+        >
+          <app-icon name="add" [style]="{ fontSize: '20px' }" /><span
+            >Criar primeira categoria</span
+          >
+        </button>
+      </app-empty-state>
+    </div>
+  } @else if (filtered().length === 0) {
     <app-empty-state
-      icon="label"
+      icon="search_off"
       title="Nenhuma categoria encontrada"
-      [description]="
-        query()
-          ? 'Tente outro termo de busca.'
-          : 'Crie a primeira categoria para organizar suas movimentações.'
-      "
+      description="Tente outro termo de busca, ajuste os filtros ou crie uma nova categoria para este tipo."
     />
   } @else {
     <div class="m3-card overflow-hidden">
