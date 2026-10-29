@@ -69,7 +69,7 @@ import { AuthService } from '../../services/auth.service';
             type="button"
             [attr.aria-label]="showPwd() ? 'Ocultar senha' : 'Mostrar senha'"
             (click)="showPwd.set(!showPwd())"
-            class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
+            class="relative h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer before:absolute before:-inset-1 before:content-['']"
           >
             <app-icon
               [name]="showPwd() ? 'visibility_off' : 'visibility'"
@@ -79,7 +79,7 @@ import { AuthService } from '../../services/auth.service';
         </app-form-field>
 
         <div class="flex items-center justify-between">
-          <label class="flex items-center gap-2 cursor-pointer select-none">
+          <label class="flex items-center gap-2 cursor-pointer select-none py-2 -my-2">
             <input
               type="checkbox"
               [(ngModel)]="remember"
@@ -90,7 +90,7 @@ import { AuthService } from '../../services/auth.service';
           </label>
           <a
             routerLink="/auth/esqueci-senha"
-            class="text-[13px] text-ocean font-medium hover:underline"
+            class="text-[13px] text-ocean font-medium hover:underline py-2 -my-2"
             >Esqueci minha senha</a
           >
         </div>
