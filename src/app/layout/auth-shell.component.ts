@@ -48,7 +48,12 @@ export class AuthShellComponent {
       <main class="min-h-screen grid place-items-center px-4 py-10">
         <div class="w-full max-w-[560px]">
           <div class="mb-10">
-            <app-logo [size]="36" tagline="Gestão para o seu negócio" to="/auth/login" />
+            <app-logo
+              [size]="36"
+              tagline="Gestão para o seu negócio"
+              to="/auth/login"
+              variant="gradient"
+            />
           </div>
           <div class="m3-card p-8 md:p-10">
             <h1 class="text-[22px] md:text-[24px] font-bold tracking-tight">{{ title }}</h1>
@@ -70,7 +75,12 @@ export class AuthShellComponent {
       <main class="min-h-screen grid lg:grid-cols-[1.05fr_1fr]">
         <div class="flex flex-col px-6 md:px-12 lg:px-16 py-12 xl:py-16">
           <div class="mb-10">
-            <app-logo [size]="36" tagline="Gestão para o seu negócio" to="/auth/login" />
+            <app-logo
+              [size]="36"
+              tagline="Gestão para o seu negócio"
+              to="/auth/login"
+              variant="gradient"
+            />
           </div>
           <div class="flex-1 grid place-items-center">
             <div class="w-full max-w-[440px]">
