@@ -267,7 +267,9 @@
       @if (isPlatform) {
         <div class="grid grid-cols-2 gap-3">
           <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Taxa cobrada (%)</span>
+            <span class="text-[13px] font-medium flex items-end mb-1.5 min-h-[2.5rem] sm:min-h-0"
+              >Taxa cobrada (%)</span
+            >
             <input
               [value]="form().taxPct"
               (input)="setFormTaxPct($any($event.target).value)"
@@ -283,7 +285,9 @@
             </p>
           </label>
           <label class="block">
-            <span class="text-[13px] font-medium block mb-1.5">Prazo de repasse (dias)</span>
+            <span class="text-[13px] font-medium flex items-end mb-1.5 min-h-[2.5rem] sm:min-h-0"
+              >Prazo de repasse (dias)</span
+            >
             <input
               [value]="form().settlementDays"
               (input)="setFormDays($any($event.target).value)"
