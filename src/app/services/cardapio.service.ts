@@ -33,6 +33,8 @@ export class CardapioService {
       name: string;
       category: string;
       price: number;
+      cost: number;
+      soldPerMonth: number;
       diasSemRevisar: number;
     }[]
   ).map((m) => {
@@ -42,6 +44,8 @@ export class CardapioService {
       name: m.name,
       category: m.category,
       price: m.price,
+      cost: m.cost,
+      soldPerMonth: m.soldPerMonth,
       active: true,
       priceUpdatedAt: when,
       priceReviewedAt: when,
@@ -130,7 +134,13 @@ export class CardapioService {
     );
   }
 
-  async create(input: { name: string; price: number; category?: string }): Promise<void> {
+  async create(input: {
+    name: string;
+    price: number;
+    category?: string;
+    cost?: number;
+    soldPerMonth?: number;
+  }): Promise<void> {
     if (environment.useMocks) {
       await delay();
       const now = new Date().toISOString();
@@ -139,6 +149,8 @@ export class CardapioService {
         name: input.name,
         category: input.category || null,
         price: input.price,
+        cost: input.cost ?? 0,
+        soldPerMonth: input.soldPerMonth ?? 0,
         active: true,
         priceUpdatedAt: now,
         priceReviewedAt: now,
@@ -150,6 +162,8 @@ export class CardapioService {
             name: input.name,
             price: input.price,
             ...(input.category ? { category: input.category } : {}),
+            ...(input.cost !== undefined ? { cost: input.cost } : {}),
+            ...(input.soldPerMonth !== undefined ? { soldPerMonth: input.soldPerMonth } : {}),
           },
           headers,
         ),
@@ -159,13 +173,19 @@ export class CardapioService {
   }
 
   /** Nome e categoria. O preço tem ação própria (muda o valor e conta como revisão). */
-  async update(id: string, input: { name?: string; category?: string }): Promise<void> {
+  /** Nome, categoria, custo e vendidos no mês. O preço tem ação própria (`changePrice`). */
+  async update(
+    id: string,
+    input: { name?: string; category?: string; cost?: number; soldPerMonth?: number },
+  ): Promise<void> {
     if (environment.useMocks) {
       await delay();
       const p = this.mockStore.find((x) => x.id === id);
       if (p) {
         if (input.name !== undefined) p.name = input.name;
         if (input.category !== undefined) p.category = input.category || null;
+        if (input.cost !== undefined) p.cost = input.cost;
+        if (input.soldPerMonth !== undefined) p.soldPerMonth = input.soldPerMonth;
       }
     } else {
       await this.call((headers) => this.menuClient.update(id, input, headers));

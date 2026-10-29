@@ -1,59 +1,128 @@
 [
   {
-    "id": "prato-frango-original",
-    "name": "Frango Original",
-    "category": "Frango",
-    "price": 36,
-    "diasSemRevisar": 30
-  },
-  {
     "id": "prato-yangnyeom",
-    "name": "Frango Yangnyeom (agridoce apimentado)",
+    "name": "Frango Yangnyeom",
     "category": "Frango",
-    "price": 38,
+    "soldPerMonth": 420,
+    "price": 64,
+    "cost": 26,
     "diasSemRevisar": 45
   },
   {
     "id": "prato-soy-garlic",
-    "name": "Frango Soy Garlic (shoyu e alho)",
+    "name": "Frango Soy Garlic",
     "category": "Frango",
-    "price": 40,
+    "soldPerMonth": 356,
+    "price": 62,
+    "cost": 25,
     "diasSemRevisar": 60
   },
   {
     "id": "prato-honey-butter",
     "name": "Frango Honey Butter",
     "category": "Frango",
-    "price": 42,
+    "soldPerMonth": 188,
+    "price": 66,
+    "cost": 31,
     "diasSemRevisar": 90
+  },
+  {
+    "id": "prato-alho-crocante",
+    "name": "Frango ao Alho Crocante",
+    "category": "Frango",
+    "soldPerMonth": 132,
+    "price": 60,
+    "cost": 30,
+    "diasSemRevisar": 75
   },
   {
     "id": "prato-cheese-powder",
     "name": "Frango Cheese Powder",
     "category": "Frango",
+    "soldPerMonth": 74,
     "price": 68,
+    "cost": 38,
     "diasSemRevisar": 190
   },
   {
-    "id": "prato-combo-casal",
-    "name": "Combo Casal (balde + 2 bebidas)",
-    "category": "Combos",
-    "price": 79,
-    "diasSemRevisar": 75
+    "id": "prato-batata",
+    "name": "Batata Coreana",
+    "category": "Acompanhamento",
+    "soldPerMonth": 310,
+    "price": 22,
+    "cost": 8,
+    "diasSemRevisar": 30
+  },
+  {
+    "id": "prato-tteokbokki",
+    "name": "Tteokbokki",
+    "category": "Acompanhamento",
+    "soldPerMonth": 164,
+    "price": 34,
+    "cost": 15,
+    "diasSemRevisar": 50
+  },
+  {
+    "id": "prato-kimchi",
+    "name": "Kimchi da casa",
+    "category": "Acompanhamento",
+    "soldPerMonth": 96,
+    "price": 18,
+    "cost": 9,
+    "diasSemRevisar": 20
+  },
+  {
+    "id": "prato-japchae",
+    "name": "Japchae",
+    "category": "Acompanhamento",
+    "soldPerMonth": 58,
+    "price": 38,
+    "cost": 22,
+    "diasSemRevisar": 110
+  },
+  {
+    "id": "prato-cerveja",
+    "name": "Cerveja long neck",
+    "category": "Bebida",
+    "soldPerMonth": 148,
+    "price": 14,
+    "cost": 4,
+    "diasSemRevisar": 20
+  },
+  {
+    "id": "prato-soju",
+    "name": "Soju",
+    "category": "Bebida",
+    "soldPerMonth": 92,
+    "price": 28,
+    "cost": 9,
+    "diasSemRevisar": 50
+  },
+  {
+    "id": "prato-refrigerante",
+    "name": "Refrigerante lata",
+    "category": "Bebida",
+    "soldPerMonth": 268,
+    "price": 8,
+    "cost": 3,
+    "diasSemRevisar": 40
+  },
+  {
+    "id": "prato-cha-cevada",
+    "name": "Chá gelado de cevada",
+    "category": "Bebida",
+    "soldPerMonth": 46,
+    "price": 12,
+    "cost": 4,
+    "diasSemRevisar": 60
   },
   {
     "id": "prato-bingsu",
     "name": "Bingsu de morango",
-    "category": "Sobremesas",
+    "category": "Sobremesa",
+    "soldPerMonth": 38,
     "price": 32,
+    "cost": 19,
     "diasSemRevisar": 175
-  },
-  {
-    "id": "prato-cerveja",
-    "name": "Cerveja",
-    "category": "Bebidas",
-    "price": 14,
-    "diasSemRevisar": 20
-  },
-  { "id": "prato-soju", "name": "Soju", "category": "Bebidas", "price": 25, "diasSemRevisar": 50 }
+  }
 ]
