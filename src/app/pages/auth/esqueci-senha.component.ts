@@ -4,34 +4,36 @@ import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { AlertComponent } from '../../shared/alert.component';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-esqueci-senha',
   standalone: true,
-  imports: [FormsModule, RouterLink, AuthCardComponent, IconComponent, FormFieldComponent],
+  imports: [
+    FormsModule,
+    RouterLink,
+    AuthCardComponent,
+    IconComponent,
+    FormFieldComponent,
+    AlertComponent,
+  ],
   template: `
-    <app-auth-card
-      title="Recuperar senha"
-      subtitle="Informe seu e-mail e enviaremos um link para você criar uma nova senha."
-      [hasFooter]="true"
-    >
-      @if (!sent()) {
+    @if (!sent()) {
+      <app-auth-card
+        title="Esqueceu a senha?"
+        subtitle="Tudo bem, acontece. Informe seu e-mail e enviaremos um link seguro para redefinir."
+        [hasFooter]="true"
+      >
         <form (ngSubmit)="onSubmit()" class="space-y-4">
           @if (error()) {
-            <div
-              role="alert"
-              class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20"
-            >
-              <app-icon
-                name="error"
-                [style]="{ fontSize: '20px' }"
-                className="text-error shrink-0 mt-0.5"
-              />
-              <div class="text-[13px] text-foreground/80">{{ error() }}</div>
-            </div>
+            <app-alert variant="error">{{ error() }}</app-alert>
           }
-          <app-form-field label="E-mail" icon="mail">
+          <app-form-field
+            label="E-mail da conta"
+            icon="mail"
+            helper="Enviaremos o link de redefinição para esse endereço."
+          >
             <input
               type="email"
               [(ngModel)]="email"
@@ -43,7 +45,7 @@ import { AuthService } from '../../services/auth.service';
           </app-form-field>
           <button
             type="submit"
-            [disabled]="loading()"
+            [disabled]="!email || loading()"
             class="w-full h-12 rounded-xl bg-mint text-primary-foreground font-semibold text-sm hover:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
             @if (loading()) {
@@ -53,41 +55,80 @@ import { AuthService } from '../../services/auth.service';
                 className="animate-spin"
               /><span>Enviando…</span>
             } @else {
-              <span>Enviar link de recuperação</span
+              <span>Enviar link de redefinição</span
               ><app-icon name="send" [style]="{ fontSize: '20px' }" />
             }
           </button>
-        </form>
-      } @else {
-        <div class="text-center space-y-4">
-          <div class="mx-auto h-16 w-16 rounded-2xl bg-mint-soft grid place-items-center">
-            <app-icon
-              name="mark_email_read"
-              [style]="{ fontSize: '32px' }"
-              className="text-ocean"
-            />
-          </div>
-          <div>
-            <div class="font-semibold text-[15px]">E-mail enviado!</div>
-            <p class="text-[13px] text-muted-foreground mt-1">
-              Verifique sua caixa de entrada em <strong>{{ email }}</strong> e siga as instruções.
-            </p>
-          </div>
           <button
             type="button"
             (click)="router.navigate(['/auth/login'])"
-            class="w-full h-12 rounded-xl bg-mint text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer"
+            class="w-full h-12 rounded-xl border border-border bg-card text-foreground font-medium text-sm hover:bg-muted transition flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>Voltar ao login</span>
+            <app-icon name="arrow_back" [style]="{ fontSize: '20px' }" />
+            <span>Voltar para o login</span>
+          </button>
+        </form>
+        <div slot="footer">
+          <a
+            routerLink="/auth/login"
+            class="inline-flex items-center gap-1.5 text-ocean font-semibold hover:underline"
+          >
+            <app-icon name="arrow_back" [style]="{ fontSize: '16px' }" /> Voltar para o login
+          </a>
+        </div>
+      </app-auth-card>
+    } @else {
+      <app-auth-card
+        title="Verifique seu e-mail"
+        subtitle="Se essa conta existir, enviamos um link para redefinir sua senha."
+        [hasFooter]="true"
+      >
+        <div class="space-y-5">
+          <div class="flex items-center justify-center">
+            <div class="h-16 w-16 rounded-2xl bg-mint-soft grid place-items-center text-ocean">
+              <app-icon name="mark_email_read" [style]="{ fontSize: '32px' }" />
+            </div>
+          </div>
+
+          <app-alert variant="info" title="E-mail a caminho">
+            Enviamos para <span class="font-semibold text-foreground break-all">{{ email }}</span
+            >. O link expira em 1 hora por segurança.
+          </app-alert>
+
+          <ul class="space-y-2.5 text-[13px] text-muted-foreground">
+            <li class="flex items-start gap-2">
+              <app-icon
+                name="check_circle"
+                [style]="{ fontSize: '16px' }"
+                className="text-mint mt-0.5"
+              />
+              <span>Procure também na caixa de spam ou promoções.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <app-icon
+                name="check_circle"
+                [style]="{ fontSize: '16px' }"
+                className="text-mint mt-0.5"
+              />
+              <span>O link só funciona uma vez. Use-o em um dispositivo confiável.</span>
+            </li>
+          </ul>
+
+          <button
+            type="button"
+            (click)="sent.set(false)"
+            class="w-full h-11 rounded-xl border border-border bg-card text-sm font-medium hover:bg-muted transition cursor-pointer"
+          >
+            Não recebi — tentar outro e-mail
           </button>
         </div>
-      }
-      <div slot="footer">
-        <a routerLink="/auth/login" class="text-ocean font-semibold hover:underline"
-          >← Voltar ao login</a
-        >
-      </div>
-    </app-auth-card>
+        <div slot="footer">
+          <a routerLink="/auth/login" class="text-ocean font-semibold hover:underline"
+            >Voltar para o login</a
+          >
+        </div>
+      </app-auth-card>
+    }
   `,
 })
 export class EsqueciSenhaComponent {

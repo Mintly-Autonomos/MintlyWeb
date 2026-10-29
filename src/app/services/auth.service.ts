@@ -291,7 +291,8 @@ export class AuthService {
     }
   }
 
-  async logout(): Promise<void> {
+  /** `redirect`: false quando a tela de despedida (`/auth/logout`) é o destino. */
+  async logout(redirect = true): Promise<void> {
     if (!environment.useMocks) {
       const rt = this._refreshToken();
       const at = this._accessToken();
@@ -304,7 +305,7 @@ export class AuthService {
       }
     }
     this.clearSession();
-    this.router.navigate(['/auth/login']);
+    if (redirect) this.router.navigate(['/auth/login']);
   }
 
   private persistTokens(accessToken: string, refreshToken: string | null, user: AuthUser): void {

@@ -360,6 +360,12 @@ export class AppLayoutComponent implements OnInit {
       title: 'Contas Financeiras',
       sub: 'Gerencie onde o dinheiro do seu negócio entra e sai.',
     },
+    '/visao-geral': { title: 'Visão Geral', sub: 'Como está seu restaurante hoje' },
+    '/fluxo-de-caixa': { title: 'Fluxo de Caixa', sub: 'Seu dinheiro hoje e nos próximos dias' },
+    '/receitas': { title: 'Receitas', sub: 'De onde vem o seu faturamento' },
+    '/custos': { title: 'Custos & Despesas', sub: 'Para onde vai o seu dinheiro' },
+    '/resultado': { title: 'Resultado', sub: 'Quanto sobrou no fim das contas' },
+    '/previsoes': { title: 'Previsões & Insights', sub: 'O que vem pela frente' },
     '/movimentacoes': {
       title: 'Movimentações',
       sub: 'Veja, registre e organize entradas e saídas.',

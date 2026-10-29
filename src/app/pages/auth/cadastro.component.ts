@@ -5,6 +5,7 @@ import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { AuthService } from '../../services/auth.service';
+import { AlertComponent } from '../../shared/alert.component';
 import { passwordRules } from '../../shared/password-rules';
 import { readAvatarFile } from '../../shared/avatar-file';
 import { maskPhoneBR } from '../../shared/format';
@@ -12,7 +13,14 @@ import { maskPhoneBR } from '../../shared/format';
 @Component({
   selector: 'app-cadastro',
   standalone: true,
-  imports: [FormsModule, RouterLink, AuthCardComponent, IconComponent, FormFieldComponent],
+  imports: [
+    FormsModule,
+    RouterLink,
+    AuthCardComponent,
+    IconComponent,
+    FormFieldComponent,
+    AlertComponent,
+  ],
   template: `
     <app-auth-card
       title="Crie sua conta Mintly"
@@ -156,7 +164,11 @@ import { maskPhoneBR } from '../../shared/format';
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
           </app-form-field>
-          <app-form-field label="E-mail" icon="mail">
+          <app-form-field
+            label="E-mail"
+            icon="mail"
+            helper="Usaremos esse e-mail para você acessar a conta."
+          >
             <input
               type="email"
               [(ngModel)]="email"
@@ -207,7 +219,12 @@ import { maskPhoneBR } from '../../shared/format';
               </div>
             }
           </div>
-          <app-form-field label="Confirmar senha" icon="lock" [error]="confirmError()">
+          <app-form-field
+            label="Confirmar senha"
+            icon="lock"
+            [error]="confirmError()"
+            [helper]="confirm && confirm === password ? 'Senhas conferem.' : ''"
+          >
             <input
               type="password"
               [(ngModel)]="confirm"
@@ -220,7 +237,11 @@ import { maskPhoneBR } from '../../shared/format';
         }
 
         @if (step() === 2) {
-          <app-form-field label="Nome do restaurante" icon="storefront">
+          <app-form-field
+            label="Nome do restaurante"
+            icon="storefront"
+            helper="Você poderá ajustar isso depois nas configurações."
+          >
             <input
               [(ngModel)]="restaurant"
               name="restaurant"
@@ -228,6 +249,10 @@ import { maskPhoneBR } from '../../shared/format';
               class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             />
           </app-form-field>
+          <app-alert variant="info" title="O que preparamos para você">
+            Ao concluir, criamos automaticamente categorias padrão (Venda Balcão, Delivery, CMV,
+            Salários, Aluguel, Impostos) e uma conta financeira inicial.
+          </app-alert>
           <label class="flex items-start gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -327,7 +352,7 @@ export class CadastroComponent {
   }
 
   protected confirmError(): string {
-    return this.confirm && this.confirm !== this.password ? 'As senhas não conferem.' : '';
+    return this.confirm && this.confirm !== this.password ? 'As senhas não coincidem.' : '';
   }
 
   protected phoneValid(): boolean {

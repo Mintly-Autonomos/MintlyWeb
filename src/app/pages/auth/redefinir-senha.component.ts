@@ -4,96 +4,127 @@ import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
+import { AlertComponent } from '../../shared/alert.component';
 import { AuthService } from '../../services/auth.service';
 import { passwordRules } from '../../shared/password-rules';
 
 @Component({
   selector: 'app-redefinir-senha',
   standalone: true,
-  imports: [FormsModule, AuthCardComponent, IconComponent, FormFieldComponent],
+  imports: [FormsModule, AuthCardComponent, IconComponent, FormFieldComponent, AlertComponent],
   template: `
     <app-auth-card
-      title="Criar nova senha"
-      subtitle="Escolha uma senha forte para proteger sua conta."
+      [title]="done() ? 'Senha redefinida' : 'Crie sua nova senha'"
+      [subtitle]="
+        done()
+          ? 'Por segurança, encerramos todas as sessões anteriores.'
+          : 'Escolha uma senha forte para proteger as finanças do seu negócio.'
+      "
     >
-      <form (ngSubmit)="onSubmit()" class="space-y-4">
-        @if (error()) {
-          <div
-            role="alert"
-            class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20"
-          >
-            <app-icon
-              name="error"
-              [style]="{ fontSize: '20px' }"
-              className="text-error shrink-0 mt-0.5"
-            />
-            <div class="text-[13px] text-foreground/80">{{ error() }}</div>
+      @if (done()) {
+        <div class="space-y-5">
+          <div class="flex items-center justify-center">
+            <div class="h-16 w-16 rounded-2xl bg-mint-soft grid place-items-center text-ocean">
+              <app-icon name="lock_reset" [style]="{ fontSize: '32px' }" />
+            </div>
           </div>
-        }
-        <app-form-field label="Nova senha" icon="lock">
-          <input
-            [type]="show() ? 'text' : 'password'"
-            [(ngModel)]="password"
-            name="password"
-            autocomplete="new-password"
-            placeholder="Mínimo 8 caracteres"
-            class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
-          />
+          <app-alert variant="success" title="Tudo certo!">
+            Você já pode entrar com sua nova senha. Recomendamos guardá-la em um gerenciador de
+            senhas.
+          </app-alert>
           <button
-            fieldSuffix
             type="button"
-            [attr.aria-label]="show() ? 'Ocultar senha' : 'Mostrar senha'"
-            (click)="show.set(!show())"
-            class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
+            (click)="enter()"
+            class="w-full h-12 rounded-xl bg-mint text-primary-foreground font-semibold text-sm hover:brightness-95 flex items-center justify-center gap-2 cursor-pointer"
           >
-            <app-icon
-              [name]="show() ? 'visibility_off' : 'visibility'"
-              [style]="{ fontSize: '18px' }"
-            />
+            <span>Entrar agora</span><app-icon name="login" [style]="{ fontSize: '20px' }" />
           </button>
-        </app-form-field>
-        <div class="grid grid-cols-2 gap-1.5">
-          @for (r of rules(); track r.label) {
+        </div>
+      } @else {
+        <form (ngSubmit)="onSubmit()" class="space-y-4">
+          @if (error()) {
             <div
-              [class]="
-                'flex items-center gap-1.5 text-[12px] ' +
-                (r.ok ? 'text-success' : 'text-muted-foreground')
-              "
+              role="alert"
+              class="flex items-start gap-3 p-3.5 rounded-xl border bg-error/10 border-error/20"
             >
               <app-icon
-                [name]="r.ok ? 'check_circle' : 'radio_button_unchecked'"
-                [style]="{ fontSize: '14px' }"
+                name="error"
+                [style]="{ fontSize: '20px' }"
+                className="text-error shrink-0 mt-0.5"
               />
-              {{ r.label }}
+              <div class="text-[13px] text-foreground/80">{{ error() }}</div>
             </div>
           }
-        </div>
-        <app-form-field label="Confirmar senha" icon="lock">
-          <input
-            type="password"
-            [(ngModel)]="confirm"
-            name="confirm"
-            autocomplete="new-password"
-            placeholder="Repita a senha"
-            class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
-          />
-        </app-form-field>
-        <button
-          type="submit"
-          [disabled]="loading() || !canSubmit()"
-          class="w-full h-12 rounded-xl bg-mint text-primary-foreground font-semibold text-sm hover:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-        >
-          @if (loading()) {
-            <app-icon
-              name="progress_activity"
-              [style]="{ fontSize: '20px' }"
-              className="animate-spin"
-            /><span>Salvando…</span>
-          } @else {
-            <span>Salvar nova senha</span><app-icon name="check" [style]="{ fontSize: '20px' }" />
-          }
-        </button>
-      </form>
+          <app-form-field label="Nova senha" icon="lock">
+            <input
+              [type]="show() ? 'text' : 'password'"
+              [(ngModel)]="password"
+              name="password"
+              autocomplete="new-password"
+              placeholder="Mínimo 8 caracteres"
+              class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+            />
+            <button
+              fieldSuffix
+              type="button"
+              [attr.aria-label]="show() ? 'Ocultar senha' : 'Mostrar senha'"
+              (click)="show.set(!show())"
+              class="h-8 w-8 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
+            >
+              <app-icon
+                [name]="show() ? 'visibility_off' : 'visibility'"
+                [style]="{ fontSize: '18px' }"
+              />
+            </button>
+          </app-form-field>
+          <div class="grid grid-cols-2 gap-1.5">
+            @for (r of rules(); track r.label) {
+              <div
+                [class]="
+                  'flex items-center gap-1.5 text-[12px] ' +
+                  (r.ok ? 'text-success' : 'text-muted-foreground')
+                "
+              >
+                <app-icon
+                  [name]="r.ok ? 'check_circle' : 'radio_button_unchecked'"
+                  [style]="{ fontSize: '14px' }"
+                />
+                {{ r.label }}
+              </div>
+            }
+          </div>
+          <app-form-field
+            label="Confirmar nova senha"
+            icon="lock"
+            [error]="confirmError()"
+            [helper]="confirm && confirm === password ? 'Senhas conferem.' : ''"
+          >
+            <input
+              type="password"
+              [(ngModel)]="confirm"
+              name="confirm"
+              autocomplete="new-password"
+              placeholder="Repita a nova senha"
+              class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+            />
+          </app-form-field>
+          <button
+            type="submit"
+            [disabled]="loading() || !canSubmit()"
+            class="w-full h-12 rounded-xl bg-mint text-primary-foreground font-semibold text-sm hover:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+          >
+            @if (loading()) {
+              <app-icon
+                name="progress_activity"
+                [style]="{ fontSize: '20px' }"
+                className="animate-spin"
+              /><span>Salvando…</span>
+            } @else {
+              <span>Salvar nova senha</span><app-icon name="check" [style]="{ fontSize: '20px' }" />
+            }
+          </button>
+        </form>
+      }
     </app-auth-card>
   `,
 })
@@ -106,6 +137,15 @@ export class RedefinirSenhaComponent {
   protected show = signal(false);
   protected loading = signal(false);
   protected error = signal<string | null>(null);
+  protected done = signal(false);
+
+  protected confirmError(): string {
+    return this.confirm && this.confirm !== this.password ? 'As senhas não coincidem.' : '';
+  }
+
+  enter(): void {
+    this.router.navigate(['/auth/login'], { queryParams: { reset: 'ok' } });
+  }
 
   // Método (não computed()): password/confirm são campos ngModel, não signals.
   protected rules() {
@@ -121,14 +161,14 @@ export class RedefinirSenhaComponent {
     if (!this.canSubmit()) return;
     const token = this.route.snapshot.queryParamMap.get('token');
     if (!token) {
-      this.error.set('Link inválido ou expirado. Solicite uma nova recuperação de senha.');
+      this.router.navigate(['/auth/token-invalido']);
       return;
     }
     this.error.set(null);
     this.loading.set(true);
     try {
       await this.auth.resetPassword(token, this.password, this.confirm);
-      this.router.navigate(['/auth/login'], { queryParams: { reset: 'ok' } });
+      this.done.set(true);
     } catch (err) {
       this.error.set(this.errMsg(err));
     } finally {
