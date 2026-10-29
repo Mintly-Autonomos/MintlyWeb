@@ -155,6 +155,14 @@ export class FluxoCaixaComponent implements OnInit {
     const d = this.data();
     return d ? offsetFromIso(d.lowestBalance.date) : 0;
   });
+  /** Menor saldo só tem sentido em um dia futuro; no dia 0 o caixa não cai abaixo de hoje. */
+  protected menorSaldoTexto = computed(() => {
+    const d = this.data();
+    if (!d || this.menorSaldoOffset() <= 0) return 'sem queda prevista no período';
+    return (
+      'menor saldo: ~' + formatBRL(d.lowestBalance.balance) + ' no dia ' + this.menorSaldoOffset()
+    );
+  });
 
   protected serie = computed(() => {
     const d = this.data();

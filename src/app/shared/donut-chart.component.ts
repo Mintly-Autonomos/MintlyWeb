@@ -18,51 +18,64 @@ interface Segment extends DonutSlice {
   standalone: true,
   host: { class: 'block relative w-full h-full' },
   template: `
-    <svg viewBox="0 0 100 100" class="w-full h-full block">
-      <g transform="rotate(-90 50 50)">
-        <circle
-          cx="50"
-          cy="50"
-          [attr.r]="radius"
-          fill="none"
-          stroke="var(--muted)"
-          stroke-width="14"
-        />
-        @for (s of segments(); track s.label) {
+    @if (hasData) {
+      <svg viewBox="0 0 100 100" class="w-full h-full block">
+        <g transform="rotate(-90 50 50)">
           <circle
             cx="50"
             cy="50"
             [attr.r]="radius"
             fill="none"
-            [attr.stroke]="s.color"
+            stroke="var(--muted)"
             stroke-width="14"
-            [attr.stroke-dasharray]="s.dasharray"
-            [attr.stroke-dashoffset]="s.dashoffset"
-            style="cursor:pointer; transition: opacity .15s"
-            [style.opacity]="hover() === null || hover() === s.label ? 1 : 0.35"
-            (mouseenter)="hover.set(s.label)"
-            (mouseleave)="hover.set(null)"
           />
-        }
-      </g>
-    </svg>
+          @for (s of segments(); track s.label) {
+            <circle
+              cx="50"
+              cy="50"
+              [attr.r]="radius"
+              fill="none"
+              [attr.stroke]="s.color"
+              stroke-width="14"
+              [attr.stroke-dasharray]="s.dasharray"
+              [attr.stroke-dashoffset]="s.dashoffset"
+              style="cursor:pointer; transition: opacity .15s"
+              [style.opacity]="hover() === null || hover() === s.label ? 1 : 0.35"
+              (mouseenter)="hover.set(s.label)"
+              (mouseleave)="hover.set(null)"
+            />
+          }
+        </g>
+      </svg>
 
-    @if (hover(); as h) {
-      <div
-        class="pointer-events-none absolute inset-0 grid place-items-center"
-        style="pointer-events:none"
-      >
-        <div class="m3-card m3-elev rounded-xl px-3 py-2 text-[12px] text-center">
-          <div class="font-semibold">{{ h }}</div>
-          <div class="tabular-nums text-muted-foreground">
-            {{ fmt(valueOf(h)) }} ({{ pctOf(h) }}%)
+      @if (hover(); as h) {
+        <div
+          class="pointer-events-none absolute inset-0 grid place-items-center"
+          style="pointer-events:none"
+        >
+          <div class="m3-card m3-elev rounded-xl px-3 py-2 text-[12px] text-center">
+            <div class="font-semibold">{{ h }}</div>
+            <div class="tabular-nums text-muted-foreground">
+              {{ fmt(valueOf(h)) }} ({{ pctOf(h) }}%)
+            </div>
           </div>
         </div>
+      }
+    } @else {
+      <div
+        class="absolute inset-0 grid place-items-center px-6 text-center text-[13px] text-muted-foreground"
+      >
+        Ainda sem dados neste período
       </div>
     }
   `,
 })
 export class DonutChartComponent {
+  /** Sem nenhum valor diferente de zero não há o que desenhar: mostra o aviso no lugar dos eixos. */
+  protected get hasData(): boolean {
+    return this.data.some((d) => d.value > 0);
+  }
+
   @Input() data: DonutSlice[] = [];
   @Input() valueFormatter: (v: number) => string = (v) => String(v);
 

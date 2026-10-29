@@ -50,99 +50,120 @@ interface AxisTick {
   standalone: true,
   host: { class: 'block relative w-full h-full' },
   template: `
-    <svg
-      [attr.viewBox]="'0 0 ' + size().w + ' ' + size().h"
-      class="w-full h-full block"
-      (mouseleave)="hover.set(null)"
-    >
-      @for (t of valueTicks(); track t.pos) {
-        @if (orientation === 'columns') {
-          <line
-            [attr.x1]="padLeft()"
-            [attr.x2]="size().w - padRight"
-            [attr.y1]="t.pos"
-            [attr.y2]="t.pos"
-            stroke="var(--border)"
-            stroke-dasharray="3 3"
-          />
-          <text
-            [attr.x]="padLeft() - 8"
-            [attr.y]="t.pos"
-            text-anchor="end"
-            dominant-baseline="middle"
-            font-size="11"
-            fill="var(--muted-foreground)"
-          >
-            {{ t.label }}
-          </text>
-        } @else {
-          <line
-            [attr.x1]="t.pos"
-            [attr.x2]="t.pos"
-            [attr.y1]="padTop"
-            [attr.y2]="size().h - padBottom()"
-            stroke="var(--border)"
-            stroke-dasharray="3 3"
-          />
-        }
-      }
-
-      @for (b of bars(); track $index) {
-        <rect
-          [attr.x]="b.x"
-          [attr.y]="b.y"
-          [attr.width]="b.width"
-          [attr.height]="b.height"
-          [attr.fill]="b.color"
-          [attr.rx]="radius"
-          style="cursor:pointer"
-          (mouseenter)="hover.set(b)"
-          (mousemove)="hover.set(b)"
-        />
-      }
-
-      @for (c of categoryTicks(); track c.pos) {
-        @if (orientation === 'columns') {
-          <text
-            [attr.x]="c.pos"
-            [attr.y]="size().h - padBottom() + 16"
-            text-anchor="middle"
-            font-size="11.5"
-            fill="var(--muted-foreground)"
-          >
-            {{ c.label }}
-          </text>
-        } @else {
-          <text
-            [attr.x]="padLeft() - 8"
-            [attr.y]="c.pos"
-            text-anchor="end"
-            dominant-baseline="middle"
-            font-size="11.5"
-            fill="var(--muted-foreground)"
-          >
-            {{ c.label }}
-          </text>
-        }
-      }
-    </svg>
-
-    @if (hover(); as h) {
-      <div
-        class="pointer-events-none absolute z-10 m3-card m3-elev rounded-xl px-3 py-2 text-[12px] whitespace-nowrap"
-        [style.left.px]="h.x + h.width / 2"
-        [style.top.px]="h.y"
-        style="transform: translate(-50%, -100%) translateY(-8px)"
+    @if (hasData) {
+      <svg
+        [attr.viewBox]="'0 0 ' + size().w + ' ' + size().h"
+        class="w-full h-full block"
+        (mouseleave)="hover.set(null)"
       >
-        <div class="font-semibold mb-0.5">{{ h.category }}</div>
-        <div class="tabular-nums text-muted-foreground">
-          {{ h.seriesName }}: <span class="font-semibold text-foreground">{{ fmt(h.value) }}</span>
+        @for (t of valueTicks(); track t.pos) {
+          @if (orientation === 'columns') {
+            <line
+              [attr.x1]="padLeft()"
+              [attr.x2]="size().w - padRight"
+              [attr.y1]="t.pos"
+              [attr.y2]="t.pos"
+              stroke="var(--border)"
+              stroke-dasharray="3 3"
+            />
+            <text
+              [attr.x]="padLeft() - 8"
+              [attr.y]="t.pos"
+              text-anchor="end"
+              dominant-baseline="middle"
+              font-size="11"
+              fill="var(--muted-foreground)"
+            >
+              {{ t.label }}
+            </text>
+          } @else {
+            <line
+              [attr.x1]="t.pos"
+              [attr.x2]="t.pos"
+              [attr.y1]="padTop"
+              [attr.y2]="size().h - padBottom()"
+              stroke="var(--border)"
+              stroke-dasharray="3 3"
+            />
+          }
+        }
+
+        @for (b of bars(); track $index) {
+          <rect
+            [attr.x]="b.x"
+            [attr.y]="b.y"
+            [attr.width]="b.width"
+            [attr.height]="b.height"
+            [attr.fill]="b.color"
+            [attr.rx]="radius"
+            style="cursor:pointer"
+            (mouseenter)="hover.set(b)"
+            (mousemove)="hover.set(b)"
+          />
+        }
+
+        @for (c of categoryTicks(); track c.pos) {
+          @if (orientation === 'columns') {
+            <text
+              [attr.x]="c.pos"
+              [attr.y]="size().h - padBottom() + 16"
+              text-anchor="middle"
+              font-size="11.5"
+              fill="var(--muted-foreground)"
+            >
+              {{ c.label }}
+            </text>
+          } @else {
+            <text
+              [attr.x]="padLeft() - 8"
+              [attr.y]="c.pos"
+              text-anchor="end"
+              dominant-baseline="middle"
+              font-size="11.5"
+              fill="var(--muted-foreground)"
+            >
+              {{ c.label }}
+            </text>
+          }
+        }
+      </svg>
+
+      @if (hover(); as h) {
+        <div
+          class="pointer-events-none absolute z-10 m3-card m3-elev rounded-xl px-3 py-2 text-[12px] whitespace-nowrap"
+          [style.left.px]="h.x + h.width / 2"
+          [style.top.px]="h.y"
+          style="transform: translate(-50%, -100%) translateY(-8px)"
+        >
+          <div class="font-semibold mb-0.5">{{ h.category }}</div>
+          <div class="tabular-nums text-muted-foreground">
+            {{ h.seriesName }}:
+            <span class="font-semibold text-foreground">{{ fmt(h.value) }}</span>
+          </div>
         </div>
+      }
+    } @else {
+      <div
+        class="absolute inset-0 grid place-items-center px-6 text-center text-[13px] text-muted-foreground"
+      >
+        Ainda sem dados neste período
       </div>
     }
   `,
 })
 export class BarChartComponent implements AfterViewInit, OnDestroy, OnChanges {
+  /** Sem nenhum valor diferente de zero não há o que desenhar: mostra o aviso no lugar dos eixos. */
+  protected get hasData(): boolean {
+    return this.data.some((d) =>
+      this.series.some((s) => {
+        const raw = field(d, s.key);
+        return (
+          raw !== null && raw !== undefined && Number(raw) !== 0 && Number.isFinite(Number(raw))
+        );
+      }),
+    );
+  }
+
   @Input() data: BarChartDatum[] = [];
   @Input() categoryKey = '';
   @Input() series: BarSeries[] = [];
