@@ -33,92 +33,105 @@ interface ComputedBar extends WaterfallRow {
   standalone: true,
   host: { class: 'block relative w-full h-full' },
   template: `
-    <svg
-      [attr.viewBox]="'0 0 ' + size().w + ' ' + size().h"
-      class="w-full h-full block"
-      (mouseleave)="hover.set(null)"
-    >
-      @for (t of valueTicks(); track t.pos) {
-        <line
-          [attr.x1]="padLeft"
-          [attr.x2]="size().w - padRight"
-          [attr.y1]="t.pos"
-          [attr.y2]="t.pos"
-          stroke="var(--border)"
-          stroke-dasharray="3 3"
-        />
-        <text
-          [attr.x]="padLeft - 8"
-          [attr.y]="t.pos"
-          text-anchor="end"
-          dominant-baseline="middle"
-          font-size="11"
-          fill="var(--muted-foreground)"
-        >
-          {{ t.label }}
-        </text>
-      }
-
-      @for (seg of connectors(); track $index) {
-        <line
-          [attr.x1]="seg.x1"
-          [attr.x2]="seg.x2"
-          [attr.y1]="seg.y"
-          [attr.y2]="seg.y"
-          stroke="var(--border)"
-          stroke-width="1"
-          stroke-dasharray="3 3"
-        />
-      }
-
-      @for (b of bars(); track b.label) {
-        <rect
-          [attr.x]="b.x"
-          [attr.y]="b.y"
-          [attr.width]="b.width"
-          [attr.height]="b.height"
-          [attr.fill]="b.color"
-          rx="8"
-          style="cursor:pointer"
-          (mouseenter)="hover.set(b)"
-          (mousemove)="hover.set(b)"
-        />
-        <text
-          [attr.x]="b.x + b.width / 2"
-          [attr.y]="b.topY - 10"
-          text-anchor="middle"
-          font-size="10.5"
-          font-weight="600"
-          fill="var(--muted-foreground)"
-        >
-          {{ brl(b.value) }}
-        </text>
-        <text
-          [attr.x]="b.x + b.width / 2"
-          [attr.y]="size().h - padBottom + 16"
-          text-anchor="middle"
-          font-size="11"
-          fill="var(--muted-foreground)"
-        >
-          {{ b.label }}
-        </text>
-      }
-    </svg>
-
-    @if (hover(); as h) {
-      <div
-        class="pointer-events-none absolute z-10 m3-card m3-elev rounded-xl px-3 py-2 text-[12px]"
-        [style.left.px]="h.x + h.width / 2"
-        [style.top.px]="h.topY - 20"
-        style="transform: translate(-50%, -100%)"
+    @if (hasData) {
+      <svg
+        [attr.viewBox]="'0 0 ' + size().w + ' ' + size().h"
+        class="w-full h-full block"
+        (mouseleave)="hover.set(null)"
       >
-        <span class="font-semibold">{{ h.label }}: </span>
-        <span class="tabular-nums font-semibold">{{ brl(h.value) }}</span>
+        @for (t of valueTicks(); track t.pos) {
+          <line
+            [attr.x1]="padLeft"
+            [attr.x2]="size().w - padRight"
+            [attr.y1]="t.pos"
+            [attr.y2]="t.pos"
+            stroke="var(--border)"
+            stroke-dasharray="3 3"
+          />
+          <text
+            [attr.x]="padLeft - 8"
+            [attr.y]="t.pos"
+            text-anchor="end"
+            dominant-baseline="middle"
+            font-size="11"
+            fill="var(--muted-foreground)"
+          >
+            {{ t.label }}
+          </text>
+        }
+
+        @for (seg of connectors(); track $index) {
+          <line
+            [attr.x1]="seg.x1"
+            [attr.x2]="seg.x2"
+            [attr.y1]="seg.y"
+            [attr.y2]="seg.y"
+            stroke="var(--border)"
+            stroke-width="1"
+            stroke-dasharray="3 3"
+          />
+        }
+
+        @for (b of bars(); track b.label) {
+          <rect
+            [attr.x]="b.x"
+            [attr.y]="b.y"
+            [attr.width]="b.width"
+            [attr.height]="b.height"
+            [attr.fill]="b.color"
+            rx="8"
+            style="cursor:pointer"
+            (mouseenter)="hover.set(b)"
+            (mousemove)="hover.set(b)"
+          />
+          <text
+            [attr.x]="b.x + b.width / 2"
+            [attr.y]="b.topY - 10"
+            text-anchor="middle"
+            font-size="10.5"
+            font-weight="600"
+            fill="var(--muted-foreground)"
+          >
+            {{ brl(b.value) }}
+          </text>
+          <text
+            [attr.x]="b.x + b.width / 2"
+            [attr.y]="size().h - padBottom + 16"
+            text-anchor="middle"
+            font-size="11"
+            fill="var(--muted-foreground)"
+          >
+            {{ b.label }}
+          </text>
+        }
+      </svg>
+
+      @if (hover(); as h) {
+        <div
+          class="pointer-events-none absolute z-10 m3-card m3-elev rounded-xl px-3 py-2 text-[12px]"
+          [style.left.px]="h.x + h.width / 2"
+          [style.top.px]="h.topY - 20"
+          style="transform: translate(-50%, -100%)"
+        >
+          <span class="font-semibold">{{ h.label }}: </span>
+          <span class="tabular-nums font-semibold">{{ brl(h.value) }}</span>
+        </div>
+      }
+    } @else {
+      <div
+        class="absolute inset-0 grid place-items-center px-6 text-center text-[13px] text-muted-foreground"
+      >
+        Ainda sem dados neste período
       </div>
     }
   `,
 })
 export class WaterfallChartComponent implements AfterViewInit, OnDestroy, OnChanges {
+  /** Sem nenhum valor diferente de zero não há o que desenhar: mostra o aviso no lugar dos eixos. */
+  protected get hasData(): boolean {
+    return this.rows.some((r) => r.value !== 0);
+  }
+
   @Input() rows: WaterfallRow[] = [];
 
   protected readonly padTop = 32;

@@ -33,92 +33,112 @@ interface AxisTick {
   standalone: true,
   host: { class: 'block relative w-full h-full' },
   template: `
-    <svg
-      [attr.viewBox]="'0 0 ' + size().w + ' ' + size().h"
-      class="w-full h-full block"
-      (mousemove)="onMove($event)"
-      (mouseleave)="hoverIndex.set(null)"
-    >
-      @for (t of valueTicks(); track t.pos) {
-        <line
-          [attr.x1]="padLeft"
-          [attr.x2]="size().w - padRight"
-          [attr.y1]="t.pos"
-          [attr.y2]="t.pos"
-          stroke="var(--border)"
-          stroke-dasharray="3 3"
-        />
-        <text
-          [attr.x]="padLeft - 8"
-          [attr.y]="t.pos"
-          text-anchor="end"
-          dominant-baseline="middle"
-          font-size="11"
-          fill="var(--muted-foreground)"
-        >
-          {{ t.label }}
-        </text>
-      }
+    @if (hasData) {
+      <svg
+        [attr.viewBox]="'0 0 ' + size().w + ' ' + size().h"
+        class="w-full h-full block"
+        (mousemove)="onMove($event)"
+        (mouseleave)="hoverIndex.set(null)"
+      >
+        @for (t of valueTicks(); track t.pos) {
+          <line
+            [attr.x1]="padLeft"
+            [attr.x2]="size().w - padRight"
+            [attr.y1]="t.pos"
+            [attr.y2]="t.pos"
+            stroke="var(--border)"
+            stroke-dasharray="3 3"
+          />
+          <text
+            [attr.x]="padLeft - 8"
+            [attr.y]="t.pos"
+            text-anchor="end"
+            dominant-baseline="middle"
+            font-size="11"
+            fill="var(--muted-foreground)"
+          >
+            {{ t.label }}
+          </text>
+        }
 
-      @for (c of categoryTicks(); track c.pos) {
-        <text
-          [attr.x]="c.pos"
-          [attr.y]="size().h - padBottom + 16"
-          text-anchor="middle"
-          font-size="11.5"
-          fill="var(--muted-foreground)"
-        >
-          {{ c.label }}
-        </text>
-      }
+        @for (c of categoryTicks(); track c.pos) {
+          <text
+            [attr.x]="c.pos"
+            [attr.y]="size().h - padBottom + 16"
+            text-anchor="middle"
+            font-size="11.5"
+            fill="var(--muted-foreground)"
+          >
+            {{ c.label }}
+          </text>
+        }
 
-      @if (hoverIndex(); as hi) {
-        <line
-          [attr.x1]="categoryTicks()[hi].pos"
-          [attr.x2]="categoryTicks()[hi].pos"
-          [attr.y1]="padTop"
-          [attr.y2]="size().h - padBottom"
-          stroke="var(--border)"
-        />
-      }
-
-      @for (s of linePaths(); track s.key) {
-        <path [attr.d]="s.d" fill="none" [attr.stroke]="s.color" stroke-width="2.5" />
         @if (hoverIndex(); as hi) {
-          <circle
-            [attr.cx]="s.points[hi].x"
-            [attr.cy]="s.points[hi].y"
-            r="3.5"
-            [attr.fill]="s.color"
-            stroke="var(--card)"
-            stroke-width="1.5"
+          <line
+            [attr.x1]="categoryTicks()[hi].pos"
+            [attr.x2]="categoryTicks()[hi].pos"
+            [attr.y1]="padTop"
+            [attr.y2]="size().h - padBottom"
+            stroke="var(--border)"
           />
         }
-      }
-    </svg>
 
-    @if (hoverIndex(); as hi) {
-      <div
-        class="pointer-events-none absolute z-10 m3-card m3-elev rounded-xl px-3 py-2 text-[12px] space-y-1"
-        [style.left.px]="categoryTicks()[hi].pos"
-        [style.top.px]="padTop"
-        style="transform: translate(-50%, -100%) translateY(-8px)"
-      >
-        <div class="font-semibold">{{ categoryTicks()[hi].label }}</div>
-        @for (s of series; track s.key) {
-          <div class="flex items-center gap-2 tabular-nums">
-            <span class="h-2 w-2 rounded-full shrink-0" [style.background]="s.color"></span>
-            <span class="text-muted-foreground">{{ s.name }}</span>
-            <span class="ml-auto font-semibold whitespace-nowrap">{{
-              fmt(valueAt(hi, s.key))
-            }}</span>
-          </div>
+        @for (s of linePaths(); track s.key) {
+          <path [attr.d]="s.d" fill="none" [attr.stroke]="s.color" stroke-width="2.5" />
+          @if (hoverIndex(); as hi) {
+            <circle
+              [attr.cx]="s.points[hi].x"
+              [attr.cy]="s.points[hi].y"
+              r="3.5"
+              [attr.fill]="s.color"
+              stroke="var(--card)"
+              stroke-width="1.5"
+            />
+          }
         }
+      </svg>
+
+      @if (hoverIndex(); as hi) {
+        <div
+          class="pointer-events-none absolute z-10 m3-card m3-elev rounded-xl px-3 py-2 text-[12px] space-y-1"
+          [style.left.px]="categoryTicks()[hi].pos"
+          [style.top.px]="padTop"
+          style="transform: translate(-50%, -100%) translateY(-8px)"
+        >
+          <div class="font-semibold">{{ categoryTicks()[hi].label }}</div>
+          @for (s of series; track s.key) {
+            <div class="flex items-center gap-2 tabular-nums">
+              <span class="h-2 w-2 rounded-full shrink-0" [style.background]="s.color"></span>
+              <span class="text-muted-foreground">{{ s.name }}</span>
+              <span class="ml-auto font-semibold whitespace-nowrap">{{
+                fmt(valueAt(hi, s.key))
+              }}</span>
+            </div>
+          }
+        </div>
+      }
+    } @else {
+      <div
+        class="absolute inset-0 grid place-items-center px-6 text-center text-[13px] text-muted-foreground"
+      >
+        Ainda sem dados neste período
       </div>
     }
   `,
 })
 export class LineChartComponent implements AfterViewInit, OnDestroy {
+  /** Sem nenhum valor diferente de zero não há o que desenhar: mostra o aviso no lugar dos eixos. */
+  protected get hasData(): boolean {
+    return this.data.some((d) =>
+      this.series.some((s) => {
+        const raw = field(d, s.key);
+        return (
+          raw !== null && raw !== undefined && Number(raw) !== 0 && Number.isFinite(Number(raw))
+        );
+      }),
+    );
+  }
+
   @Input() data: LineChartDatum[] = [];
   @Input() categoryKey = '';
   @Input() series: LineSeries[] = [];

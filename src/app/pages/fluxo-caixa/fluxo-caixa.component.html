@@ -105,9 +105,7 @@
         [value]="fmtBRL(d.projectedBalance)"
         icon="query_stats"
         status="warning"
-        [subtext]="
-          'menor saldo: ~' + fmtBRL(d.lowestBalance.balance) + ' no dia ' + menorSaldoOffset()
-        "
+        [subtext]="menorSaldoTexto()"
       >
         <app-hint
           slot="hint"
