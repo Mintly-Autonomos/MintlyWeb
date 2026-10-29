@@ -87,11 +87,37 @@
   </app-filter-bar>
 
   <!-- List -->
-  @if (filtered().length === 0) {
+  @if (movements().length === 0 && !loading()) {
+    <div class="m3-card">
+      <app-empty-state
+        icon="receipt_long"
+        title="Você ainda não registrou movimentações"
+        description="Registre sua primeira entrada ou saída para acompanhar o caixa, ou importe de uma vez uma planilha com o que já aconteceu."
+        [hasAction]="true"
+      >
+        <div class="flex flex-wrap justify-center gap-2">
+          <button
+            (click)="openCreate('income')"
+            class="inline-flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-medium transition cursor-pointer bg-mint text-primary-foreground hover:brightness-95"
+          >
+            <app-icon name="add" [style]="{ fontSize: '20px' }" /><span
+              >Registrar primeira entrada</span
+            >
+          </button>
+          <button
+            (click)="openCreate('expense')"
+            class="inline-flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-medium transition cursor-pointer border border-border text-foreground hover:bg-muted"
+          >
+            <app-icon name="remove" [style]="{ fontSize: '20px' }" /><span>Registrar saída</span>
+          </button>
+        </div>
+      </app-empty-state>
+    </div>
+  } @else if (filtered().length === 0) {
     <app-empty-state
-      icon="receipt_long"
+      icon="search_off"
       title="Nenhuma movimentação encontrada"
-      description="Tente ajustar os filtros ou registre uma nova movimentação."
+      description="Ajuste os filtros ou tente outro termo de busca."
     />
   } @else {
     <div class="m3-card overflow-hidden">
