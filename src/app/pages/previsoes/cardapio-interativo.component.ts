@@ -289,7 +289,7 @@ export class CardapioInterativoComponent {
     this.f.set({
       nome: p.name,
       categoria: p.category ?? '',
-      preco: '',
+      preco: String(p.price).replace('.', ','),
       custo: p.cost ? String(p.cost).replace('.', ',') : '',
       vendidos: p.soldPerMonth ? String(p.soldPerMonth) : '',
     });
@@ -303,8 +303,13 @@ export class CardapioInterativoComponent {
     const v = this.f();
     const custo = v.custo.trim() === '' ? 0 : this.num(v.custo);
     const vendidos = v.vendidos.trim() === '' ? 0 : Math.round(this.num(v.vendidos));
+    const preco = this.num(v.preco);
     if (!v.nome.trim()) {
       this.toast.error('O prato precisa de um nome.');
+      return;
+    }
+    if (v.preco.trim() === '' || !(preco >= 0)) {
+      this.toast.error('Informe um preço válido.');
       return;
     }
     if (!(custo >= 0) || !(vendidos >= 0)) {
@@ -319,6 +324,11 @@ export class CardapioInterativoComponent {
         cost: custo,
         soldPerMonth: vendidos,
       });
+      // Preço só vai pelo endpoint próprio quando mudou: é ele que conta como revisão de preço.
+      if (preco !== p.price) {
+        await this.svc.changePrice(p.id, preco);
+        this.voltarPreco(p.id);
+      }
       this.editandoId.set(null);
       this.toast.success('Dados do prato atualizados.');
     } catch (err) {
