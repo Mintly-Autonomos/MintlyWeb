@@ -250,7 +250,7 @@
         <button
           type="button"
           (click)="toggleImportMode()"
-          class="text-[12.5px] font-semibold text-ocean underline underline-offset-2 shrink-0 cursor-pointer"
+          class="text-[12.5px] font-semibold text-ocean underline underline-offset-2 shrink-0 cursor-pointer py-2 -my-2"
         >
           {{ importMode() ? 'Cadastro manual' : 'Importar em massa' }}
         </button>
@@ -313,7 +313,7 @@
         <button
           type="button"
           (click)="downloadTemplate()"
-          class="inline-flex items-center gap-2 text-[12.5px] font-semibold text-ocean cursor-pointer"
+          class="inline-flex items-center gap-2 text-[12.5px] font-semibold text-ocean cursor-pointer py-2 -my-2"
         >
           <app-icon name="download" [style]="{ fontSize: '16px' }" />Baixar modelo em branco
         </button>
