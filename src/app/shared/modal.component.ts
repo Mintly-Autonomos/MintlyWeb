@@ -47,7 +47,7 @@ let modalSeq = 0;
               <app-icon name="close" [style]="{ fontSize: '20px' }" />
             </button>
           </div>
-          <div class="px-6 pb-6 max-h-[70vh] overflow-y-auto">
+          <div class="px-6 pb-6 max-h-[min(70vh,calc(100dvh-12rem))] overflow-y-auto">
             <ng-content />
           </div>
           @if (hasFooter) {
