@@ -99,6 +99,9 @@ export class IdleSessionService {
   private async expire(): Promise<void> {
     this.stop();
     await this.zone.run(async () => {
+      // O token de acesso dura 15 min e já venceu: sem renovar antes, o servidor recusaria o logout e o
+      // token de renovação continuaria válido por lá.
+      await this.auth.refresh();
       await this.auth.logout(false);
       await this.router.navigate(['/auth/sessao-expirada'], {
         queryParams: { motivo: 'inatividade' },

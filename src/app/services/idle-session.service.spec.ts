@@ -13,17 +13,26 @@ const MIN = 60 * 1000;
 describe('IdleSessionService', () => {
   let svc: IdleSessionService;
   let logout: ReturnType<typeof vi.fn>;
+  let refresh: ReturnType<typeof vi.fn>;
+  let order: string[];
   let navigate: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-30T12:00:00Z'));
     localStorage.clear();
-    logout = vi.fn().mockResolvedValue(undefined);
+    order = [];
+    refresh = vi.fn().mockImplementation(async () => {
+      order.push('refresh');
+      return true;
+    });
+    logout = vi.fn().mockImplementation(async () => {
+      order.push('logout');
+    });
     navigate = vi.fn().mockResolvedValue(true);
     TestBed.configureTestingModule({
       providers: [
-        { provide: AuthService, useValue: { logout } },
+        { provide: AuthService, useValue: { logout, refresh } },
         { provide: Router, useValue: { navigate } },
       ],
     });
@@ -55,6 +64,12 @@ describe('IdleSessionService', () => {
     expect(navigate).toHaveBeenCalledWith(['/auth/sessao-expirada'], {
       queryParams: { motivo: 'inatividade' },
     });
+  });
+
+  it('renova o token antes de sair, para o servidor aceitar o logout e revogar o token de renovação', async () => {
+    svc.start();
+    await advance(31 * MIN);
+    expect(order).toEqual(['refresh', 'logout']);
   });
 
   it('usar o app (tecla, mouse, toque, rolagem) recomeça a contagem', async () => {
