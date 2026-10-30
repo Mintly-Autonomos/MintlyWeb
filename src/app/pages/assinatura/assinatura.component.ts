@@ -4,6 +4,7 @@ import { subscriptionTiers } from 'mintly-lib';
 import type {
   SubscriptionPlanMonths,
   SubscriptionPlanOption,
+  SubscriptionRecurring,
   SubscriptionTier,
   SubscriptionTierOption,
 } from 'mintly-lib';
@@ -14,6 +15,8 @@ import { AuthService } from '../../services/auth.service';
 import { SubscriptionService } from '../../services/subscription.service';
 import { apiErrorInfo } from '../../shared/api-error';
 import {
+  SUPPORT_EMAIL,
+  fmtEndsAt,
   formatCents,
   planLabel,
   planPerMonthLabel,
@@ -43,6 +46,78 @@ const DEFAULT_PLAN: SubscriptionPlanMonths = 3;
             Nenhum pagamento de verdade será cobrado: você aprova ou recusa o pagamento numa tela de
             simulação.
           </app-alert>
+        </div>
+      }
+
+      @if (recurring(); as rec) {
+        <div class="mb-4 rounded-2xl border border-border bg-card p-4" data-testid="renovacao">
+          @switch (rec.status) {
+            @case ('authorized') {
+              <p class="font-semibold text-[14px] flex items-center gap-2">
+                <app-icon name="autorenew" [style]="{ fontSize: '20px' }" className="text-mint" />
+                Renovação automática ativa
+              </p>
+              <p class="text-[12.5px] text-muted-foreground mt-1 leading-relaxed">
+                Plano {{ tierName(rec.tier) }} · cobrança a cada {{ rec.days }} dias no mesmo
+                cartão. Cada cobrança aprovada soma {{ rec.days }} dias ao seu acesso.
+              </p>
+              @if (confirmingCancel()) {
+                <div class="mt-3 rounded-xl bg-warning/10 p-3 text-[12.5px] leading-relaxed">
+                  Cancelar a renovação? Você continua com acesso até {{ endsAtLabel() }}, mas não
+                  cobramos de novo.
+                  <div class="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      (click)="cancelRenewal()"
+                      [disabled]="busy()"
+                      class="h-9 px-3 rounded-lg bg-error text-white text-[12.5px] font-semibold disabled:opacity-60 cursor-pointer"
+                    >
+                      {{ busy() ? 'Cancelando…' : 'Cancelar renovação' }}
+                    </button>
+                    <button
+                      type="button"
+                      (click)="confirmingCancel.set(false)"
+                      class="h-9 px-3 rounded-lg border border-border text-[12.5px] font-medium hover:bg-muted cursor-pointer"
+                    >
+                      Manter
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  (click)="confirmingCancel.set(true)"
+                  class="mt-2 text-[13px] font-medium text-ocean hover:underline cursor-pointer"
+                >
+                  Cancelar renovação automática
+                </button>
+              }
+              @if (provider() === 'mock') {
+                <button
+                  type="button"
+                  (click)="chargeNext()"
+                  [disabled]="busy()"
+                  class="mt-2 ml-4 text-[12.5px] text-muted-foreground hover:underline cursor-pointer"
+                >
+                  Simular próxima cobrança (teste)
+                </button>
+              }
+            }
+            @case ('paused') {
+              <p class="font-semibold text-[14px]">Renovação automática pausada</p>
+              <p class="text-[12.5px] text-muted-foreground mt-1">
+                A renovação está pausada no Mercado Pago: nenhuma cobrança nova até ela voltar. Seu
+                acesso vai até {{ endsAtLabel() }}.
+              </p>
+            }
+            @case ('cancelled') {
+              <p class="font-semibold text-[14px]">Renovação automática cancelada</p>
+              <p class="text-[12.5px] text-muted-foreground mt-1">
+                Não vamos mais cobrar sozinhos. Seu acesso vai até {{ endsAtLabel() }}; depois é só
+                assinar de novo.
+              </p>
+            }
+          }
         </div>
       }
 
@@ -163,6 +238,23 @@ const DEFAULT_PLAN: SubscriptionPlanMonths = 3;
           </div>
         }
 
+        <label
+          class="mt-4 flex items-start gap-3 rounded-2xl border border-border bg-card p-3.5 cursor-pointer hover:bg-muted"
+        >
+          <input
+            type="checkbox"
+            [checked]="autoRenew()"
+            (change)="autoRenew.set($any($event.target).checked)"
+            class="mt-0.5 h-5 w-5 accent-mint cursor-pointer"
+          />
+          <span class="min-w-0">
+            <span class="block font-semibold text-[14px]">Renovar automaticamente</span>
+            <span class="block text-[12.5px] text-muted-foreground mt-0.5 leading-relaxed">
+              {{ renewalText() }}
+            </span>
+          </span>
+        </label>
+
         <button
           type="button"
           (click)="pay()"
@@ -179,6 +271,13 @@ const DEFAULT_PLAN: SubscriptionPlanMonths = 3;
             concluir.
           }
           O acesso é liberado assim que o pagamento é aprovado.
+        </p>
+        <p class="text-[12px] text-muted-foreground text-center mt-2 leading-relaxed">
+          Reembolso: escreva para
+          <a [href]="'mailto:' + supportEmail" class="font-medium text-ocean hover:underline">{{
+            supportEmail
+          }}</a
+          >.
         </p>
       }
 
@@ -216,6 +315,10 @@ export class AssinaturaComponent implements OnInit {
   protected busy = signal(false);
   protected error = signal<string | null>(null);
   protected loadError = signal<string | null>(null);
+  /** Renovação automática: começa desmarcada (a pessoa escolhe ser cobrada de novo). */
+  protected autoRenew = signal(false);
+  protected confirmingCancel = signal(false);
+  protected supportEmail = SUPPORT_EMAIL;
 
   /** Tipos (com seus planos) da API; antes dela responder, os da própria lib (mesma tabela de preços). */
   protected tiers = computed<SubscriptionTierOption[]>(
@@ -224,6 +327,19 @@ export class AssinaturaComponent implements OnInit {
   protected plans = computed<SubscriptionPlanOption[]>(
     () => this.tiers().find((t) => t.tier === this.selectedTier())?.plans ?? [],
   );
+  protected recurring = computed<SubscriptionRecurring | null>(
+    () => this.subscription.overview()?.recurring ?? null,
+  );
+  protected endsAtLabel = computed(() => fmtEndsAt(this.state().endsAt));
+  protected tierName = tierLabel;
+  protected renewalText = computed(() => {
+    const plan = this.selectedPlan();
+    const dias = plan ? `a cada ${plan.days} dias` : 'a cada ciclo do plano';
+    return (
+      `Cobramos de novo ${dias}, no mesmo cartão, e somamos os dias ao seu acesso. ` +
+      'Você cancela quando quiser, aqui nesta tela, e o acesso continua até o fim do que já foi pago.'
+    );
+  });
   protected tierChange = computed(() => tierChangeNotice(this.state(), this.selectedTier()));
   protected provider = computed(() => this.subscription.overview()?.provider ?? null);
   protected state = computed(() => {
@@ -235,7 +351,9 @@ export class AssinaturaComponent implements OnInit {
   protected selectedPlan = computed(() => this.plans().find((p) => p.months === this.selected()));
   protected payLabel = computed(() => {
     const plan = this.selectedPlan();
-    return plan ? `Pagar ${formatCents(plan.totalCents)} · ${tierLabel(plan.tier)}` : 'Pagar';
+    if (!plan) return 'Pagar';
+    const base = `Pagar ${formatCents(plan.totalCents)} · ${tierLabel(plan.tier)}`;
+    return this.autoRenew() ? `${base} · renova a cada ${plan.days} dias` : base;
   });
 
   protected label = planLabel;
@@ -265,7 +383,7 @@ export class AssinaturaComponent implements OnInit {
     this.busy.set(true);
     this.error.set(null);
     try {
-      const checkout = await this.subscription.checkout(plan.months, plan.tier);
+      const checkout = await this.subscription.checkout(plan.months, plan.tier, this.autoRenew());
       // Endereço do próprio app (simulador) navega por dentro; o do provedor sai do site.
       if (checkout.checkoutUrl.startsWith('/')) {
         await this.router.navigateByUrl(checkout.checkoutUrl);
@@ -275,6 +393,34 @@ export class AssinaturaComponent implements OnInit {
     } catch (err) {
       const message = apiErrorInfo(err).message;
       this.error.set(message ?? 'Tente novamente em instantes.');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async cancelRenewal(): Promise<void> {
+    if (this.busy()) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.subscription.cancelRenewal();
+      this.confirmingCancel.set(false);
+    } catch (err) {
+      this.error.set(
+        apiErrorInfo(err).message ?? 'Não foi possível cancelar agora. Tente de novo.',
+      );
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async chargeNext(): Promise<void> {
+    if (this.busy()) return;
+    this.busy.set(true);
+    try {
+      await this.subscription.mockChargeNext();
+    } catch (err) {
+      this.error.set(apiErrorInfo(err).message ?? 'Não foi possível simular a cobrança.');
     } finally {
       this.busy.set(false);
     }

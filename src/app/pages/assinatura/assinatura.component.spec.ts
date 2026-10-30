@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
 import { computeSubscriptionState, subscriptionTiers } from 'mintly-lib';
-import type { SubscriptionOverview, SubscriptionTier } from 'mintly-lib';
+import type { SubscriptionOverview, SubscriptionRecurring, SubscriptionTier } from 'mintly-lib';
 import { AuthService } from '../../services/auth.service';
 import { SubscriptionService } from '../../services/subscription.service';
 import { AssinaturaComponent } from './assinatura.component';
@@ -17,15 +17,19 @@ describe('AssinaturaComponent', () => {
   let logout: ReturnType<typeof vi.fn>;
   let endsAt: string | null;
   let tier: SubscriptionTier | null;
+  let cancelRenewal: ReturnType<typeof vi.fn>;
+  let mockChargeNext: ReturnType<typeof vi.fn>;
 
   const ov = (
     provider: 'mock' | 'mercadopago',
     ends: string | null = null,
     ovTier: SubscriptionTier | null = tier,
+    recurring: SubscriptionRecurring | null = null,
   ): SubscriptionOverview => ({
     ...computeSubscriptionState(ends, new Date(), ovTier),
     tiers: subscriptionTiers(),
     provider,
+    recurring,
   });
 
   async function render(initial: SubscriptionOverview | null = ov('mock')) {
@@ -38,7 +42,10 @@ describe('AssinaturaComponent', () => {
       tier: 'basic',
       months: 3,
       totalCents: 42750,
+      autoRenew: false,
     });
+    cancelRenewal = vi.fn().mockResolvedValue(undefined);
+    mockChargeNext = vi.fn().mockResolvedValue(undefined);
     logout = vi.fn();
     TestBed.configureTestingModule({
       providers: [
@@ -50,7 +57,10 @@ describe('AssinaturaComponent', () => {
             logout,
           },
         },
-        { provide: SubscriptionService, useValue: { overview, refresh, checkout } },
+        {
+          provide: SubscriptionService,
+          useValue: { overview, refresh, checkout, cancelRenewal, mockChargeNext },
+        },
       ],
     });
     const fixture = TestBed.createComponent(AssinaturaComponent);
@@ -138,7 +148,7 @@ describe('AssinaturaComponent', () => {
     payButton(f).click();
     await f.whenStable();
 
-    expect(checkout).toHaveBeenCalledWith(6, 'basic');
+    expect(checkout).toHaveBeenCalledWith(6, 'basic', false);
     expect(navigate).toHaveBeenCalledWith('/assinatura/simulador?pagamento=p1');
   });
 
@@ -261,7 +271,7 @@ describe('AssinaturaComponent', () => {
       f.detectChanges();
       payButton(f).click();
       await f.whenStable();
-      expect(checkout).toHaveBeenCalledWith(1, 'pro');
+      expect(checkout).toHaveBeenCalledWith(1, 'pro', false);
     });
 
     it('quem já tem o Pro abre no Pro, marcado como "Seu plano", sem aviso de troca', async () => {
@@ -319,6 +329,150 @@ describe('AssinaturaComponent', () => {
       tierCards(f)[0].click();
       f.detectChanges();
       expect(norm(el(f).textContent)).not.toContain('Você está mudando');
+    });
+  });
+
+  describe('renovação automática', () => {
+    const rec = (over: Partial<SubscriptionRecurring> = {}): SubscriptionRecurring => ({
+      status: 'authorized',
+      tier: 'pro',
+      months: 3,
+      days: 90,
+      startedAt: '2026-10-01T00:00:00.000Z',
+      ...over,
+    });
+    const checkbox = (f: { nativeElement: HTMLElement }) =>
+      el(f).querySelector<HTMLInputElement>('label input[type="checkbox"]')!;
+    const card = (f: { nativeElement: HTMLElement }) =>
+      el(f).querySelector('[data-testid="renovacao"]');
+    const button = (f: { nativeElement: HTMLElement }, re: RegExp) =>
+      Array.from(el(f).querySelectorAll<HTMLButtonElement>('button')).find((b) =>
+        re.test(norm(b.textContent)),
+      );
+
+    it('a opção vem DESMARCADA e explica a cobrança: dias, mesmo cartão e como cancelar', async () => {
+      const f = await render();
+      expect(checkbox(f).checked).toBe(false);
+      const text = norm(el(f).querySelector('label')?.textContent);
+      expect(text).toContain('Renovar automaticamente');
+      expect(text).toContain('a cada 90 dias'); // o plano de 3 meses já vem marcado
+      expect(text).toContain('mesmo cartão');
+      expect(text).toContain('cancela quando quiser');
+    });
+
+    it('os dias da explicação acompanham o plano escolhido', async () => {
+      const f = await render();
+      radios(f)[3].click();
+      f.detectChanges();
+      expect(norm(el(f).querySelector('label')?.textContent)).toContain('a cada 360 dias');
+    });
+
+    it('marcada: o botão avisa que renova e o checkout leva autoRenew', async () => {
+      const f = await render();
+      vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      checkbox(f).click();
+      f.detectChanges();
+      expect(norm(payButton(f).textContent)).toContain('renova a cada 90 dias');
+
+      payButton(f).click();
+      await f.whenStable();
+
+      expect(checkout).toHaveBeenCalledWith(3, 'basic', true);
+    });
+
+    it('sem renovação ativa não mostra o cartão de renovação', async () => {
+      const f = await render();
+      expect(card(f)).toBeNull();
+    });
+
+    it('renovação ativa: mostra o plano e os dias, e oferece cancelar', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'pro';
+      const f = await render(ov('mock', endsAt, 'pro', rec()));
+      const text = norm(card(f)?.textContent);
+      expect(text).toContain('Renovação automática ativa');
+      expect(text).toContain('Plano Pro');
+      expect(text).toContain('a cada 90 dias');
+      expect(button(f, /Cancelar renovação automática/)).toBeTruthy();
+    });
+
+    it('cancelar pede confirmação (com a data do acesso) antes de cancelar de verdade', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'pro';
+      const f = await render(ov('mock', endsAt, 'pro', rec()));
+      button(f, /Cancelar renovação automática/)!.click();
+      f.detectChanges();
+      expect(cancelRenewal).not.toHaveBeenCalled();
+      expect(norm(card(f)?.textContent)).toContain('não cobramos de novo');
+      expect(norm(card(f)?.textContent)).toContain(new Date(endsAt).toLocaleDateString('pt-BR'));
+
+      button(f, /^Cancelar renovação$/)!.click();
+      await f.whenStable();
+
+      expect(cancelRenewal).toHaveBeenCalledTimes(1);
+    });
+
+    it('"Manter" desiste do cancelamento', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'pro';
+      const f = await render(ov('mock', endsAt, 'pro', rec()));
+      button(f, /Cancelar renovação automática/)!.click();
+      f.detectChanges();
+      button(f, /^Manter$/)!.click();
+      f.detectChanges();
+      expect(cancelRenewal).not.toHaveBeenCalled();
+      expect(button(f, /Cancelar renovação automática/)).toBeTruthy();
+    });
+
+    it('erro ao cancelar aparece na tela e a renovação continua', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'pro';
+      const f = await render(ov('mock', endsAt, 'pro', rec()));
+      cancelRenewal.mockRejectedValue(
+        Object.assign(new Error('Não foi possível cancelar a renovação agora.'), { status: 502 }),
+      );
+      button(f, /Cancelar renovação automática/)!.click();
+      f.detectChanges();
+      button(f, /^Cancelar renovação$/)!.click();
+      await f.whenStable();
+      f.detectChanges();
+      expect(norm(el(f).textContent)).toContain('Não foi possível cancelar a renovação agora.');
+    });
+
+    it('pausada e cancelada têm texto próprio, sem botão de cancelar', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'pro';
+      const paused = await render(ov('mock', endsAt, 'pro', rec({ status: 'paused' })));
+      expect(norm(card(paused)?.textContent)).toContain('pausada');
+      expect(button(paused, /Cancelar renovação automática/)).toBeUndefined();
+      TestBed.resetTestingModule();
+      const cancelled = await render(ov('mock', endsAt, 'pro', rec({ status: 'cancelled' })));
+      expect(norm(card(cancelled)?.textContent)).toContain('cancelada');
+      expect(norm(card(cancelled)?.textContent)).toContain('Seu acesso vai até');
+    });
+
+    it('"Simular próxima cobrança" só aparece no simulador', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'pro';
+      const mock = await render(ov('mock', endsAt, 'pro', rec()));
+      const charge = button(mock, /Simular próxima cobrança/);
+      expect(charge).toBeTruthy();
+      charge!.click();
+      await mock.whenStable();
+      expect(mockChargeNext).toHaveBeenCalledTimes(1);
+      TestBed.resetTestingModule();
+      const real = await render(ov('mercadopago', endsAt, 'pro', rec()));
+      expect(button(real, /Simular próxima cobrança/)).toBeUndefined();
+    });
+  });
+
+  describe('reembolso', () => {
+    it('diz para escrever ao suporte, com o e-mail clicável', async () => {
+      const f = await render();
+      const link = el(f).querySelector<HTMLAnchorElement>('a[href^="mailto:"]');
+      expect(link?.getAttribute('href')).toBe('mailto:mintly@sptech.school');
+      expect(norm(link?.textContent)).toBe('mintly@sptech.school');
+      expect(norm(el(f).textContent)).toContain('Reembolso: escreva para');
     });
   });
 

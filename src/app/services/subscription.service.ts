@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
+  SUBSCRIPTION_PLAN_DAYS,
   applySubscriptionPurchase,
   computeSubscriptionState,
   isSubscriptionPlan,
@@ -13,6 +14,7 @@ import type {
   SubscriptionCheckoutResponse,
   SubscriptionOverview,
   SubscriptionPlanMonths,
+  SubscriptionRecurring,
   SubscriptionTier,
 } from 'mintly-lib';
 import { environment } from '../../environments/environment';
@@ -41,6 +43,9 @@ export class SubscriptionService {
 
   /** Última resposta de GET /subscription (tipos com planos, preços e provedor para montar a tela). */
   readonly overview = signal<SubscriptionOverview | null>(null);
+
+  /** Modo mock: a renovação automática simulada (no modo real ela vem da API). */
+  private mockRecurring: SubscriptionRecurring | null = null;
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
@@ -71,6 +76,7 @@ export class SubscriptionService {
         ...computeSubscriptionState(current.endsAt, new Date(), current.tier),
         tiers: subscriptionTiers(),
         provider: 'mock',
+        recurring: this.mockRecurring,
       };
       this.overview.set(overview);
       return overview;
@@ -127,13 +133,14 @@ export class SubscriptionService {
   async checkout(
     months: SubscriptionPlanMonths,
     tier: SubscriptionTier = 'basic',
+    autoRenew = false,
   ): Promise<SubscriptionCheckoutResponse> {
     if (!isSubscriptionPlan(months)) throw new Error('Plano inválido.');
     if (!isSubscriptionTier(tier)) throw new Error('Tipo de assinatura inválido.');
     if (environment.useMocks) {
       await delay();
       this.rememberBaseline();
-      const paymentId = `mock-${tier}-${months}-${Date.now()}`;
+      const paymentId = `mock-${tier}-${months}-${autoRenew ? 'auto-' : ''}${Date.now()}`;
       return {
         paymentId,
         checkoutUrl: `/assinatura/simulador?pagamento=${paymentId}`,
@@ -141,12 +148,46 @@ export class SubscriptionService {
         tier,
         months,
         totalCents: subscriptionPlanPrice(months, tier).totalCents,
+        autoRenew,
       };
     }
-    const response = await this.call((headers) => this.client.checkout({ months, tier }, headers));
+    const response = await this.call((headers) =>
+      this.client.checkout({ months, tier, ...(autoRenew ? { autoRenew: true } : {}) }, headers),
+    );
     if (!response.payload) throw new Error('Resposta de pagamento sem dados.');
     this.rememberBaseline();
     return response.payload;
+  }
+
+  /** Cancela a renovação automática: o acesso continua até a data já paga, mas não há nova cobrança. */
+  async cancelRenewal(): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      if (this.mockRecurring) this.mockRecurring = { ...this.mockRecurring, status: 'cancelled' };
+      await this.refresh();
+      return;
+    }
+    await this.call((headers) => this.client.cancelRenewal(headers));
+    await this.refresh();
+  }
+
+  /** Só no ambiente de teste: simula a cobrança do próximo ciclo da renovação automática. */
+  async mockChargeNext(): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      const rec = this.mockRecurring;
+      if (rec?.status !== 'authorized') return;
+      const current = this.auth.subscriptionState();
+      const purchase = applySubscriptionPurchase(
+        { endsAt: current.endsAt ? new Date(current.endsAt) : null, tier: current.tier },
+        { tier: rec.tier, months: rec.months },
+      );
+      this.auth.setSubscriptionEndsAt(purchase.endsAt.toISOString(), purchase.tier);
+      await this.refresh();
+      return;
+    }
+    await this.call((headers) => this.client.mockChargeNext(headers));
+    await this.refresh();
   }
 
   /** Só no ambiente de teste: aprova ou recusa o pagamento simulado. */
@@ -154,7 +195,7 @@ export class SubscriptionService {
     if (environment.useMocks) {
       await delay();
       if (decision === 'approved') {
-        const match = /^mock-(basic|pro)-(\d+)-/.exec(paymentId);
+        const match = /^mock-(basic|pro)-(\d+)-(auto-)?/.exec(paymentId);
         const tier = match?.[1];
         const months = Number(match?.[2]);
         if (isSubscriptionTier(tier) && isSubscriptionPlan(months)) {
@@ -165,6 +206,15 @@ export class SubscriptionService {
             { tier, months },
           );
           this.auth.setSubscriptionEndsAt(purchase.endsAt.toISOString(), purchase.tier);
+          if (match?.[3]) {
+            this.mockRecurring = {
+              status: 'authorized',
+              tier,
+              months,
+              days: SUBSCRIPTION_PLAN_DAYS[months],
+              startedAt: new Date().toISOString(),
+            };
+          }
         }
       }
       return;

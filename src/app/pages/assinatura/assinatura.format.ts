@@ -40,6 +40,9 @@ export function tierChangeNotice(
   };
 }
 
+/** E-mail do suporte do Mintly: pedidos de reembolso e dúvidas sobre cobrança vão para lá. */
+export const SUPPORT_EMAIL = 'mintly@sptech.school';
+
 export function planLabel(months: number): string {
   return months === 1 ? '1 mês' : `${months} meses`;
 }

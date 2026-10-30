@@ -20,6 +20,8 @@ describe('SubscriptionService (API)', () => {
     overview: ReturnType<typeof vi.fn>;
     checkout: ReturnType<typeof vi.fn>;
     mockDecide: ReturnType<typeof vi.fn>;
+    cancelRenewal: ReturnType<typeof vi.fn>;
+    mockChargeNext: ReturnType<typeof vi.fn>;
   };
 
   const overviewPayload = (
@@ -35,6 +37,7 @@ describe('SubscriptionService (API)', () => {
       expiresSoon: false,
       tiers: [],
       provider: 'mock',
+      recurring: null,
     },
   });
 
@@ -44,7 +47,13 @@ describe('SubscriptionService (API)', () => {
     TestBed.configureTestingModule({ providers: [provideRouter([])] });
     svc = TestBed.inject(SubscriptionService);
     auth = TestBed.inject(AuthService);
-    client = { overview: vi.fn(), checkout: vi.fn(), mockDecide: vi.fn() };
+    client = {
+      overview: vi.fn(),
+      checkout: vi.fn(),
+      mockDecide: vi.fn(),
+      cancelRenewal: vi.fn(),
+      mockChargeNext: vi.fn(),
+    };
     (svc as unknown as { client: unknown }).client = client;
   });
 
@@ -133,8 +142,14 @@ describe('SubscriptionService (API)', () => {
       });
       const out = await svc.checkout(6);
       expect(client.checkout.mock.calls[0][0]).toEqual({ months: 6, tier: 'basic' });
+      await svc.checkout(12, 'pro', true);
+      expect(client.checkout.mock.calls[1][0]).toEqual({
+        months: 12,
+        tier: 'pro',
+        autoRenew: true,
+      });
       await svc.checkout(3, 'pro');
-      expect(client.checkout.mock.calls[1][0]).toEqual({ months: 3, tier: 'pro' });
+      expect(client.checkout.mock.calls[2][0]).toEqual({ months: 3, tier: 'pro' });
       expect(out.checkoutUrl).toBe('https://mp.test/pagar');
     });
 
@@ -193,6 +208,34 @@ describe('SubscriptionService (API)', () => {
       sessionStorage.setItem('mintly-checkout-baseline', end);
       svc.clearBaseline();
       expect(sessionStorage.getItem('mintly-checkout-baseline')).toBeNull();
+    });
+  });
+
+  describe('renovação automática', () => {
+    it('cancelRenewal chama a API e atualiza o estado', async () => {
+      client.cancelRenewal = vi.fn().mockResolvedValue({ payload: { status: 'cancelled' } });
+      client.overview.mockResolvedValue(
+        overviewPayload(new Date(Date.now() + 30 * DAY).toISOString(), 'active', 'pro'),
+      );
+      await svc.cancelRenewal();
+      expect(client.cancelRenewal).toHaveBeenCalledTimes(1);
+      expect(client.overview).toHaveBeenCalled();
+    });
+
+    it('cancelRenewal: erro da API sobe para a tela', async () => {
+      const err = Object.assign(new Error('Não foi possível cancelar'), { status: 502 });
+      client.cancelRenewal = vi.fn().mockRejectedValue(err);
+      await expect(svc.cancelRenewal()).rejects.toBe(err);
+    });
+
+    it('mockChargeNext chama a API e atualiza o estado', async () => {
+      client.mockChargeNext = vi.fn().mockResolvedValue({ payload: { status: 'approved' } });
+      client.overview.mockResolvedValue(
+        overviewPayload(new Date(Date.now() + 60 * DAY).toISOString()),
+      );
+      await svc.mockChargeNext();
+      expect(client.mockChargeNext).toHaveBeenCalledTimes(1);
+      expect(client.overview).toHaveBeenCalled();
     });
   });
 
@@ -313,6 +356,53 @@ describe('SubscriptionService (modo mock)', () => {
     const ends = new Date(auth.subscriptionState().endsAt as string).getTime();
     expect(ends).toBeGreaterThanOrEqual(before + days * DAY);
     expect(ends).toBeLessThanOrEqual(Date.now() + days * DAY);
+  });
+
+  describe('renovação automática (modo mock)', () => {
+    it('aprovar uma assinatura com renovação ativa a renovação; o resumo a mostra', async () => {
+      const c = await svc.checkout(3, 'pro', true);
+      expect(c.autoRenew).toBe(true);
+      await svc.mockDecide(c.paymentId, 'approved');
+
+      const o = await svc.refresh();
+
+      expect(o?.recurring).toMatchObject({
+        status: 'authorized',
+        tier: 'pro',
+        months: 3,
+        days: 90,
+      });
+    });
+
+    it('pagamento único não cria renovação', async () => {
+      const c = await svc.checkout(3, 'pro');
+      expect(c.autoRenew).toBe(false);
+      await svc.mockDecide(c.paymentId, 'approved');
+      expect((await svc.refresh())?.recurring).toBeNull();
+    });
+
+    it('recusar a primeira cobrança não ativa renovação', async () => {
+      const c = await svc.checkout(1, 'basic', true);
+      await svc.mockDecide(c.paymentId, 'rejected');
+      expect((await svc.refresh())?.recurring).toBeNull();
+    });
+
+    it('a próxima cobrança soma os dias do plano ao que sobrou', async () => {
+      await svc.mockDecide((await svc.checkout(1, 'basic', true)).paymentId, 'approved');
+      const first = new Date(auth.subscriptionState().endsAt as string).getTime();
+      await svc.mockChargeNext();
+      expect(new Date(auth.subscriptionState().endsAt as string).getTime()).toBe(first + 30 * DAY);
+    });
+
+    it('cancelar a renovação mantém o acesso e para de cobrar', async () => {
+      await svc.mockDecide((await svc.checkout(1, 'basic', true)).paymentId, 'approved');
+      const first = new Date(auth.subscriptionState().endsAt as string).getTime();
+      await svc.cancelRenewal();
+      expect((await svc.refresh())?.recurring?.status).toBe('cancelled');
+      await svc.mockChargeNext();
+      expect(new Date(auth.subscriptionState().endsAt as string).getTime()).toBe(first);
+      expect(auth.hasActiveSubscription()).toBe(true);
+    });
   });
 
   it('tipo inválido no checkout é recusado', async () => {
