@@ -168,7 +168,15 @@ function toMovement(raw: FinancialMovement): Movement {
     channel?: MovementChannel;
     paymentMethod: LibPaymentMethod;
     description?: string;
-    audit?: { createdAt?: unknown; updatedAt?: unknown; createdBy?: string; updatedBy?: string };
+    audit?: {
+      createdAt?: unknown;
+      updatedAt?: unknown;
+      createdBy?: string;
+      updatedBy?: string;
+      /** A API acrescenta o nome de quem fez (o id é só um código). */
+      createdByName?: string;
+      updatedByName?: string;
+    };
   };
   return {
     id: (r._id ?? r.id) as string,
@@ -186,9 +194,9 @@ function toMovement(raw: FinancialMovement): Movement {
     paymentMethod: PAYMENT_FROM_LIB[r.paymentMethod] ?? null,
     channel: r.channel ? CHANNEL_FROM_LIB[r.channel] : null,
     notes: r.description ?? null,
-    createdBy: r.audit?.createdBy ?? '—',
+    createdBy: r.audit?.createdByName ?? r.audit?.createdBy ?? '—',
     createdAt: toISO(r.audit?.createdAt),
-    updatedBy: r.audit?.updatedBy ?? '—',
+    updatedBy: r.audit?.updatedByName ?? r.audit?.updatedBy ?? '—',
     updatedAt: toISO(r.audit?.updatedAt),
   };
 }

@@ -123,10 +123,13 @@ function toCategory(raw: FinancialCategory): Category {
     updatedAt?: unknown;
     createdBy?: string;
     updatedBy?: string;
+    createdByName?: string;
+    updatedByName?: string;
   };
   const rawHistory = (raw.history ?? []) as {
     at: unknown;
     by: string;
+    byName?: string;
     action: string;
     detail?: string;
   }[];
@@ -142,9 +145,9 @@ function toCategory(raw: FinancialCategory): Category {
     subcategories: (raw.subcategories ?? []).map(toSubcategory),
     active: raw.status === RecordStatus.Active,
     protected: raw.isSystem,
-    createdBy: audit?.createdBy ?? '—',
+    createdBy: audit?.createdByName ?? audit?.createdBy ?? '—',
     createdAt: toISO(audit?.createdAt),
-    updatedBy: audit?.updatedBy ?? '—',
+    updatedBy: audit?.updatedByName ?? audit?.updatedBy ?? '—',
     updatedAt: toISO(audit?.updatedAt),
     history: rawHistory
       .slice()
@@ -152,7 +155,7 @@ function toCategory(raw: FinancialCategory): Category {
       .map((h, i) => ({
         id: i + 1,
         at: toISO(h.at),
-        by: h.by,
+        by: h.byName ?? h.by,
         action: h.action,
         detail: h.detail,
         icon: actionIcon(h.action),
