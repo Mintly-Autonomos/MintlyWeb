@@ -10,6 +10,12 @@ describe('auditActionLabel', () => {
     expect(auditActionLabel('register')).toBe('Criada');
   });
 
+  it('traduz as alterações de nome, taxa e prazo da conta', () => {
+    expect(auditActionLabel('update-name')).toBe('Nome alterado');
+    expect(auditActionLabel('update-fee')).toBe('Taxa alterada');
+    expect(auditActionLabel('update-settlement')).toBe('Prazo de repasse alterado');
+  });
+
   it('ignora caixa e espaços no código', () => {
     expect(auditActionLabel('  Inactivate '.replace('Inactivate', 'INACTIVATE'))).toBe('Inativada');
   });
