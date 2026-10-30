@@ -91,6 +91,6 @@ export function expiryNoticeText(
   const dias = state.daysLeft === 1 ? '1 dia' : `${state.daysLeft} dias`;
   return {
     title: `Sua assinatura vence em ${dias}`,
-    description: `O acesso termina em ${fmtEndsAt(state.endsAt)}. Renove agora: o novo período é somado ao que ainda resta.`,
+    description: `O acesso termina em ${fmtEndsAt(state.endsAt)}. Renove agora: renovar o mesmo plano soma o novo período ao que ainda resta; trocar de plano começa a contar hoje.`,
   };
 }

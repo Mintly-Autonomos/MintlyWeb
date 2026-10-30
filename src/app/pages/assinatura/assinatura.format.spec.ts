@@ -161,6 +161,7 @@ describe('expiryNoticeText (aviso 3 dias antes)', () => {
   it('a descrição diz a data e que renovar soma ao que resta', () => {
     const text = expiryNoticeText(state(2));
     expect(text?.description).toContain('Renove agora');
-    expect(text?.description).toContain('somado');
+    expect(text?.description).toContain('soma o novo período');
+    expect(text?.description).toContain('trocar de plano começa a contar hoje');
   });
 });
