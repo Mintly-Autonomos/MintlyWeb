@@ -308,9 +308,10 @@ export class ContasService {
       return;
     }
 
+    // O tipo da conta é imutável na API: qualquer `type` no PATCH volta 409, mesmo igual ao
+    // armazenado. Aqui ele só serve para saber se é plataforma (taxa/prazo), nunca vai no corpo.
     const patch: Partial<FinancialAccount> = {
       ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.type !== undefined ? { type: TYPE_TO_LIB[input.type] } : {}),
       ...(input.active !== undefined
         ? { status: input.active ? RecordStatus.Active : RecordStatus.Inactive }
         : {}),
