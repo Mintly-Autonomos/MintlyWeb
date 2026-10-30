@@ -154,6 +154,39 @@ describe('AuthService — assinatura', () => {
       expect(auth.hasActiveSubscription()).toBe(true);
     });
 
+    it('o login guarda o tipo (pro) e o logout apaga', async () => {
+      const end = new Date(Date.now() + 9 * DAY).toISOString();
+      (auth as unknown as { authClient: unknown }).authClient = {
+        login: vi.fn().mockResolvedValue({
+          payload: {
+            accessToken: 'a',
+            refreshToken: 'r',
+            user,
+            subscription: { status: 'active', tier: 'pro', endsAt: end },
+          },
+        }),
+      };
+      await auth.login('ana@x.com', 'Senha123', true);
+      expect(auth.subscriptionState().tier).toBe('pro');
+      expect(localStorage.getItem('mintly-subscription-tier')).toBe('pro');
+
+      auth.setSubscriptionEndsAt(null);
+      expect(auth.subscriptionState().tier).toBeNull();
+      expect(localStorage.getItem('mintly-subscription-tier')).toBeNull();
+    });
+
+    it('conta com data mas sem tipo (liberada à mão) é Básico', async () => {
+      auth.setSubscriptionEndsAt(new Date(Date.now() + 9 * DAY).toISOString());
+      expect(auth.subscriptionState().tier).toBe('basic');
+    });
+
+    it('402 com assinatura Pro ativa mantém o tipo Pro no estado vencido', () => {
+      vi.spyOn(router, 'navigate').mockResolvedValue(true);
+      auth.setSubscriptionEndsAt(new Date(Date.now() + 5 * DAY).toISOString(), 'pro');
+      auth.onApiError({ status: 402, code: 'SUBSCRIPTION-0001' });
+      expect(auth.subscriptionState()).toMatchObject({ status: 'expired', tier: 'pro' });
+    });
+
     it('login sem assinatura na resposta: fica sem assinatura (o guard confere com a API)', async () => {
       auth.setSubscriptionEndsAt(new Date(Date.now() + 9 * DAY).toISOString());
       (auth as unknown as { authClient: unknown }).authClient = {

@@ -1,7 +1,12 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { subscriptionPlans } from 'mintly-lib';
-import type { SubscriptionPlanMonths, SubscriptionPlanOption } from 'mintly-lib';
+import { subscriptionTiers } from 'mintly-lib';
+import type {
+  SubscriptionPlanMonths,
+  SubscriptionPlanOption,
+  SubscriptionTier,
+  SubscriptionTierOption,
+} from 'mintly-lib';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { AlertComponent } from '../../shared/alert.component';
 import { IconComponent } from '../../shared/icon.component';
@@ -14,6 +19,9 @@ import {
   planPerMonthLabel,
   planSavingCents,
   subscriptionHeadline,
+  tierBlurb,
+  tierChangeNotice,
+  tierLabel,
 } from './assinatura.format';
 
 /** Plano que já vem marcado: o do meio, sem empurrar ninguém para o mais caro nem para o mais barato. */
@@ -52,7 +60,53 @@ const DEFAULT_PLAN: SubscriptionPlanMonths = 3;
           Tentar de novo
         </button>
       } @else {
-        <div role="radiogroup" aria-label="Plano de assinatura" class="space-y-2.5">
+        <div
+          role="radiogroup"
+          aria-label="Tipo de assinatura"
+          class="grid grid-cols-2 gap-2.5 mb-4"
+        >
+          @for (t of tiers(); track t.tier) {
+            <button
+              type="button"
+              role="radio"
+              [attr.aria-checked]="selectedTier() === t.tier"
+              (click)="selectedTier.set(t.tier)"
+              [class]="
+                'text-left rounded-2xl border p-3.5 transition cursor-pointer ' +
+                (selectedTier() === t.tier
+                  ? 'border-mint bg-mint-soft'
+                  : 'border-border bg-card hover:bg-muted')
+              "
+            >
+              <span class="flex items-center gap-2 flex-wrap">
+                <span class="font-semibold text-[15px]">{{ t.label }}</span>
+                @if (state().status === 'active' && state().tier === t.tier) {
+                  <span
+                    class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-ocean/10 text-ocean"
+                  >
+                    Seu plano
+                  </span>
+                }
+              </span>
+              <span class="block text-[13px] font-semibold tabular-nums mt-0.5"
+                >{{ cents(t.monthlyCents) }} por mês</span
+              >
+              <span class="block text-[12px] text-muted-foreground mt-1 leading-snug">{{
+                blurb(t.tier)
+              }}</span>
+            </button>
+          }
+        </div>
+
+        @if (tierChange(); as change) {
+          <div class="mb-4">
+            <app-alert variant="warning" [title]="change.title">
+              {{ change.description }}
+            </app-alert>
+          </div>
+        }
+
+        <div role="radiogroup" aria-label="Período da assinatura" class="space-y-2.5">
           @for (p of plans(); track p.months) {
             <button
               type="button"
@@ -157,14 +211,20 @@ export class AssinaturaComponent implements OnInit {
   private subscription = inject(SubscriptionService);
 
   protected selected = signal<SubscriptionPlanMonths>(DEFAULT_PLAN);
+  /** Tipo escolhido: começa no que a pessoa já tem (renovar) ou no Básico. Segue o estado assim que ele chega. */
+  protected selectedTier = signal<SubscriptionTier>(this.auth.subscriptionState().tier ?? 'basic');
   protected busy = signal(false);
   protected error = signal<string | null>(null);
   protected loadError = signal<string | null>(null);
 
-  /** Planos da API; antes dela responder, os da própria lib (mesma tabela de preços). */
-  protected plans = computed<SubscriptionPlanOption[]>(
-    () => this.subscription.overview()?.plans ?? subscriptionPlans(),
+  /** Tipos (com seus planos) da API; antes dela responder, os da própria lib (mesma tabela de preços). */
+  protected tiers = computed<SubscriptionTierOption[]>(
+    () => this.subscription.overview()?.tiers ?? subscriptionTiers(),
   );
+  protected plans = computed<SubscriptionPlanOption[]>(
+    () => this.tiers().find((t) => t.tier === this.selectedTier())?.plans ?? [],
+  );
+  protected tierChange = computed(() => tierChangeNotice(this.state(), this.selectedTier()));
   protected provider = computed(() => this.subscription.overview()?.provider ?? null);
   protected state = computed(() => {
     // O estado vem da API quando há; senão do que está guardado (calculado na hora).
@@ -175,10 +235,11 @@ export class AssinaturaComponent implements OnInit {
   protected selectedPlan = computed(() => this.plans().find((p) => p.months === this.selected()));
   protected payLabel = computed(() => {
     const plan = this.selectedPlan();
-    return plan ? `Pagar ${formatCents(plan.totalCents)}` : 'Pagar';
+    return plan ? `Pagar ${formatCents(plan.totalCents)} · ${tierLabel(plan.tier)}` : 'Pagar';
   });
 
   protected label = planLabel;
+  protected blurb = tierBlurb;
   protected cents = formatCents;
   protected perMonth = planPerMonthLabel;
   protected saving = planSavingCents;
@@ -190,7 +251,9 @@ export class AssinaturaComponent implements OnInit {
   async load(): Promise<void> {
     this.loadError.set(null);
     try {
-      await this.subscription.refresh();
+      const overview = await this.subscription.refresh();
+      // Quem já tem assinatura abre no tipo dela (renovar é o caso comum).
+      if (overview?.tier) this.selectedTier.set(overview.tier);
     } catch {
       this.loadError.set('Verifique sua conexão e tente novamente.');
     }
@@ -202,7 +265,7 @@ export class AssinaturaComponent implements OnInit {
     this.busy.set(true);
     this.error.set(null);
     try {
-      const checkout = await this.subscription.checkout(plan.months);
+      const checkout = await this.subscription.checkout(plan.months, plan.tier);
       // Endereço do próprio app (simulador) navega por dentro; o do provedor sai do site.
       if (checkout.checkoutUrl.startsWith('/')) {
         await this.router.navigateByUrl(checkout.checkoutUrl);

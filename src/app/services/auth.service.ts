@@ -1,7 +1,7 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { computeSubscriptionState } from 'mintly-lib';
-import type { Headers, SubscriptionState } from 'mintly-lib';
+import type { Headers, SubscriptionState, SubscriptionTier } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { MintlyClientService } from './mintly-client.service';
 import { apiErrorInfo } from '../shared/api-error';
@@ -26,6 +26,7 @@ interface MockRegisteredUser {
   avatar?: string;
   /** Modo mock: data limite da assinatura (ISO); `null` = nunca assinou. */
   subscriptionEndsAt?: string | null;
+  subscriptionTier?: SubscriptionTier | null;
 }
 
 const REMEMBER_KEY = 'mintly-remember';
@@ -35,6 +36,8 @@ const KEYS = {
   user: 'mintly-user',
   /** Data limite da assinatura (ISO). O estado (ativa/vencida) é calculado na hora, não guardado. */
   subscription: 'mintly-subscription-ends',
+  /** Tipo da assinatura (basic | pro). */
+  subscriptionTier: 'mintly-subscription-tier',
   /** Recém-cadastrado: depois de pagar, ainda falta o onboarding. */
   pendingOnboarding: 'mintly-pending-onboarding',
 } as const;
@@ -50,6 +53,7 @@ const registeredUsers: MockRegisteredUser[] = [
   {
     ...mockAuth.user,
     subscriptionEndsAt: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+    subscriptionTier: 'basic',
   },
 ];
 
@@ -74,6 +78,7 @@ export class AuthService {
   private _refreshToken = signal<string | null>(this.read(KEYS.refresh));
   private _user = signal<AuthUser | null>(this.loadStoredUser());
   private _subscriptionEndsAt = signal<string | null>(this.read(KEYS.subscription));
+  private _subscriptionTier = signal<string | null>(this.read(KEYS.subscriptionTier));
 
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly currentUser = this._user.asReadonly();
@@ -84,18 +89,25 @@ export class AuthService {
    * na próxima navegação, sem esperar um novo login.
    */
   subscriptionState(): SubscriptionState {
-    return computeSubscriptionState(this._subscriptionEndsAt());
+    return computeSubscriptionState(
+      this._subscriptionEndsAt(),
+      new Date(),
+      this._subscriptionTier(),
+    );
   }
 
   hasActiveSubscription(): boolean {
     return this.subscriptionState().status === 'active';
   }
 
-  /** Guarda a data limite que a API informou (login, cadastro ou GET /subscription). */
-  setSubscriptionEndsAt(endsAt: string | null): void {
+  /** Guarda a data limite e o tipo que a API informou (login, cadastro ou GET /subscription). */
+  setSubscriptionEndsAt(endsAt: string | null, tier?: SubscriptionTier | null): void {
     this._subscriptionEndsAt.set(endsAt);
     if (endsAt) this.write(KEYS.subscription, endsAt);
     else this.remove(KEYS.subscription);
+    this._subscriptionTier.set(endsAt && tier ? tier : null);
+    if (endsAt && tier) this.write(KEYS.subscriptionTier, tier);
+    else this.remove(KEYS.subscriptionTier);
   }
 
   /**
@@ -105,7 +117,9 @@ export class AuthService {
   onApiError(err: unknown): boolean {
     const { status, code } = apiErrorInfo(err);
     if (status !== 402 || code !== 'SUBSCRIPTION-0001') return false;
-    if (this.hasActiveSubscription()) this.setSubscriptionEndsAt(new Date(0).toISOString());
+    if (this.hasActiveSubscription()) {
+      this.setSubscriptionEndsAt(new Date(0).toISOString(), this.subscriptionState().tier);
+    }
     if (!this.router.url.startsWith('/assinatura')) this.router.navigate(['/assinatura']);
     return true;
   }
@@ -213,7 +227,7 @@ export class AuthService {
         restaurantId: match.restaurantId,
         avatarDataUrl: match.avatar,
       });
-      this.setSubscriptionEndsAt(match.subscriptionEndsAt ?? null);
+      this.setSubscriptionEndsAt(match.subscriptionEndsAt ?? null, match.subscriptionTier);
       return;
     }
 
@@ -226,7 +240,7 @@ export class AuthService {
       restaurantId: result.user.restaurantId,
       avatarDataUrl: result.user.person.avatar,
     });
-    this.setSubscriptionEndsAt(result.subscription?.endsAt ?? null);
+    this.setSubscriptionEndsAt(result.subscription?.endsAt ?? null, result.subscription?.tier);
   }
 
   /** Cadastro inicial (usuário + restaurante). Já autentica com os tokens retornados. */
@@ -290,7 +304,7 @@ export class AuthService {
       avatarDataUrl: result.user.person.avatar,
     });
     // Conta nova nunca tem assinatura: a tela de assinatura vem antes de tudo.
-    this.setSubscriptionEndsAt(result.subscription?.endsAt ?? null);
+    this.setSubscriptionEndsAt(result.subscription?.endsAt ?? null, result.subscription?.tier);
     this.write(KEYS.pendingOnboarding, '1');
   }
 
@@ -398,6 +412,8 @@ export class AuthService {
     this.remove(AVATAR_KEY);
     this._subscriptionEndsAt.set(null);
     this.remove(KEYS.subscription);
+    this._subscriptionTier.set(null);
+    this.remove(KEYS.subscriptionTier);
     this.remove(KEYS.pendingOnboarding);
   }
 

@@ -8,7 +8,7 @@ import { LogoComponent } from '../shared/logo.component';
 import { IconComponent } from '../shared/icon.component';
 import { ToastService } from '../shared/toast.service';
 import { AVATAR_ACCEPT, readAvatarFile } from '../shared/avatar-file';
-import { fmtEndsAt } from '../pages/assinatura/assinatura.format';
+import { fmtEndsAt, tierLabel } from '../pages/assinatura/assinatura.format';
 
 const NAV = [
   { to: '/visao-geral', label: 'Visão Geral', icon: 'space_dashboard' },
@@ -316,9 +316,9 @@ const NAV = [
                     <span class="leading-tight">
                       Minha assinatura
                       @if (subscriptionEnds) {
-                        <span class="block text-[11px] text-muted-foreground"
-                          >Até {{ subscriptionEnds }}</span
-                        >
+                        <span class="block text-[11px] text-muted-foreground">{{
+                          subscriptionSummary
+                        }}</span>
                       }
                     </span>
                   </a>
@@ -452,6 +452,12 @@ export class AppLayoutComponent implements OnInit {
     return this.auth.currentUser()?.empresa?.trim() || 'Meu negócio';
   }
   /** Data limite da assinatura, para o menu da conta ("30/11/2026"). */
+  /** "Pro · até 30/11/2026" — o tipo da assinatura e até quando vale. */
+  get subscriptionSummary(): string {
+    const label = tierLabel(this.auth.subscriptionState().tier);
+    return label ? `${label} · até ${this.subscriptionEnds}` : `Até ${this.subscriptionEnds}`;
+  }
+
   get subscriptionEnds(): string {
     return fmtEndsAt(this.auth.subscriptionState().endsAt);
   }

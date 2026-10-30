@@ -22,8 +22,20 @@ describe('SubscriptionService (API)', () => {
     mockDecide: ReturnType<typeof vi.fn>;
   };
 
-  const overviewPayload = (endsAt: string | null, status = 'active') => ({
-    payload: { status, endsAt, daysLeft: 20, expiresSoon: false, plans: [], provider: 'mock' },
+  const overviewPayload = (
+    endsAt: string | null,
+    status = 'active',
+    tier: string | null = 'basic',
+  ) => ({
+    payload: {
+      status,
+      tier,
+      endsAt,
+      daysLeft: 20,
+      expiresSoon: false,
+      tiers: [],
+      provider: 'mock',
+    },
   });
 
   beforeEach(() => {
@@ -47,6 +59,13 @@ describe('SubscriptionService (API)', () => {
       expect(svc.overview()?.endsAt).toBe(end);
       expect(auth.subscriptionState().endsAt).toBe(end);
       expect(auth.hasActiveSubscription()).toBe(true);
+    });
+
+    it('guarda também o tipo da assinatura (pro) no AuthService', async () => {
+      const end = new Date(Date.now() + 20 * DAY).toISOString();
+      client.overview.mockResolvedValue(overviewPayload(end, 'active', 'pro'));
+      await svc.refresh();
+      expect(auth.subscriptionState().tier).toBe('pro');
     });
 
     it('manda env e token nos cabeçalhos', async () => {
@@ -101,18 +120,21 @@ describe('SubscriptionService (API)', () => {
   });
 
   describe('checkout', () => {
-    it('manda só os meses (o valor nunca vai do cliente) e devolve o link de pagamento', async () => {
+    it('manda só o período e o tipo (o valor nunca vai do cliente) e devolve o link de pagamento', async () => {
       client.checkout.mockResolvedValue({
         payload: {
           paymentId: 'p1',
           checkoutUrl: 'https://mp.test/pagar',
           provider: 'mercadopago',
+          tier: 'basic',
           months: 6,
           totalCents: 81000,
         },
       });
       const out = await svc.checkout(6);
-      expect(client.checkout.mock.calls[0][0]).toEqual({ months: 6 });
+      expect(client.checkout.mock.calls[0][0]).toEqual({ months: 6, tier: 'basic' });
+      await svc.checkout(3, 'pro');
+      expect(client.checkout.mock.calls[1][0]).toEqual({ months: 3, tier: 'pro' });
       expect(out.checkoutUrl).toBe('https://mp.test/pagar');
     });
 
@@ -208,11 +230,13 @@ describe('SubscriptionService (modo mock)', () => {
     flags.useMocks = false;
   });
 
-  it('o resumo traz os 4 planos e o provedor simulado', async () => {
+  it('o resumo traz os tipos Básico e Pro, cada um com os 4 planos, e o provedor simulado', async () => {
     const o = await svc.refresh();
     expect(o?.provider).toBe('mock');
-    expect(o?.plans.map((p) => p.months)).toEqual([1, 3, 6, 12]);
+    expect(o?.tiers.map((t) => t.tier)).toEqual(['basic', 'pro']);
+    o?.tiers.forEach((t) => expect(t.plans.map((p) => p.months)).toEqual([1, 3, 6, 12]));
     expect(o?.status).toBe('none');
+    expect(o?.tier).toBeNull();
   });
 
   it('aprovar no simulador libera por 1 mês e dá para renovar somando ao que sobrou', async () => {
@@ -238,5 +262,49 @@ describe('SubscriptionService (modo mock)', () => {
 
   it('o total do plano no checkout vem da tabela da lib', async () => {
     expect((await svc.checkout(12)).totalCents).toBe(153000);
+    expect((await svc.checkout(12, 'pro')).totalCents).toBe(233580);
+  });
+
+  it('o checkout leva o tipo e o simulador aprova o Pro gravando o tipo', async () => {
+    const c = await svc.checkout(1, 'pro');
+    expect(c.tier).toBe('pro');
+    await svc.mockDecide(c.paymentId, 'approved');
+    expect(auth.subscriptionState()).toMatchObject({ status: 'active', tier: 'pro' });
+  });
+
+  it('mesmo tipo soma ao que sobrou (renovar o Pro)', async () => {
+    await svc.mockDecide((await svc.checkout(1, 'pro')).paymentId, 'approved');
+    const end1 = new Date(auth.subscriptionState().endsAt as string);
+    await svc.mockDecide((await svc.checkout(3, 'pro')).paymentId, 'approved');
+    const end2 = new Date(auth.subscriptionState().endsAt as string);
+    expect(end2.getTime()).toBeGreaterThan(end1.getTime() + 88 * DAY);
+  });
+
+  it('DOWNGRADE: Pro de 12 meses → Básico de 1 mês conta de hoje e descarta o Pro que sobrava', async () => {
+    await svc.mockDecide((await svc.checkout(12, 'pro')).paymentId, 'approved');
+    expect(new Date(auth.subscriptionState().endsAt as string).getTime()).toBeGreaterThan(
+      Date.now() + 360 * DAY,
+    );
+
+    await svc.mockDecide((await svc.checkout(1, 'basic')).paymentId, 'approved');
+
+    const state = auth.subscriptionState();
+    expect(state.tier).toBe('basic');
+    expect(new Date(state.endsAt as string).getTime()).toBeLessThan(Date.now() + 32 * DAY);
+    expect(new Date(state.endsAt as string).getTime()).toBeGreaterThan(Date.now() + 27 * DAY);
+  });
+
+  it('UPGRADE: Básico → Pro também conta de hoje, sem somar ao Básico que sobrava', async () => {
+    await svc.mockDecide((await svc.checkout(12, 'basic')).paymentId, 'approved');
+    await svc.mockDecide((await svc.checkout(1, 'pro')).paymentId, 'approved');
+    const state = auth.subscriptionState();
+    expect(state.tier).toBe('pro');
+    expect(new Date(state.endsAt as string).getTime()).toBeLessThan(Date.now() + 32 * DAY);
+  });
+
+  it('tipo inválido no checkout é recusado', async () => {
+    await expect(svc.checkout(1, 'premium' as never)).rejects.toThrow(
+      'Tipo de assinatura inválido',
+    );
   });
 });

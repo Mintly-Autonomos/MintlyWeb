@@ -7,6 +7,9 @@ import {
   planPerMonthLabel,
   planSavingCents,
   subscriptionHeadline,
+  tierBlurb,
+  tierChangeNotice,
+  tierLabel,
 } from './assinatura.format';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -71,6 +74,63 @@ describe('subscriptionHeadline', () => {
     expect(h.title).toBe('Sua assinatura');
     expect(h.subtitle).toContain(fmtEndsAt(end.toISOString()));
     expect(h.subtitle).toContain('soma');
+  });
+
+  it('ativa: diz o tipo e que trocar de plano começa a contar hoje', () => {
+    const end = new Date(now.getTime() + 20 * DAY);
+    const h = subscriptionHeadline(computeSubscriptionState(end, now, 'pro'));
+    expect(h.subtitle).toContain('Plano Pro ativo até');
+    expect(h.subtitle).toContain('trocar de plano começa a contar hoje');
+  });
+});
+
+describe('tierLabel e tierBlurb', () => {
+  it('nomes dos tipos; vazio sem tipo', () => {
+    expect(tierLabel('basic')).toBe('Básico');
+    expect(tierLabel('pro')).toBe('Pro');
+    expect(tierLabel(null)).toBe('');
+  });
+
+  it('o Pro não promete recurso específico', () => {
+    expect(tierBlurb('basic')).toBe('Tudo o que o Mintly oferece hoje.');
+    expect(tierBlurb('pro')).toContain('chegarão em breve');
+  });
+});
+
+describe('tierChangeNotice (troca de tipo não dá desconto e conta de hoje)', () => {
+  const now = new Date();
+  const active = (tier: 'basic' | 'pro') =>
+    computeSubscriptionState(new Date(now.getTime() + 20 * DAY), now, tier);
+
+  it('mesmo tipo: sem aviso', () => {
+    expect(tierChangeNotice(active('pro'), 'pro')).toBeNull();
+    expect(tierChangeNotice(active('basic'), 'basic')).toBeNull();
+  });
+
+  it('vencida ou sem assinatura: sem aviso (não há tempo a perder)', () => {
+    expect(
+      tierChangeNotice(
+        computeSubscriptionState(new Date(now.getTime() - DAY), now, 'pro'),
+        'basic',
+      ),
+    ).toBeNull();
+    expect(tierChangeNotice(computeSubscriptionState(null, now), 'pro')).toBeNull();
+  });
+
+  it('upgrade: explica a regra e a data que sobrava, sem falar em perder recursos', () => {
+    const n = tierChangeNotice(active('basic'), 'pro')!;
+    expect(n.title).toBe('Você está mudando do Básico para o Pro');
+    expect(n.description).toContain('não dá desconto nem crédito');
+    expect(n.description).toContain(fmtEndsAt(active('basic').endsAt));
+    expect(n.description).toContain('o Pro começa a contar hoje, não quando o Básico terminaria');
+    expect(n.description).not.toContain('perde');
+  });
+
+  it('downgrade: mesma regra e avisa que perde os recursos do Pro', () => {
+    const n = tierChangeNotice(active('pro'), 'basic')!;
+    expect(n.title).toBe('Você está mudando do Pro para o Básico');
+    expect(n.description).toContain('o Básico começa a contar hoje, não quando o Pro terminaria');
+    expect(n.description).toContain('Você perde os recursos do Pro');
   });
 });
 

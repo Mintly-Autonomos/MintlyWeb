@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
-import { computeSubscriptionState, subscriptionPlans } from 'mintly-lib';
-import type { SubscriptionOverview } from 'mintly-lib';
+import { computeSubscriptionState, subscriptionTiers } from 'mintly-lib';
+import type { SubscriptionOverview, SubscriptionTier } from 'mintly-lib';
 import { AuthService } from '../../services/auth.service';
 import { SubscriptionService } from '../../services/subscription.service';
 import { AssinaturaComponent } from './assinatura.component';
@@ -16,13 +16,15 @@ describe('AssinaturaComponent', () => {
   let checkout: ReturnType<typeof vi.fn>;
   let logout: ReturnType<typeof vi.fn>;
   let endsAt: string | null;
+  let tier: SubscriptionTier | null;
 
   const ov = (
     provider: 'mock' | 'mercadopago',
     ends: string | null = null,
+    ovTier: SubscriptionTier | null = tier,
   ): SubscriptionOverview => ({
-    ...computeSubscriptionState(ends),
-    plans: subscriptionPlans(),
+    ...computeSubscriptionState(ends, new Date(), ovTier),
+    tiers: subscriptionTiers(),
     provider,
   });
 
@@ -33,6 +35,7 @@ describe('AssinaturaComponent', () => {
       paymentId: 'p1',
       checkoutUrl: '/assinatura/simulador?pagamento=p1',
       provider: 'mock',
+      tier: 'basic',
       months: 3,
       totalCents: 42750,
     });
@@ -42,7 +45,10 @@ describe('AssinaturaComponent', () => {
         provideRouter([]),
         {
           provide: AuthService,
-          useValue: { subscriptionState: () => computeSubscriptionState(endsAt), logout },
+          useValue: {
+            subscriptionState: () => computeSubscriptionState(endsAt, new Date(), tier),
+            logout,
+          },
         },
         { provide: SubscriptionService, useValue: { overview, refresh, checkout } },
       ],
@@ -55,8 +61,18 @@ describe('AssinaturaComponent', () => {
   }
 
   const el = (f: { nativeElement: HTMLElement }) => f.nativeElement;
+  /** Os períodos (1, 3, 6, 12 meses) do tipo escolhido. */
   const radios = (f: { nativeElement: HTMLElement }) =>
-    Array.from(el(f).querySelectorAll<HTMLButtonElement>('[role="radio"]'));
+    Array.from(
+      el(f).querySelectorAll<HTMLButtonElement>(
+        '[aria-label="Período da assinatura"] [role="radio"]',
+      ),
+    );
+  /** Os tipos (Básico e Pro). */
+  const tierCards = (f: { nativeElement: HTMLElement }) =>
+    Array.from(
+      el(f).querySelectorAll<HTMLButtonElement>('[aria-label="Tipo de assinatura"] [role="radio"]'),
+    );
   const payButton = (f: { nativeElement: HTMLElement }) =>
     Array.from(el(f).querySelectorAll<HTMLButtonElement>('button')).find((b) =>
       /Pagar|Abrindo/.test(norm(b.textContent)),
@@ -64,6 +80,7 @@ describe('AssinaturaComponent', () => {
 
   beforeEach(() => {
     endsAt = null;
+    tier = null;
   });
 
   it('mostra os 4 planos com preço total e desconto', async () => {
@@ -117,7 +134,7 @@ describe('AssinaturaComponent', () => {
     payButton(f).click();
     await f.whenStable();
 
-    expect(checkout).toHaveBeenCalledWith(6);
+    expect(checkout).toHaveBeenCalledWith(6, 'basic');
     expect(navigate).toHaveBeenCalledWith('/assinatura/simulador?pagamento=p1');
   });
 
@@ -170,7 +187,8 @@ describe('AssinaturaComponent', () => {
     endsAt = new Date(Date.now() + 20 * DAY).toISOString();
     const f = await render(ov('mock', endsAt));
     expect(norm(el(f).textContent)).toContain('Sua assinatura');
-    expect(norm(el(f).textContent)).toContain('Renovar agora soma');
+    expect(norm(el(f).textContent)).toContain('Renovar o mesmo plano soma');
+    expect(norm(el(f).textContent)).toContain('trocar de plano começa a contar hoje');
     expect(norm(el(f).textContent)).toContain('Voltar para o app');
   });
 
@@ -195,6 +213,109 @@ describe('AssinaturaComponent', () => {
   it('antes da API responder já mostra os planos da própria lib', async () => {
     const f = await render(null);
     expect(radios(f)).toHaveLength(4);
+  });
+
+  describe('tipos: Básico e Pro', () => {
+    it('mostra Básico e Pro com o valor mensal, e o Pro sem promessa de recurso específico', async () => {
+      const f = await render();
+      const texts = tierCards(f).map((r) => norm(r.textContent));
+      expect(texts).toHaveLength(2);
+      expect(texts[0]).toContain('Básico');
+      expect(texts[0]).toContain('R$ 150,00 por mês');
+      expect(texts[1]).toContain('Pro');
+      expect(texts[1]).toContain('R$ 229,00 por mês');
+      expect(texts[1]).toContain('recursos exclusivos do Pro chegarão em breve');
+    });
+
+    it('sem assinatura começa no Básico', async () => {
+      const f = await render();
+      expect(tierCards(f).map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+    });
+
+    it('escolher o Pro troca os preços dos 4 períodos, com os mesmos descontos', async () => {
+      const f = await render();
+      tierCards(f)[1].click();
+      f.detectChanges();
+      const texts = radios(f).map((r) => norm(r.textContent));
+      expect(texts).toHaveLength(4);
+      expect(texts[0]).toContain('R$ 229,00');
+      expect(texts[1]).toContain('5% de desconto');
+      expect(texts[1]).toContain('R$ 652,65');
+      expect(texts[2]).toContain('10% de desconto');
+      expect(texts[2]).toContain('R$ 1.236,60');
+      expect(texts[3]).toContain('15% de desconto');
+      expect(texts[3]).toContain('R$ 2.335,80');
+      expect(norm(payButton(f).textContent)).toContain('Pagar R$ 652,65 · Pro');
+    });
+
+    it('pagar o Pro manda o tipo junto com o período', async () => {
+      const f = await render();
+      vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      tierCards(f)[1].click();
+      f.detectChanges();
+      radios(f)[0].click();
+      f.detectChanges();
+      payButton(f).click();
+      await f.whenStable();
+      expect(checkout).toHaveBeenCalledWith(1, 'pro');
+    });
+
+    it('quem já tem o Pro abre no Pro, marcado como "Seu plano", sem aviso de troca', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'pro';
+      const f = await render(ov('mock', endsAt, 'pro'));
+      expect(tierCards(f).map((r) => r.getAttribute('aria-checked'))).toEqual(['false', 'true']);
+      expect(norm(tierCards(f)[1].textContent)).toContain('Seu plano');
+      expect(norm(tierCards(f)[0].textContent)).not.toContain('Seu plano');
+      expect(norm(el(f).textContent)).not.toContain('Você está mudando');
+      expect(norm(el(f).textContent)).toContain('Plano Pro ativo até');
+    });
+
+    it('UPGRADE (Básico → Pro) com tempo sobrando: avisa que não há crédito e que conta de hoje', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'basic';
+      const f = await render(ov('mock', endsAt, 'basic'));
+      tierCards(f)[1].click();
+      f.detectChanges();
+      const text = norm(el(f).textContent);
+      expect(text).toContain('Você está mudando do Básico para o Pro');
+      expect(text).toContain('não dá desconto nem crédito');
+      expect(text).toContain('o Pro começa a contar hoje, não quando o Básico terminaria');
+      expect(text).not.toContain('Você perde os recursos do Pro');
+    });
+
+    it('DOWNGRADE (Pro → Básico) com tempo sobrando: descreve a regra e avisa que perde os recursos do Pro', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'pro';
+      const f = await render(ov('mock', endsAt, 'pro'));
+      tierCards(f)[0].click();
+      f.detectChanges();
+      const text = norm(el(f).textContent);
+      expect(text).toContain('Você está mudando do Pro para o Básico');
+      expect(text).toContain('não dá desconto nem crédito');
+      expect(text).toContain('o Básico começa a contar hoje, não quando o Pro terminaria');
+      expect(text).toContain('Você perde os recursos do Pro');
+    });
+
+    it('voltar para o tipo atual tira o aviso', async () => {
+      endsAt = new Date(Date.now() + 20 * DAY).toISOString();
+      tier = 'pro';
+      const f = await render(ov('mock', endsAt, 'pro'));
+      tierCards(f)[0].click();
+      f.detectChanges();
+      tierCards(f)[1].click();
+      f.detectChanges();
+      expect(norm(el(f).textContent)).not.toContain('Você está mudando');
+    });
+
+    it('vencida: trocar de tipo não mostra aviso (não há tempo a perder)', async () => {
+      endsAt = new Date(Date.now() - 3 * DAY).toISOString();
+      tier = 'pro';
+      const f = await render(ov('mock', endsAt, 'pro'));
+      tierCards(f)[0].click();
+      f.detectChanges();
+      expect(norm(el(f).textContent)).not.toContain('Você está mudando');
+    });
   });
 
   it('"Sair da conta" faz logout', async () => {

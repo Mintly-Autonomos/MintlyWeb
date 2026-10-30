@@ -1,17 +1,19 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
+  applySubscriptionPurchase,
   computeSubscriptionState,
-  extendSubscription,
   isSubscriptionPlan,
+  isSubscriptionTier,
   subscriptionPlanPrice,
-  subscriptionPlans,
+  subscriptionTiers,
 } from 'mintly-lib';
 import type {
   Headers,
   SubscriptionCheckoutResponse,
   SubscriptionOverview,
   SubscriptionPlanMonths,
+  SubscriptionTier,
 } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
@@ -37,7 +39,7 @@ export class SubscriptionService {
   private router = inject(Router);
   private client = inject(MintlyClientService).client.subscriptionClient;
 
-  /** Última resposta de GET /subscription (planos, preços e provedor para montar a tela). */
+  /** Última resposta de GET /subscription (tipos com planos, preços e provedor para montar a tela). */
   readonly overview = signal<SubscriptionOverview | null>(null);
 
   private get headers(): Headers {
@@ -64,9 +66,10 @@ export class SubscriptionService {
   async refresh(): Promise<SubscriptionOverview | null> {
     if (environment.useMocks) {
       await delay(150);
+      const current = this.auth.subscriptionState();
       const overview: SubscriptionOverview = {
-        ...computeSubscriptionState(this.mockEndsAt()),
-        plans: subscriptionPlans(),
+        ...computeSubscriptionState(current.endsAt, new Date(), current.tier),
+        tiers: subscriptionTiers(),
         provider: 'mock',
       };
       this.overview.set(overview);
@@ -77,7 +80,7 @@ export class SubscriptionService {
       const overview = response.payload ?? null;
       if (overview) {
         this.overview.set(overview);
-        this.auth.setSubscriptionEndsAt(overview.endsAt);
+        this.auth.setSubscriptionEndsAt(overview.endsAt, overview.tier);
       }
       return overview;
     } catch (err) {
@@ -121,21 +124,26 @@ export class SubscriptionService {
   }
 
   /** Cria a cobrança do plano. Devolve para onde levar a pessoa pagar. */
-  async checkout(months: SubscriptionPlanMonths): Promise<SubscriptionCheckoutResponse> {
+  async checkout(
+    months: SubscriptionPlanMonths,
+    tier: SubscriptionTier = 'basic',
+  ): Promise<SubscriptionCheckoutResponse> {
     if (!isSubscriptionPlan(months)) throw new Error('Plano inválido.');
+    if (!isSubscriptionTier(tier)) throw new Error('Tipo de assinatura inválido.');
     if (environment.useMocks) {
       await delay();
       this.rememberBaseline();
-      const paymentId = `mock-${months}-${Date.now()}`;
+      const paymentId = `mock-${tier}-${months}-${Date.now()}`;
       return {
         paymentId,
         checkoutUrl: `/assinatura/simulador?pagamento=${paymentId}`,
         provider: 'mock',
+        tier,
         months,
-        totalCents: subscriptionPlanPrice(months).totalCents,
+        totalCents: subscriptionPlanPrice(months, tier).totalCents,
       };
     }
-    const response = await this.call((headers) => this.client.checkout({ months }, headers));
+    const response = await this.call((headers) => this.client.checkout({ months, tier }, headers));
     if (!response.payload) throw new Error('Resposta de pagamento sem dados.');
     this.rememberBaseline();
     return response.payload;
@@ -146,20 +154,22 @@ export class SubscriptionService {
     if (environment.useMocks) {
       await delay();
       if (decision === 'approved') {
-        const months = Number(/^mock-(\d+)-/.exec(paymentId)?.[1]);
-        if (isSubscriptionPlan(months)) {
-          const current = this.mockEndsAt();
-          const endsAt = extendSubscription(current ? new Date(current) : null, months);
-          this.auth.setSubscriptionEndsAt(endsAt.toISOString());
+        const match = /^mock-(basic|pro)-(\d+)-/.exec(paymentId);
+        const tier = match?.[1];
+        const months = Number(match?.[2]);
+        if (isSubscriptionTier(tier) && isSubscriptionPlan(months)) {
+          const current = this.auth.subscriptionState();
+          // Mesma regra da API: mesmo tipo soma ao que sobrou; tipo diferente conta de hoje.
+          const purchase = applySubscriptionPurchase(
+            { endsAt: current.endsAt ? new Date(current.endsAt) : null, tier: current.tier },
+            { tier, months },
+          );
+          this.auth.setSubscriptionEndsAt(purchase.endsAt.toISOString(), purchase.tier);
         }
       }
       return;
     }
     await this.call((headers) => this.client.mockDecide({ paymentId, decision }, headers));
     await this.refresh();
-  }
-
-  private mockEndsAt(): string | null {
-    return this.auth.subscriptionState().endsAt;
   }
 }
