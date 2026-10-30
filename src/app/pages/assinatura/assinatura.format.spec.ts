@@ -35,7 +35,7 @@ describe('planLabel', () => {
 describe('preço por mês e economia', () => {
   it('3 meses: R$ 142,50 por mês e economiza R$ 22,50', () => {
     const plan = subscriptionPlanPrice(3);
-    expect(norm(planPerMonthLabel(plan))).toBe('R$ 142,50 por mês');
+    expect(norm(planPerMonthLabel(plan))).toBe('R$ 142,50 por mês · 90 dias de acesso');
     expect(planSavingCents(plan)).toBe(2250);
   });
 

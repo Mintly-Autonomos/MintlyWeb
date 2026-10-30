@@ -283,7 +283,7 @@ describe('SubscriptionService (modo mock)', () => {
   it('DOWNGRADE: Pro de 12 meses → Básico de 1 mês conta de hoje e descarta o Pro que sobrava', async () => {
     await svc.mockDecide((await svc.checkout(12, 'pro')).paymentId, 'approved');
     expect(new Date(auth.subscriptionState().endsAt as string).getTime()).toBeGreaterThan(
-      Date.now() + 360 * DAY,
+      Date.now() + 359 * DAY,
     );
 
     await svc.mockDecide((await svc.checkout(1, 'basic')).paymentId, 'approved');
@@ -300,6 +300,19 @@ describe('SubscriptionService (modo mock)', () => {
     const state = auth.subscriptionState();
     expect(state.tier).toBe('pro');
     expect(new Date(state.endsAt as string).getTime()).toBeLessThan(Date.now() + 32 * DAY);
+  });
+
+  it.each([
+    [1, 30],
+    [3, 90],
+    [6, 180],
+    [12, 360],
+  ] as const)('dias fixos: %i mês(es) libera %i dias', async (months, days) => {
+    const before = Date.now();
+    await svc.mockDecide((await svc.checkout(months)).paymentId, 'approved');
+    const ends = new Date(auth.subscriptionState().endsAt as string).getTime();
+    expect(ends).toBeGreaterThanOrEqual(before + days * DAY);
+    expect(ends).toBeLessThanOrEqual(Date.now() + days * DAY);
   });
 
   it('tipo inválido no checkout é recusado', async () => {

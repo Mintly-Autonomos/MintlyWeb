@@ -51,7 +51,7 @@ export function fmtEndsAt(iso: string | null): string {
 }
 
 export function planPerMonthLabel(plan: SubscriptionPlanOption): string {
-  return `${formatCents(plan.perMonthCents)} por mês`;
+  return `${formatCents(plan.perMonthCents)} por mês · ${plan.days} dias de acesso`;
 }
 
 /** Quanto o plano economiza frente a pagar mês a mês, em reais (só faz sentido com desconto). */

@@ -103,6 +103,10 @@ describe('AssinaturaComponent', () => {
     const f = await render();
     const three = norm(radios(f)[1].textContent);
     expect(three).toContain('R$ 142,50 por mês');
+    expect(three).toContain('90 dias de acesso');
+    expect(norm(radios(f)[0].textContent)).toContain('30 dias de acesso');
+    expect(norm(radios(f)[2].textContent)).toContain('180 dias de acesso');
+    expect(norm(radios(f)[3].textContent)).toContain('360 dias de acesso');
     expect(three).toContain('você economiza R$ 22,50');
   });
 
