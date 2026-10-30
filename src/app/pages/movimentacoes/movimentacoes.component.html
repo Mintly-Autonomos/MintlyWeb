@@ -62,12 +62,12 @@
       label="Tipo"
       [value]="typeFilter()"
       [options]="typeOpts"
-      (valueChange)="typeFilter.set($any($event))"
+      (valueChange)="setTypeFilter($any($event))"
     />
     <app-filter-select
       label="Status"
       [value]="statusFilter()"
-      [options]="statusOpts"
+      [options]="statusOpts()"
       (valueChange)="statusFilter.set($any($event))"
     />
     <app-filter-select
@@ -294,12 +294,13 @@
             />
             <p class="mt-2 text-sm font-medium">Arraste o arquivo aqui</p>
             <p class="text-[12px] text-muted-foreground mt-1">
-              ou clique para selecionar uma planilha .xlsx preenchida com o modelo
+              ou clique para selecionar uma planilha .xlsx ou .csv (o modelo ajuda, mas outras
+              planilhas também funcionam)
             </p>
             <label class="mt-3 inline-block">
               <input
                 type="file"
-                accept=".xlsx"
+                accept=".xlsx,.csv,.txt"
                 class="hidden"
                 (change)="onImportFilePicked($event)"
               />
@@ -390,6 +391,7 @@
                 >R$</span
               >
               <input
+                appMoneyInput
                 [value]="form().value"
                 (input)="setFormField('value', $any($event.target).value)"
                 type="text"
@@ -402,7 +404,7 @@
               <p class="text-error text-[12px] mt-1">{{ amountError }}</p>
             } @else {
               <p class="text-muted-foreground text-[12px] mt-1">
-                Use ponto ou vírgula para os centavos.
+                Digite os centavos depois da vírgula (ex.: 1.234,50).
               </p>
             }
           </label>
@@ -808,6 +810,90 @@
         >
       </div>
 
+      @if (
+        blankCount('type') +
+          blankCount('categoryName') +
+          blankCount('accountName') +
+          blankCount('paymentMethod') +
+          blankCount('status') >
+        0
+      ) {
+        <div class="rounded-xl border border-border bg-muted/40 p-3">
+          <p class="text-[12.5px] font-medium">
+            Faltou algo na planilha? Preencha de uma vez as linhas em branco:
+          </p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            @if (blankCount('type') > 0) {
+              <select
+                (change)="
+                  fillBlank('type', $any($event.target).value); $any($event.target).value = ''
+                "
+                class="h-8 rounded-lg border border-border bg-card px-2 text-[12px] cursor-pointer"
+              >
+                <option value="">Tipo ({{ blankCount('type') }})…</option>
+                <option value="income">Receita</option>
+                <option value="expense">Despesa</option>
+              </select>
+            }
+            @if (blankCount('categoryName') > 0) {
+              <select
+                (change)="
+                  fillBlank('categoryName', $any($event.target).value);
+                  $any($event.target).value = ''
+                "
+                class="h-8 rounded-lg border border-border bg-card px-2 text-[12px] cursor-pointer"
+              >
+                <option value="">Categoria ({{ blankCount('categoryName') }})…</option>
+                @for (c of allActiveCategories(); track c.id) {
+                  <option [value]="c.name">{{ c.name }}</option>
+                }
+              </select>
+            }
+            @if (blankCount('accountName') > 0) {
+              <select
+                (change)="
+                  fillBlank('accountName', $any($event.target).value);
+                  $any($event.target).value = ''
+                "
+                class="h-8 rounded-lg border border-border bg-card px-2 text-[12px] cursor-pointer"
+              >
+                <option value="">Conta ({{ blankCount('accountName') }})…</option>
+                @for (a of accounts(); track a.id) {
+                  <option [value]="a.name">{{ a.name }}</option>
+                }
+              </select>
+            }
+            @if (blankCount('paymentMethod') > 0) {
+              <select
+                (change)="
+                  fillBlank('paymentMethod', $any($event.target).value);
+                  $any($event.target).value = ''
+                "
+                class="h-8 rounded-lg border border-border bg-card px-2 text-[12px] cursor-pointer"
+              >
+                <option value="">Forma de pagamento ({{ blankCount('paymentMethod') }})…</option>
+                @for (pm of paymentMethods; track pm) {
+                  <option [value]="pm">{{ pm }}</option>
+                }
+              </select>
+            }
+            @if (blankCount('status') > 0) {
+              <select
+                (change)="
+                  fillBlank('status', $any($event.target).value); $any($event.target).value = ''
+                "
+                class="h-8 rounded-lg border border-border bg-card px-2 text-[12px] cursor-pointer"
+              >
+                <option value="">Status ({{ blankCount('status') }})…</option>
+                <option value="settled">Concluído (Recebido ou Pago)</option>
+                <option value="pending">Pendente</option>
+                <option value="cancelled">Cancelado</option>
+              </select>
+            }
+          </div>
+        </div>
+      }
+
       <div class="rounded-xl border border-border overflow-hidden">
         <div class="overflow-x-auto max-h-[420px]">
           <table class="w-full text-[12px]">
@@ -849,10 +935,16 @@
                   </td>
                   <td class="px-2 py-1.5">
                     <select
-                      [value]="row.type"
-                      (change)="updateRowField(i, 'type', $any($event.target).value)"
-                      class="h-8 rounded-lg border border-border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer"
+                      [value]="row.type ?? ''"
+                      (change)="updateRowField(i, 'type', $any($event.target).value || null)"
+                      [class]="
+                        'h-8 rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
+                        (row.type ? 'border-border' : 'border-error/60')
+                      "
                     >
+                      @if (!row.type) {
+                        <option value="" [selected]="true">(selecione)</option>
+                      }
                       @for (o of importTypeOpts; track o.value) {
                         <option [value]="o.value" [selected]="o.value === row.type">
                           {{ o.label }}
@@ -900,7 +992,7 @@
                           {{ row.categoryName || '(selecione)' }}
                         </option>
                       }
-                      @for (c of allActiveCategories(); track c.id) {
+                      @for (c of importCategoriesFor(row); track c.id) {
                         <option [value]="c.name" [selected]="c.name === row.categoryName">
                           {{ c.name }}
                         </option>
@@ -938,9 +1030,12 @@
                           $any($event.target).value ? $any($event.target).value : null
                         )
                       "
-                      class="h-8 w-28 rounded-lg border border-border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer"
+                      [class]="
+                        'h-8 w-28 rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
+                        (row.paymentMethod ? 'border-border' : 'border-error/60')
+                      "
                     >
-                      <option value="" [selected]="!row.paymentMethod">—</option>
+                      <option value="" [selected]="!row.paymentMethod">(selecione)</option>
                       @for (pm of paymentMethods; track pm) {
                         <option [value]="pm" [selected]="pm === row.paymentMethod">{{ pm }}</option>
                       }
@@ -948,10 +1043,16 @@
                   </td>
                   <td class="px-2 py-1.5">
                     <select
-                      [value]="row.status"
-                      (change)="updateRowField(i, 'status', $any($event.target).value)"
-                      class="h-8 w-28 rounded-lg border border-border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer"
+                      [value]="row.status ?? ''"
+                      (change)="updateRowField(i, 'status', $any($event.target).value || null)"
+                      [class]="
+                        'h-8 w-28 rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
+                        (row.status ? 'border-border' : 'border-error/60')
+                      "
                     >
+                      @if (!row.status) {
+                        <option value="" [selected]="true">(selecione)</option>
+                      }
                       @for (o of importStatusOpts; track o.value) {
                         <option [value]="o.value" [selected]="o.value === row.status">
                           {{ o.label }}
@@ -993,7 +1094,9 @@
         >
           {{
             confirmingImport()
-              ? 'Importando…'
+              ? importProgress()
+                ? 'Importando ' + importProgress()!.done + ' de ' + importProgress()!.total + '…'
+                : 'Importando…'
               : 'Confirmar importação (' + importIncludedCount() + ')'
           }}
         </button>

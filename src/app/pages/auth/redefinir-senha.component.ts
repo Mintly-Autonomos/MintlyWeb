@@ -1,5 +1,6 @@
 import { Component, signal, inject } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
+import { apiErrorMessage } from '../../shared/api-error-message';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
@@ -177,7 +178,6 @@ export class RedefinirSenhaComponent {
   }
 
   private errMsg(err: unknown): string {
-    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
-    return data?.message ?? 'Não foi possível redefinir a senha. O link pode ter expirado.';
+    return apiErrorMessage(err, 'Não foi possível redefinir a senha. O link pode ter expirado.');
   }
 }

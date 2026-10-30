@@ -1,4 +1,4 @@
-import { fmtShortDate, maskPhoneBR } from './format';
+import { fmtShortDate, localISODate, localISOMonth, maskPhoneBR } from './format';
 
 // O runner dos testes é Node; o tsconfig.spec não carrega @types/node.
 declare const process: { env: Record<string, string | undefined> };
@@ -38,5 +38,21 @@ describe('maskPhoneBR', () => {
     expect(maskPhoneBR('')).toBe('');
     expect(maskPhoneBR('1')).toBe('(1');
     expect(maskPhoneBR('119')).toBe('(11) 9');
+  });
+});
+
+describe('localISODate / localISOMonth', () => {
+  it('usa o calendário de quem usa, não o UTC (23h30 do dia 29 continua dia 29)', () => {
+    const noite = new Date(2026, 9, 29, 23, 30);
+    expect(localISODate(noite)).toBe('2026-10-29');
+    expect(localISOMonth(noite)).toBe('2026-10');
+  });
+
+  it('último minuto do mês continua no mês', () => {
+    expect(localISOMonth(new Date(2026, 9, 31, 23, 59))).toBe('2026-10');
+  });
+
+  it('completa com zero', () => {
+    expect(localISODate(new Date(2026, 0, 5))).toBe('2026-01-05');
   });
 });

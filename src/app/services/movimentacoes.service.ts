@@ -2,7 +2,6 @@ import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Workbook } from 'exceljs';
 import {
-  IMPORT_MOVEMENTS_MAX_ROWS,
   MovementDirection,
   MovementStatus,
   MovementChannel,
@@ -17,6 +16,18 @@ import type {
 } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { apiErrorInfo } from '../shared/api-error';
+import {
+  decodeCsv,
+  mapColumns,
+  parseCsv,
+  parsePayment,
+  parseStatus,
+  parseType,
+  templateColumns,
+} from '../shared/import-parse';
+import type { ImportField } from '../shared/import-parse';
+import { localISODate } from '../shared/format';
 import { MintlyClientService } from './mintly-client.service';
 import mockMovements from '../mocks/mock_movements.json';
 
@@ -135,9 +146,9 @@ function fromMovStatus(status: MovStatus): MovementStatus {
 }
 
 function toISODate(value: unknown): string {
-  if (!value) return new Date().toISOString().slice(0, 10);
+  if (!value) return localISODate();
   const d = value instanceof Date ? value : new Date(value as string);
-  return isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
+  return isNaN(d.getTime()) ? localISODate() : d.toISOString().slice(0, 10);
 }
 function toISODateOrNull(value: unknown): string | null {
   if (!value) return null;
@@ -214,14 +225,18 @@ export class DuplicateMovementError extends Error {}
 /** Uma linha da planilha, já traduzida pro shape da tela (o parse em si é feito no front — não existe endpoint de upload). */
 export interface ImportMovementItem {
   row: number;
-  type: MovType;
+  /** `null` = a planilha não disse (ou não deu para entender): a pessoa escolhe na revisão. */
+  type: MovType | null;
   title: string;
   value: number;
+  /** AAAA-MM-DD; vazio quando a planilha não trouxe uma data válida. */
   date: string;
+  /** O que a planilha trazia numa data que não deu para entender (para a mensagem de erro). */
+  dateRaw?: string;
   categoryName: string;
   accountName: string;
   paymentMethod: PaymentMethod | null;
-  status: MovStatus;
+  status: MovStatus | null;
   notes: string | null;
   valid: boolean;
   error: string | null;
@@ -247,6 +262,16 @@ export interface ImportMovementsResult {
 }
 
 const normalizeName = (name: string): string => name.trim().toLowerCase();
+
+/**
+ * Linhas por pedido à API. A API grava uma a uma (cada uma numa transação) e o pedido tem limite de
+ * tempo (15 s no cliente): um arquivo de 55 linhas num pedido só estourava o tempo mesmo gravando tudo.
+ * Em lotes pequenos cada pedido responde rápido e a tela mostra o andamento.
+ */
+export const IMPORT_CHUNK_ROWS = 20;
+
+/** Tamanho máximo do título de uma movimentação (a API recusa mais que isso). */
+export const MOVEMENT_TITLE_MAX = 120;
 
 /**
  * Número como o brasileiro digita: "1.234,50", "R$ 1.234,50", "184,5", "1234.5". Vírgula é o
@@ -323,7 +348,7 @@ export class MovimentacoesService {
   }
 
   private statusOf(err: unknown): number | undefined {
-    return (err as { response?: { status?: number } })?.response?.status;
+    return apiErrorInfo(err).status;
   }
 
   async refresh(): Promise<void> {
@@ -445,7 +470,7 @@ export class MovimentacoesService {
       if (mov) {
         mov.status = status;
         if (status === 'received' || status === 'paid') {
-          mov.settledAt = settledAt ?? new Date().toISOString().slice(0, 10);
+          mov.settledAt = settledAt ?? localISODate();
         }
         mov.updatedBy = this.by;
         mov.updatedAt = new Date().toISOString();
@@ -478,6 +503,7 @@ export class MovimentacoesService {
       categories: { id: string; name: string; type: MovType }[];
       accounts: { id: string; name: string }[];
     },
+    onProgress?: (done: number, total: number) => void,
   ): Promise<ImportMovementsResult> {
     if (environment.useMocks) {
       const result = await this.fetchConfirmMock(items);
@@ -501,6 +527,14 @@ export class MovimentacoesService {
     const seen = new Set<string>();
     const rows: ImportMovementRow[] = [];
     for (const item of items) {
+      if (!item.type || !item.paymentMethod || !item.status) {
+        failedRows.push({
+          row: item.row,
+          title: item.title,
+          error: 'Faltou escolher o tipo, a forma de pagamento ou o status.',
+        });
+        continue;
+      }
       const categoryId = categories.get(`${item.type}|${normalizeName(item.categoryName)}`);
       const accountId = accounts.get(normalizeName(item.accountName));
       if (!categoryId || !accountId) {
@@ -522,7 +556,7 @@ export class MovimentacoesService {
         date: item.date,
         accountId,
         categoryId,
-        paymentMethod: PAYMENT_TO_LIB[item.paymentMethod ?? 'Dinheiro'],
+        paymentMethod: PAYMENT_TO_LIB[item.paymentMethod],
         status: fromMovStatus(item.status),
         ...(item.notes ? { description: item.notes } : {}),
         ...(repeated ? { confirmDuplicate: true } : {}),
@@ -531,8 +565,9 @@ export class MovimentacoesService {
 
     const titles = new Map(items.map((i) => [i.row, i.title]));
     let replayed = false;
-    for (let from = 0; from < rows.length; from += IMPORT_MOVEMENTS_MAX_ROWS) {
-      const chunk = rows.slice(from, from + IMPORT_MOVEMENTS_MAX_ROWS);
+    onProgress?.(0, rows.length);
+    for (let from = 0; from < rows.length; from += IMPORT_CHUNK_ROWS) {
+      const chunk = rows.slice(from, from + IMPORT_CHUNK_ROWS);
       const idempotencyKey = this.importKeyFor(chunk);
       const response = await this.call((headers) =>
         this.movementClient.importMovements({ idempotencyKey, rows: chunk }, headers),
@@ -542,6 +577,7 @@ export class MovimentacoesService {
       // Chegou resposta: a próxima importação desse mesmo conteúdo é uma nova, não um reenvio.
       this.importKeys.delete(JSON.stringify(chunk));
       replayed ||= result.replayed;
+      onProgress?.(Math.min(from + chunk.length, rows.length), rows.length);
       for (const r of result.results) {
         if (r.status === 'created' && r.movement) {
           inserted.push(toMovement(r.movement));
@@ -578,113 +614,56 @@ export class MovimentacoesService {
   /** Motivo da falha de uma linha, em linguagem de gente: usa o que a API respondeu. */
   private importFailure(error: { code: string; message: string } | undefined): string {
     if (error?.code === 'VALIDATION_ERROR') {
-      return 'A API recusou os dados: confira data, valor e se a categoria é do mesmo tipo da linha.';
+      // A API diz quais campos recusou (ex.: "Dados inválidos (title: ...)"): mostra o motivo exato.
+      return error.message
+        ? `A API recusou os dados: ${error.message}`
+        : 'A API recusou os dados: confira data, valor e se a categoria é do mesmo tipo da linha.';
     }
     return error?.message || 'Falha ao gravar.';
   }
 
   /**
-   * Lê o .xlsx de verdade (colunas na mesma ordem do modelo baixado: Tipo, Título, Valor,
-   * Data, Categoria, Conta, Forma de pagamento, Status, Observações) e monta a prévia.
-   * Só valida o que é formato de célula aqui (célula vazia, tipo/status não reconhecido...) —
-   * se a categoria/conta existe de verdade é revalidado na tela, contra os cadastros atuais.
+   * Lê a planilha (.xlsx ou .csv) no front e monta a prévia. As colunas são achadas pelo NOME do
+   * cabeçalho (sem diferenciar caixa nem acento, com sinônimos); sem cabeçalho reconhecível vale a
+   * ordem do modelo (Tipo, Título, Valor, Data, Categoria, Conta, Forma de pagamento, Status,
+   * Observações). O que a planilha não trouxer fica em branco: a pessoa completa na revisão.
+   * Se a categoria/conta existe de verdade é revalidado na tela, contra os cadastros atuais.
    */
   private async fetchPreview(file: File): Promise<ImportMovementsPreview> {
     const formatoMsg =
-      'Não foi possível ler o arquivo. Envie uma planilha .xlsx (baixe o modelo e preencha).';
-    if (!/\.xlsx$/i.test(file.name)) throw new Error(formatoMsg);
-    const workbook = new Workbook();
-    try {
-      await workbook.xlsx.load(await file.arrayBuffer());
-    } catch {
-      throw new Error(formatoMsg);
-    }
-    const sheet = workbook.getWorksheet('Movimentações') ?? workbook.worksheets[0];
-    if (!sheet) {
-      throw new Error('Não foi possível ler nenhuma aba no arquivo enviado.');
-    }
+      'Não foi possível ler o arquivo. Envie uma planilha .xlsx ou um arquivo .csv (baixe o modelo e preencha).';
+    const isCsv = /\.(csv|txt)$/i.test(file.name);
+    if (!isCsv && !/\.xlsx$/i.test(file.name)) throw new Error(formatoMsg);
 
-    const TIPO_MAP: Record<string, MovType> = { receita: 'income', despesa: 'expense' };
-    const STATUS_MAP: Record<string, MovStatus> = {
-      recebido: 'received',
-      pago: 'paid',
-      pendente: 'pending',
-      cancelado: 'cancelled',
-    };
-
-    const cellText = (value: unknown): string => {
-      if (value === null || value === undefined) return '';
-      if (value instanceof Date) return value.toISOString().slice(0, 10);
-      if (typeof value === 'object' && 'text' in (value as Record<string, unknown>)) {
-        return String((value as { text: unknown }).text ?? '').trim();
+    const grid: ImportGridRow[] = [];
+    if (isCsv) {
+      let rows: string[][];
+      try {
+        rows = parseCsv(decodeCsv(await file.arrayBuffer()));
+      } catch {
+        throw new Error(formatoMsg);
       }
-      return String(value).trim();
-    };
-    const cellDate = (value: unknown): string => {
-      if (value instanceof Date) return value.toISOString().slice(0, 10);
-      return cellText(value);
-    };
-    const cellNumber = (value: unknown): number =>
-      typeof value === 'number' ? value : parseNumberBR(cellText(value));
-
-    const items: ImportMovementItem[] = [];
-    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber === 1) return; // cabeçalho
-      const tipoRaw = cellText(row.getCell(1).value).toLowerCase();
-      const title = cellText(row.getCell(2).value);
-      const value = cellNumber(row.getCell(3).value);
-      const dateRaw = cellDate(row.getCell(4).value);
-      const date = normalizeDate(dateRaw) ?? dateRaw;
-      const categoryName = cellText(row.getCell(5).value);
-      const accountName = cellText(row.getCell(6).value);
-      const paymentRaw = cellText(row.getCell(7).value);
-      const statusRaw = cellText(row.getCell(8).value).toLowerCase();
-      const notes = cellText(row.getCell(9).value) || null;
-
-      // Linha inteiramente vazia (sobra de formatação) — ignora.
-      if (!tipoRaw && !title && !value && !date && !categoryName && !accountName) return;
-
-      const errors: string[] = [];
-      const type = TIPO_MAP[tipoRaw];
-      if (!type) errors.push(`tipo "${tipoRaw || '(vazio)'}" inválido (use receita ou despesa)`);
-      if (!title) errors.push('título vazio');
-      if (!(value > 0)) errors.push('valor deve ser maior que zero');
-      if (!dateRaw) errors.push('data vazia');
-      else if (normalizeDate(dateRaw) === null) {
-        errors.push(`data "${dateRaw}" inválida (use AAAA-MM-DD ou DD/MM/AAAA)`);
+      rows.forEach((cells, i) => grid.push({ row: i + 1, cells }));
+    } else {
+      const workbook = new Workbook();
+      try {
+        await workbook.xlsx.load(await file.arrayBuffer());
+      } catch {
+        throw new Error(formatoMsg);
       }
-      if (!categoryName) errors.push('categoria vazia');
-      if (!accountName) errors.push('conta vazia');
-
-      const paymentMethod = (PAYMENT_METHODS as readonly string[]).includes(paymentRaw)
-        ? (paymentRaw as PaymentMethod)
-        : null;
-      const status = STATUS_MAP[statusRaw] ?? 'pending';
-
-      items.push({
-        row: rowNumber,
-        type: type ?? 'income',
-        title,
-        value,
-        date,
-        categoryName,
-        accountName,
-        paymentMethod,
-        status,
-        notes,
-        valid: errors.length === 0,
-        error: errors.length ? errors.join('; ') : null,
+      const sheet = workbook.getWorksheet('Movimentações') ?? workbook.worksheets[0];
+      if (!sheet) {
+        throw new Error('Não foi possível ler nenhuma aba no arquivo enviado.');
+      }
+      const width = Math.max(sheet.columnCount, 1);
+      sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        grid.push({
+          row: rowNumber,
+          cells: Array.from({ length: width }, (_, i) => row.getCell(i + 1).value),
+        });
       });
-    });
-
-    const validRows = items.filter((i) => i.valid).length;
-    return {
-      fileName: file.name,
-      totalRows: items.length,
-      validRows,
-      invalidRows: items.length - validRows,
-      items,
-    };
+    }
+    return buildImportPreview(file.name, grid);
   }
 
   private async fetchConfirmMock(items: ImportMovementItem[]): Promise<ImportMovementsResult> {
@@ -694,8 +673,8 @@ export class MovimentacoesService {
       const mov: Movement = {
         id: `import-${Date.now()}-${this.mockStore.length}`,
         title: i.title,
-        type: i.type,
-        status: i.status,
+        type: i.type ?? 'income',
+        status: i.status ?? 'pending',
         date: i.date,
         dueDate: null,
         settledAt: i.status === 'received' || i.status === 'paid' ? i.date : null,
@@ -716,4 +695,116 @@ export class MovimentacoesService {
     });
     return { insertedCount: inserted.length, items: inserted, failedRows: [] };
   }
+}
+
+/** Uma linha do arquivo (xlsx ou csv) com o número que ela tem na planilha. */
+export interface ImportGridRow {
+  row: number;
+  cells: unknown[];
+}
+
+const cellText = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === 'object') {
+    const v = value as { text?: unknown; result?: unknown; richText?: { text: string }[] };
+    if (v.richText)
+      return v.richText
+        .map((r) => r.text)
+        .join('')
+        .trim();
+    if (v.text !== undefined) return String(v.text ?? '').trim();
+    if (v.result !== undefined) return String(v.result ?? '').trim();
+  }
+  return String(value).trim();
+};
+
+/**
+ * Monta a prévia a partir das linhas lidas (a primeira é o cabeçalho). Só garante o que dá para saber
+ * pela linha em si; o que falta (tipo, categoria, conta, forma de pagamento, status) vira erro de
+ * "preencher na revisão", não impede o resto da linha de ser lido.
+ */
+export function buildImportPreview(
+  fileName: string,
+  grid: ImportGridRow[],
+): ImportMovementsPreview {
+  const [header, ...body] = grid;
+  if (!header) return { fileName, totalRows: 0, validRows: 0, invalidRows: 0, items: [] };
+
+  let columns = mapColumns(header.cells.map(cellText));
+  // Cabeçalho que não é reconhecido (ou quase nada): vale a ordem do modelo do Mintly.
+  if (Object.keys(columns).length < 2) columns = templateColumns();
+  const cell = (cells: unknown[], field: ImportField): unknown =>
+    columns[field] === undefined ? undefined : cells[columns[field]!];
+
+  const items: ImportMovementItem[] = [];
+  for (const { row, cells } of body) {
+    const tipoRaw = cellText(cell(cells, 'type'));
+    const title = cellText(cell(cells, 'title'));
+    const valueCell = cell(cells, 'value');
+    let value = typeof valueCell === 'number' ? valueCell : parseNumberBR(cellText(valueCell));
+    const dateCell = cell(cells, 'date');
+    const dateRaw = cellText(dateCell);
+    const date = normalizeDate(dateRaw) ?? '';
+    const categoryName = cellText(cell(cells, 'category'));
+    const accountName = cellText(cell(cells, 'account'));
+    const paymentRaw = cellText(cell(cells, 'payment'));
+    const statusRaw = cellText(cell(cells, 'status'));
+    const notes = cellText(cell(cells, 'notes')) || null;
+
+    // Linha inteiramente vazia (sobra de formatação) — ignora.
+    if (!tipoRaw && !title && !value && !dateRaw && !categoryName && !accountName) continue;
+
+    let type: MovType | null = parseType(tipoRaw);
+    // Sem tipo na planilha, valor negativo é saída (e o valor passa a ser positivo).
+    if (!type && value < 0) type = 'expense';
+    if (value < 0) value = -value;
+
+    const paymentMethod = parsePayment(paymentRaw, PAYMENT_METHODS);
+    const status = parseStatus(statusRaw, type);
+
+    const errors: string[] = [];
+    if (!type) errors.push(tipoRaw ? `tipo "${tipoRaw}" não reconhecido` : 'falta o tipo');
+    if (!title) errors.push('título vazio');
+    else if (title.length > MOVEMENT_TITLE_MAX) {
+      errors.push(
+        `título passa de ${MOVEMENT_TITLE_MAX} caracteres (tem ${title.length}): encurte`,
+      );
+    }
+    if (!(value > 0)) errors.push('valor deve ser maior que zero');
+    if (!date) {
+      errors.push(
+        dateRaw ? `data "${dateRaw}" inválida (use AAAA-MM-DD ou DD/MM/AAAA)` : 'data vazia',
+      );
+    }
+    if (!categoryName) errors.push('falta a categoria');
+    if (!accountName) errors.push('falta a conta');
+    if (!paymentMethod) errors.push('falta a forma de pagamento');
+    if (!status) errors.push('falta o status');
+
+    items.push({
+      row,
+      type,
+      title,
+      value,
+      date,
+      ...(dateRaw && !date ? { dateRaw } : {}),
+      categoryName,
+      accountName,
+      paymentMethod,
+      status,
+      notes,
+      valid: errors.length === 0,
+      error: errors.length ? errors.join('; ') : null,
+    });
+  }
+
+  const validRows = items.filter((i) => i.valid).length;
+  return {
+    fileName,
+    totalRows: items.length,
+    validRows,
+    invalidRows: items.length - validRows,
+    items,
+  };
 }

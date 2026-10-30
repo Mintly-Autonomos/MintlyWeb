@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { apiErrorInfo } from '../shared/api-error';
 import { CategoriasService } from './categorias.service';
 import { ContasService } from './contas.service';
 import { MintlyClientService } from './mintly-client.service';
@@ -57,11 +58,7 @@ export class PrevisoesService {
   }
 
   private isUnauthorized(err: unknown): boolean {
-    return (
-      typeof err === 'object' &&
-      err !== null &&
-      (err as { response?: { status?: number } }).response?.status === 401
-    );
+    return typeof err === 'object' && err !== null && apiErrorInfo(err).status === 401;
   }
 
   /** Fração de imposto sobre a venda do mês (impostos ÷ receita bruta do DRE); 0 sem regime. */

@@ -15,6 +15,7 @@ import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { FilterBarComponent, FilterSelectComponent } from '../../shared/filter-bar.component';
 import { AuditTimelineComponent } from '../../shared/audit-timeline.component';
 import { ToastService } from '../../shared/toast.service';
+import { apiErrorMessage } from '../../shared/api-error-message';
 import { fmtDateTime } from '../../shared/format';
 
 interface CatForm {
@@ -165,8 +166,7 @@ export class CategoriasComponent implements OnInit {
   }
 
   private errMsg(err: unknown): string {
-    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
-    return data?.message ?? 'Não foi possível concluir a operação. Tente novamente.';
+    return apiErrorMessage(err);
   }
 
   async save(): Promise<void> {

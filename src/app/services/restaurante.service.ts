@@ -4,6 +4,8 @@ import { TaxRegime } from 'mintly-lib';
 import type { Headers, RestaurantTaxProfile as LibTaxProfile } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { apiErrorInfo } from '../shared/api-error';
+import { localISOMonth } from '../shared/format';
 import { MintlyClientService } from './mintly-client.service';
 
 export type TaxRegimeKey = 'mei' | 'simplesNacionalAnexoI';
@@ -125,11 +127,7 @@ export class RestauranteService {
   }
 
   private isUnauthorized(err: unknown): boolean {
-    return (
-      typeof err === 'object' &&
-      err !== null &&
-      (err as { response?: { status?: number } }).response?.status === 401
-    );
+    return typeof err === 'object' && err !== null && apiErrorInfo(err).status === 401;
   }
 
   private mockProfile(month?: string): RestaurantProfile {
@@ -138,7 +136,7 @@ export class RestauranteService {
       taxRegime: mockState.taxRegime,
       tax: {
         regime: mockState.taxRegime,
-        referenceMonth: month ?? new Date().toISOString().slice(0, 7),
+        referenceMonth: month ?? localISOMonth(),
         rbt12: 0,
         monthsOfHistory: 0,
         rbt12Proportional: true,

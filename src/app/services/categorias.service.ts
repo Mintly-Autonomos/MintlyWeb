@@ -10,6 +10,7 @@ import {
 import type { FinancialCategory, Headers, Subcategory as LibSubcategory } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { apiErrorInfo } from '../shared/api-error';
 import { MintlyClientService } from './mintly-client.service';
 import mockCategories from '../mocks/mock_categories.json';
 
@@ -224,11 +225,7 @@ export class CategoriasService {
   }
 
   private isUnauthorized(err: unknown): boolean {
-    return (
-      typeof err === 'object' &&
-      err !== null &&
-      (err as { response?: { status?: number } }).response?.status === 401
-    );
+    return typeof err === 'object' && err !== null && apiErrorInfo(err).status === 401;
   }
 
   async refresh(): Promise<void> {

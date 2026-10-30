@@ -3,6 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
 import { AuthService } from '../services/auth.service';
+import { apiErrorInfo } from '../shared/api-error';
 import { NotificationsService, AppNotification } from '../services/notifications.service';
 import { LogoComponent } from '../shared/logo.component';
 import { IconComponent } from '../shared/icon.component';
@@ -397,8 +398,11 @@ export class AppLayoutComponent implements OnInit {
   }
 
   private avatarErrorMessage(err: unknown, fallback: string): string {
-    const api = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-    return api ?? (err instanceof Error && !('response' in err) ? err.message : fallback);
+    const api = apiErrorInfo(err).message;
+    return (
+      api ??
+      (err instanceof Error && apiErrorInfo(err).status === undefined ? err.message : fallback)
+    );
   }
 
   goToNotification(n: AppNotification): void {

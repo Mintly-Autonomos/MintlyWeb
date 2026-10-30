@@ -86,3 +86,14 @@ export function fmtMonthLong(month: string): string {
   if (!y || !m || m < 1 || m > 12) return month;
   return `${MESES_LONGO[m - 1]}/${y}`;
 }
+
+/** Data de HOJE (ou da data dada) no calendário de quem está usando: "AAAA-MM-DD". Não usar toISOString: é UTC e depois das 21h no Brasil já é o dia seguinte. */
+export function localISODate(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Mês corrente no calendário de quem usa: "AAAA-MM". */
+export function localISOMonth(date: Date = new Date()): string {
+  return localISODate(date).slice(0, 7);
+}

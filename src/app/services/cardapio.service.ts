@@ -3,6 +3,8 @@ import { Router } from '@angular/router';
 import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { apiErrorInfo } from '../shared/api-error';
+import { apiErrorMessage } from '../shared/api-error-message';
 import { MintlyClientService } from './mintly-client.service';
 import mockCardapio from '../mocks/mock_cardapio.json';
 import { Prato, PratoAlerta, diasSemRevisao, precisaRevisar, toPrato } from './cardapio.builder';
@@ -84,14 +86,12 @@ export class CardapioService {
   }
 
   private isUnauthorized(err: unknown): boolean {
-    return (err as { response?: { status?: number } })?.response?.status === 401;
+    return apiErrorInfo(err).status === 401;
   }
 
   /** Texto de erro da API quando há (ex.: "Já existe um prato com este nome"). */
   errorMessage(err: unknown, fallback = 'Não foi possível concluir a operação. Tente novamente.') {
-    return (
-      (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
-    );
+    return apiErrorMessage(err, fallback);
   }
 
   /** Lista de pratos + avisos, juntos (os avisos mudam sempre que um preço é revisado). */
