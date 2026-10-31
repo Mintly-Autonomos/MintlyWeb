@@ -6,6 +6,7 @@ import { IconComponent } from '../../shared/icon.component';
 import { FormFieldComponent } from '../../shared/form-field.component';
 import { AlertComponent } from '../../shared/alert.component';
 import { AuthService } from '../../services/auth.service';
+import { apiErrorInfo } from '../../shared/api-error';
 
 @Component({
   selector: 'app-login',
@@ -171,7 +172,7 @@ export class LoginComponent {
       this.router.navigate(['/']);
     } catch (err) {
       // 429: a conta foi bloqueada por excesso de tentativas (a API pausa o acesso por alguns minutos).
-      if ((err as { response?: { status?: number } })?.response?.status === 429) {
+      if (apiErrorInfo(err).status === 429) {
         this.router.navigate(['/auth/bloqueado']);
         return;
       }

@@ -26,15 +26,20 @@ import {
 import { ContasService } from '../../services/contas.service';
 import { CategoriasService } from '../../services/categorias.service';
 import { ToastService } from '../../shared/toast.service';
-import { formatBRL, fmtDateTime, fmtShortDate } from '../../shared/format';
+import { formatBRL, fmtDateTime, fmtShortDate, localISODate } from '../../shared/format';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
+import { moneyToInput } from '../../shared/money-input';
+import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
+import { matchName } from '../../shared/import-parse';
 
+// Data de hoje no calendário de quem usa (toISOString é UTC: depois das 21h já seria "amanhã").
 function isoToday(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localISODate();
 }
 function isoAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  return localISODate(d);
 }
 
 type Period = 'all' | 'today' | '7d' | '30d' | 'custom';
@@ -44,14 +49,16 @@ const FEE_RATES: Record<string, number> = { iFood: 12, Rappi: 15 };
 /** Linha da prévia de importação, editável na tela antes de confirmar. */
 interface EditableImportRow {
   row: number;
-  type: MovType;
+  /** `null`: a planilha não trouxe — a pessoa escolhe na revisão (assim também forma de pagamento e status). */
+  type: MovType | null;
   title: string;
   value: number;
   date: string;
+  dateRaw?: string;
   categoryName: string;
   accountName: string;
   paymentMethod: PaymentMethod | null;
-  status: MovStatus;
+  status: MovStatus | null;
   notes: string | null;
   /** Se vai ser gravada ao confirmar — só pode ser true quando `valid` também é. */
   included: boolean;
@@ -78,6 +85,7 @@ interface MovForm {
   standalone: true,
   imports: [
     FormsModule,
+    MoneyInputDirective,
     IconComponent,
     ChipComponent,
     ModalComponent,
@@ -111,6 +119,8 @@ export class MovimentacoesComponent implements OnInit {
   protected importRows = signal<EditableImportRow[]>([]);
   protected importConfirmWarningOpen = signal(false);
   protected confirmingImport = signal(false);
+  /** Andamento da gravação: "Importando 20 de 55…". */
+  protected importProgress = signal<{ done: number; total: number } | null>(null);
   protected importResult = signal<ImportMovementsResult | null>(null);
 
   protected importTypeOpts: { value: MovType; label: string }[] = [
@@ -184,13 +194,29 @@ export class MovimentacoesComponent implements OnInit {
     { value: 'income', label: 'Receita' },
     { value: 'expense', label: 'Despesa' },
   ];
-  protected statusOpts = [
-    { value: 'all', label: 'Todos' },
-    { value: 'received', label: 'Recebido' },
-    { value: 'paid', label: 'Pago' },
-    { value: 'pending', label: 'Pendente' },
-    { value: 'cancelled', label: 'Cancelado' },
-  ];
+  /**
+   * "Recebido" só existe em entrada e "Pago" só em saída: com o tipo escolhido o filtro mostra só o
+   * que faz sentido; sem tipo, mostra os dois.
+   */
+  protected statusOpts = computed(() => {
+    const type = this.typeFilter();
+    return [
+      { value: 'all', label: 'Todos' },
+      ...(type !== 'expense' ? [{ value: 'received', label: 'Recebido' }] : []),
+      ...(type !== 'income' ? [{ value: 'paid', label: 'Pago' }] : []),
+      { value: 'pending', label: 'Pendente' },
+      { value: 'cancelled', label: 'Cancelado' },
+    ];
+  });
+
+  /** Trocou o tipo e o status escolhido deixou de existir nele (ex.: "Pago" em Receita): volta para "Todos". */
+  protected setTypeFilter(type: 'all' | MovType): void {
+    this.typeFilter.set(type);
+    const status = this.statusFilter();
+    if ((type === 'income' && status === 'paid') || (type === 'expense' && status === 'received')) {
+      this.statusFilter.set('all');
+    }
+  }
   protected periodOpts = [
     { value: 'all', label: 'Todos' },
     { value: 'today', label: 'Hoje' },
@@ -401,8 +427,7 @@ export class MovimentacoesComponent implements OnInit {
   }
 
   private errMsg(err: unknown): string {
-    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
-    return data?.message ?? 'Não foi possível concluir a operação. Tente novamente.';
+    return apiErrorMessage(err);
   }
 
   // ── CRUD ──────────────────────────────────────────────────────────────
@@ -435,7 +460,7 @@ export class MovimentacoesComponent implements OnInit {
     this.form.set({
       type: m.type,
       title: m.title,
-      value: String(m.value),
+      value: moneyToInput(m.value),
       date: m.date,
       categoryId: m.categoryId,
       accountId: m.accountId,
@@ -660,27 +685,27 @@ export class MovimentacoesComponent implements OnInit {
       this.importFileName.set(preview.fileName);
       this.importRows.set(
         preview.items.map((item) => {
-          // Revalida de cara contra categorias/contas reais — o parse só garante formato de célula.
+          // Categoria e conta da planilha viram o nome EXATO do cadastro ("Venda delivery" ->
+          // "Venda Delivery"): a lista da tela só marca a opção com o nome idêntico, e sem isso a
+          // categoria já preenchida na planilha aparecia como se estivesse em branco.
+          const category = this.canonicalCategory(item.categoryName, item.type);
+          const account = matchName(item.accountName, this.accounts());
           const revalidated = this.revalidateRow({
             row: item.row,
             type: item.type,
             title: item.title,
             value: item.value,
             date: item.date,
-            categoryName: item.categoryName,
-            accountName: item.accountName,
+            dateRaw: item.dateRaw,
+            categoryName: category?.name ?? item.categoryName,
+            accountName: account?.name ?? item.accountName,
             paymentMethod: item.paymentMethod,
             status: item.status,
             notes: item.notes,
-            included: item.valid,
-            valid: item.valid,
-            error: item.error,
+            included: true,
+            valid: true,
+            error: null,
           });
-          // Problema de formato que o parse pegou (ex.: tipo/status não reconhecido) e que a
-          // revalidação não teria como recalcular sozinha (o campo já veio normalizado) — mantém.
-          if (!item.valid && revalidated.valid) {
-            return { ...revalidated, valid: false, included: false, error: item.error };
-          }
           return this.flagPossibleDuplicate(revalidated);
         }),
       );
@@ -688,11 +713,35 @@ export class MovimentacoesComponent implements OnInit {
     } catch (err) {
       // Erros de leitura da planilha já vêm com texto próprio (sem resposta da API).
       this.toast.error(
-        err instanceof Error && !('response' in err) ? err.message : this.errMsg(err),
+        err instanceof Error &&
+          !isNoResponseError(err) &&
+          !('status' in err) &&
+          !('response' in err)
+          ? err.message
+          : this.errMsg(err),
       );
     } finally {
       this.importing.set(false);
     }
+  }
+
+  /** Categoria do cadastro com o mesmo nome (sem caixa/acento); prefere a do tipo da linha. */
+  private canonicalCategory(name: string, type: MovType | null) {
+    const active = this.allActiveCategories();
+    return (
+      (type
+        ? matchName(
+            name,
+            active.filter((c) => c.type === type),
+          )
+        : null) ?? matchName(name, active)
+    );
+  }
+
+  /** Categorias que podem ser escolhidas numa linha: as do tipo dela (todas, se ainda sem tipo). */
+  importCategoriesFor(row: EditableImportRow) {
+    const all = this.allActiveCategories();
+    return row.type ? all.filter((c) => c.type === row.type) : all;
   }
 
   /**
@@ -728,23 +777,46 @@ export class MovimentacoesComponent implements OnInit {
   /** Reavalia uma linha editada — recalcula erro/validade e ajusta `included`. */
   private revalidateRow(row: EditableImportRow): EditableImportRow {
     const errors: string[] = [];
+    if (!row.type) errors.push('falta o tipo (receita ou despesa)');
     if (!row.title.trim()) errors.push('título vazio');
-    if (!(row.value > 0)) errors.push('valor deve ser maior que zero');
-    if (!row.date) errors.push('data vazia');
-    const sameName = this.allActiveCategories().filter(
-      (c) => c.name.trim().toLowerCase() === row.categoryName.trim().toLowerCase(),
-    );
-    if (sameName.length === 0) {
-      errors.push(`categoria "${row.categoryName}" não encontrada`);
-    } else if (!sameName.some((c) => c.type === row.type)) {
-      // A API recusa categoria de tipo diferente do lançamento.
-      const doTipo = row.type === 'income' ? 'despesa' : 'receita';
-      errors.push(`categoria "${row.categoryName}" é de ${doTipo}, mas a linha é do outro tipo`);
+    else if (row.title.length > this.TITLE_MAX) {
+      errors.push(
+        `título passa de ${this.TITLE_MAX} caracteres (tem ${row.title.length}): encurte`,
+      );
     }
-    const accountOk = this.accounts().some(
-      (a) => a.name.trim().toLowerCase() === row.accountName.trim().toLowerCase(),
-    );
-    if (!accountOk) errors.push(`conta "${row.accountName}" não encontrada`);
+    if (!(row.value > 0)) errors.push('valor deve ser maior que zero');
+    if (!row.date) {
+      errors.push(
+        row.dateRaw
+          ? `data "${row.dateRaw}" inválida (use AAAA-MM-DD ou DD/MM/AAAA)`
+          : 'data vazia',
+      );
+    }
+    if (!row.categoryName.trim()) {
+      errors.push('falta a categoria');
+    } else {
+      const sameName = this.allActiveCategories().filter(
+        (c) => c.name.trim().toLowerCase() === row.categoryName.trim().toLowerCase(),
+      );
+      if (sameName.length === 0) {
+        errors.push(`categoria "${row.categoryName}" não encontrada`);
+      } else if (row.type && !sameName.some((c) => c.type === row.type)) {
+        // A API recusa categoria de tipo diferente do lançamento.
+        const doTipo = row.type === 'income' ? 'despesa' : 'receita';
+        errors.push(`categoria "${row.categoryName}" é de ${doTipo}, mas a linha é do outro tipo`);
+      }
+    }
+    if (!row.accountName.trim()) {
+      errors.push('falta a conta');
+    } else if (
+      !this.accounts().some(
+        (a) => a.name.trim().toLowerCase() === row.accountName.trim().toLowerCase(),
+      )
+    ) {
+      errors.push(`conta "${row.accountName}" não encontrada`);
+    }
+    if (!row.paymentMethod) errors.push('falta a forma de pagamento');
+    if (!row.status) errors.push('falta o status');
 
     const valid = errors.length === 0;
     return {
@@ -762,8 +834,55 @@ export class MovimentacoesComponent implements OnInit {
     value: EditableImportRow[K],
   ): void {
     this.importRows.update((rows) =>
-      rows.map((r, i) => (i === index ? this.revalidateRow({ ...r, [field]: value }) : r)),
+      rows.map((r, i) => {
+        if (i !== index) return r;
+        // Escolheu a data na tela: o texto que a planilha trazia deixa de valer.
+        const next = field === 'date' ? { ...r, dateRaw: undefined } : r;
+        return this.revalidateRow({ ...next, [field]: value });
+      }),
     );
+  }
+
+  /**
+   * Preenche de uma vez o campo em branco de todas as linhas (útil quando a planilha não traz uma
+   * coluna inteira). Só mexe em linha em que o campo está vazio: o que veio da planilha não muda.
+   */
+  fillBlank(
+    field: 'type' | 'categoryName' | 'accountName' | 'paymentMethod' | 'status',
+    raw: string,
+  ): void {
+    if (!raw) return;
+    this.importRows.update((rows) =>
+      rows.map((r) => {
+        const blank = !r[field];
+        if (!blank) return r;
+        if (field === 'categoryName') {
+          // Categoria só serve se for do tipo da linha.
+          const c = this.canonicalCategory(raw, r.type);
+          return c && (!r.type || c.type === r.type)
+            ? this.revalidateRow({ ...r, categoryName: c.name })
+            : r;
+        }
+        if (field === 'status') {
+          // "Concluído" vira Recebido em entrada e Pago em saída.
+          const status =
+            raw === 'settled'
+              ? r.type === 'income'
+                ? 'received'
+                : r.type === 'expense'
+                  ? 'paid'
+                  : null
+              : (raw as MovStatus);
+          return status ? this.revalidateRow({ ...r, status }) : r;
+        }
+        return this.revalidateRow({ ...r, [field]: raw } as EditableImportRow);
+      }),
+    );
+  }
+
+  /** Quantas linhas ainda têm esse campo em branco (mostra/esconde a barra de preenchimento). */
+  blankCount(field: 'type' | 'categoryName' | 'accountName' | 'paymentMethod' | 'status'): number {
+    return this.importRows().filter((r) => !r[field]).length;
   }
 
   toggleRowIncluded(index: number, included: boolean): void {
@@ -804,6 +923,7 @@ export class MovimentacoesComponent implements OnInit {
     const items: ImportMovementItem[] = this.importRows()
       .filter((r) => r.included && r.valid)
       .map((r) => ({
+        dateRaw: undefined,
         row: r.row,
         type: r.type,
         title: r.title,
@@ -820,19 +940,30 @@ export class MovimentacoesComponent implements OnInit {
     if (items.length === 0) return;
     this.confirmingImport.set(true);
     try {
-      const result = await this.svc.confirmImport(items, {
-        categories: this.categoriasSvc
-          .categories()
-          .map((c) => ({ id: c.id, name: c.name, type: c.type })),
-        accounts: this.contasSvc.accounts().map((a) => ({ id: a.id, name: a.name })),
-      });
+      const result = await this.svc.confirmImport(
+        items,
+        {
+          categories: this.categoriasSvc
+            .categories()
+            .map((c) => ({ id: c.id, name: c.name, type: c.type })),
+          accounts: this.contasSvc.accounts().map((a) => ({ id: a.id, name: a.name })),
+        },
+        (done, total) => this.importProgress.set({ done, total }),
+      );
       this.closeImportPreview();
       this.importResult.set(result);
       this.closeModal();
     } catch (err) {
-      this.toast.error(this.errMsg(err));
+      // Pode ter gravado parte das linhas antes de o erro chegar: atualiza a lista e avisa.
+      await this.svc.refresh().catch(() => undefined);
+      this.toast.error(
+        isNoResponseError(err)
+          ? 'A conexão caiu ou demorou demais durante a importação. Atualizei a lista: confira o que já entrou antes de tentar de novo (reenviar as mesmas linhas não duplica).'
+          : this.errMsg(err),
+      );
     } finally {
       this.confirmingImport.set(false);
+      this.importProgress.set(null);
     }
   }
 

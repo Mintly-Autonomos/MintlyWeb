@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { MintlyClientService } from './mintly-client.service';
+import { apiErrorInfo } from '../shared/api-error';
 import mockAuth from '../mocks/mock_auth.json';
 
 export interface AuthUser {
@@ -120,7 +121,7 @@ export class AuthService {
     try {
       return await fn(headers());
     } catch (err) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
+      const status = apiErrorInfo(err).status;
       if (status === 401 && (await this.refresh())) return await fn(headers());
       throw err;
     }

@@ -11,6 +11,7 @@ import type {
 } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { apiErrorInfo } from '../shared/api-error';
 import { MintlyClientService } from './mintly-client.service';
 import mockCustos from '../mocks/mock_custos.json';
 
@@ -213,11 +214,7 @@ export class CustosService {
   }
 
   private isUnauthorized(err: unknown): boolean {
-    return (
-      typeof err === 'object' &&
-      err !== null &&
-      (err as { response?: { status?: number } }).response?.status === 401
-    );
+    return typeof err === 'object' && err !== null && apiErrorInfo(err).status === 401;
   }
 
   async refresh(month?: string, channel?: ChannelFilter): Promise<void> {

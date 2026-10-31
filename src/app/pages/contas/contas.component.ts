@@ -15,6 +15,7 @@ import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { FilterBarComponent, FilterSelectComponent } from '../../shared/filter-bar.component';
 import { AuditTimelineComponent } from '../../shared/audit-timeline.component';
 import { ToastService } from '../../shared/toast.service';
+import { apiErrorMessage } from '../../shared/api-error-message';
 import { formatBRL, fmtDateTime } from '../../shared/format';
 
 function normalize(s: string): string {
@@ -228,8 +229,7 @@ export class ContasComponent implements OnInit {
   }
 
   private errMsg(err: unknown): string {
-    const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
-    return data?.message ?? 'Não foi possível concluir a operação. Tente novamente.';
+    return apiErrorMessage(err);
   }
 
   async save(): Promise<void> {

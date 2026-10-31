@@ -1,5 +1,6 @@
 import { Component, signal, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { apiErrorMessage } from '../../shared/api-error-message';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
@@ -415,11 +416,9 @@ export class CadastroComponent {
   }
 
   private errMsg(err: unknown): string {
-    const res = (err as { response?: { data?: { message?: string } } })?.response;
-    if (!res)
-      return 'Não conseguimos falar com o servidor. Verifique sua internet e tente novamente.';
-    return (
-      res.data?.message ?? 'Não conseguimos criar sua conta. Verifique os dados e tente novamente.'
+    return apiErrorMessage(
+      err,
+      'Não conseguimos criar sua conta. Verifique os dados e tente novamente.',
     );
   }
 }
