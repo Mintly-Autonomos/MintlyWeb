@@ -976,12 +976,14 @@
                   </td>
                   <td class="px-2 py-1.5">
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      [value]="row.value"
-                      (input)="updateRowField(i, 'value', $any($event.target).valueAsNumber || 0)"
-                      class="h-8 w-full rounded-lg border border-border bg-card px-2 text-[12px] text-right outline-none focus:ring-2 focus:ring-mint/40"
+                      appMoneyInput
+                      type="text"
+                      inputmode="decimal"
+                      data-testid="valor-linha"
+                      [value]="row.valueText"
+                      (input)="setRowValue(i, $any($event.target).value)"
+                      (blur)="padRowValue(i)"
+                      class="h-8 w-full rounded-lg border border-border bg-card px-2 text-[12px] text-right tabular-nums outline-none focus:ring-2 focus:ring-mint/40"
                     />
                   </td>
                   <td class="px-2 py-1.5">

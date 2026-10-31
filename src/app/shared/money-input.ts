@@ -23,6 +23,17 @@ export function formatMoneyInput(raw: string): string {
   return `${integer || '0'},${decimals}`;
 }
 
+/**
+ * Completa as casas decimais ao sair do campo: "145" -> "145,00", "14500,5" -> "14.500,50", ",5" -> "0,50".
+ * Campo vazio continua vazio (a pessoa ainda não preencheu).
+ */
+export function padMoneyInput(raw: string): string {
+  const text = formatMoneyInput(raw);
+  if (!text) return '';
+  const [integer, decimals = ''] = text.split(',');
+  return `${integer || '0'},${decimals.padEnd(2, '0')}`;
+}
+
 /** Número vindo do cadastro (ex.: 14500.5) -> texto do campo ("14.500,50"). */
 export function moneyToInput(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '';

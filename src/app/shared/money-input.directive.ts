@@ -1,5 +1,5 @@
 import { Directive, ElementRef, HostListener, inject } from '@angular/core';
-import { formatMoneyInput } from './money-input';
+import { formatMoneyInput, padMoneyInput } from './money-input';
 
 /**
  * Formata o campo de dinheiro enquanto a pessoa digita, mantendo o cursor no lugar (conta quantos
@@ -9,6 +9,15 @@ import { formatMoneyInput } from './money-input';
 @Directive({ selector: 'input[appMoneyInput]', standalone: true })
 export class MoneyInputDirective {
   private el = inject<ElementRef<HTMLInputElement>>(ElementRef).nativeElement;
+
+  /** Ao sair do campo o valor sempre fecha com as duas casas (",00"). */
+  @HostListener('blur')
+  onBlur(): void {
+    const padded = padMoneyInput(this.el.value);
+    if (padded === this.el.value) return;
+    this.el.value = padded;
+    this.el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 
   @HostListener('input')
   onInput(): void {
