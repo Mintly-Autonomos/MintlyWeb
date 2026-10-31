@@ -310,7 +310,41 @@ describe('Importar em massa — planilhas fora do modelo', () => {
       ]),
     );
     expect(items[0].valid).toBe(false);
-    expect(items[0].error).toBe('título passa de 120 caracteres (tem 125): encurte');
+    expect(items[0].error).toBe(
+      'título passa de 120 caracteres (tem 125): encurte e coloque os detalhes em Observações',
+    );
+  });
+
+  it('observações com mais de 500 caracteres são sinalizadas; até 500 passam', () => {
+    const base = [
+      'Tipo',
+      'Título',
+      'Valor',
+      'Data',
+      'Categoria',
+      'Conta',
+      'Forma de pagamento',
+      'Status',
+      'Observações',
+    ];
+    const linha = (obs: string) => [
+      'Receita',
+      'Pedido',
+      10,
+      '2026-10-29',
+      'Venda Delivery',
+      'Keeta',
+      'Pix',
+      'Recebido',
+      obs,
+    ];
+    const { items } = buildImportPreview(
+      'x.xlsx',
+      g([base, linha('x'.repeat(500)), linha('x'.repeat(501))]),
+    );
+    expect(items[0].valid).toBe(true);
+    expect(items[1].valid).toBe(false);
+    expect(items[1].error).toBe('observações passam de 500 caracteres (têm 501): encurte');
   });
 
   it('arquivo vazio não quebra', () => {

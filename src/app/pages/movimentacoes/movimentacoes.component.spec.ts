@@ -15,6 +15,7 @@ interface Internals {
   importRows: () => Row[];
   submitImport(): Promise<void>;
   confirmImportPreview(): void;
+  closeImportPreview(): void;
   toggleRowIncluded(index: number, included: boolean): void;
   importFile: { set(f: File | null): void };
   fillBlank(field: string, raw: string): void;
@@ -24,6 +25,7 @@ interface Internals {
   importCategoriesFor(row: Row): { name: string }[];
 }
 interface Row {
+  notes: string | null;
   type: string | null;
   categoryName: string;
   accountName: string;
@@ -56,9 +58,11 @@ describe('MovimentacoesComponent', () => {
   let c: Internals;
   let fixture: ComponentFixture<MovimentacoesComponent>;
   let previewImport: ReturnType<typeof vi.fn>;
+  let confirmImport: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     previewImport = vi.fn();
+    confirmImport = vi.fn().mockResolvedValue({ insertedCount: 1, items: [], failedRows: [] });
     TestBed.configureTestingModule({
       providers: [
         {
@@ -68,6 +72,7 @@ describe('MovimentacoesComponent', () => {
             loading: signal(false),
             refresh: vi.fn().mockResolvedValue(undefined),
             previewImport,
+            confirmImport: confirmImport,
           },
         },
         {
@@ -352,7 +357,9 @@ describe('MovimentacoesComponent', () => {
       const root = fixture.nativeElement as HTMLElement;
       const messages = text(root, '[data-testid="erro-linha"]');
       expect(messages).toHaveLength(2);
-      expect(messages[0]).toBe('título passa de 120 caracteres (tem 125): encurte');
+      expect(messages[0]).toBe(
+        'título passa de 120 caracteres (tem 125): encurte e coloque os detalhes em Observações',
+      );
       expect(messages[1]).toBe('falta a categoria');
     });
 
@@ -375,7 +382,9 @@ describe('MovimentacoesComponent', () => {
       const root = fixture.nativeElement as HTMLElement;
       const reasons = text(root, '[data-testid="motivo-excluida"]');
       expect(reasons).toHaveLength(2);
-      expect(reasons[0]).toBe('título passa de 120 caracteres (tem 125): encurte');
+      expect(reasons[0]).toBe(
+        'título passa de 120 caracteres (tem 125): encurte e coloque os detalhes em Observações',
+      );
       expect(reasons[1]).toBe('falta a categoria');
       expect(root.textContent).toContain('clique em Revisar');
     });
@@ -392,6 +401,141 @@ describe('MovimentacoesComponent', () => {
       const root = fixture.nativeElement as HTMLElement;
       expect(text(root, '[data-testid="motivo-excluida"]')).toEqual(['Você desmarcou esta linha.']);
       expect(root.textContent).not.toContain('clique em Revisar');
+    });
+  });
+
+  describe('observações na revisão: recolhidas num botão, abrem uma linha extra', () => {
+    const longTitle = 'Pedido 8547 - ' + 'x'.repeat(111); // 125 caracteres
+    const header = [
+      'Tipo',
+      'Título',
+      'Valor',
+      'Data',
+      'Categoria',
+      'Conta',
+      'Forma de pagamento',
+      'Status',
+      'Observações',
+    ];
+    const root = () => fixture.nativeElement as HTMLElement;
+    const button = () => root().querySelector<HTMLButtonElement>('[data-testid="btn-obs"]')!;
+    const textarea = () =>
+      root().querySelector<HTMLTextAreaElement>('textarea[data-testid="obs-linha"]');
+    const flat = (e: Element) => (e.textContent ?? '').split(/\s+/).join(' ').trim();
+
+    const load = async (obs = '', title = longTitle) => {
+      previewImport.mockResolvedValue(
+        buildImportPreview('x.xlsx', [
+          { row: 1, cells: header },
+          {
+            row: 2,
+            cells: [
+              'Receita',
+              title,
+              135,
+              '2026-10-29',
+              'Venda Delivery',
+              'Keeta',
+              'Pix',
+              'Recebido',
+              obs,
+            ],
+          },
+        ]),
+      );
+      c.importFile.set(new File(['x'], 'base.xlsx'));
+      await c.submitImport();
+      fixture.detectChanges();
+    };
+
+    it('a tabela tem uma coluna estreita "Obs." com um botão por linha, e o campo começa recolhido', async () => {
+      await load();
+      const headers = Array.from(root().querySelectorAll('thead th')).map((th) => flat(th));
+      expect(headers).toContain('Obs.');
+      expect(root().querySelectorAll('[data-testid="btn-obs"]')).toHaveLength(1);
+      expect(textarea()).toBeNull();
+      expect(button().getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('apertar o botão abre uma linha extra com o campo (e apertar de novo recolhe)', async () => {
+      await load();
+      button().click();
+      fixture.detectChanges();
+      expect(textarea()).not.toBeNull();
+      expect(root().querySelector('[data-testid="linha-obs"]')).not.toBeNull();
+      expect(button().getAttribute('aria-expanded')).toBe('true');
+      button().click();
+      fixture.detectChanges();
+      expect(textarea()).toBeNull();
+    });
+
+    it('o texto que a planilha já trazia aparece no campo e o botão avisa que há observações', async () => {
+      await load('Curry + batata', 'Pedido 1');
+      expect(button().title).toBe('Observações: Curry + batata');
+      expect(button().querySelector('span.rounded-full')).not.toBeNull();
+      button().click();
+      fixture.detectChanges();
+      expect(textarea()!.value).toBe('Curry + batata');
+    });
+
+    it('sem observações o botão não tem o indicador', async () => {
+      await load('', 'Pedido 1');
+      expect(button().title).toBe('Adicionar observações');
+      expect(button().querySelector('span.rounded-full')).toBeNull();
+    });
+
+    it('digitar no campo atualiza a linha; apagar volta a null', async () => {
+      await load('', 'Pedido 1');
+      button().click();
+      fixture.detectChanges();
+      textarea()!.value = 'detalhes';
+      textarea()!.dispatchEvent(new Event('input', { bubbles: true }));
+      expect(c.importRows()[0].notes).toBe('detalhes');
+      textarea()!.value = '';
+      textarea()!.dispatchEvent(new Event('input', { bubbles: true }));
+      expect(c.importRows()[0].notes).toBeNull();
+    });
+
+    it('título longo: encurta o título, coloca os detalhes nas Observações e eles seguem para a API', async () => {
+      await load();
+      expect(c.importRows()[0].valid).toBe(false);
+      expect(c.importRows()[0].error).toContain('coloque os detalhes em Observações');
+
+      button().click();
+      fixture.detectChanges();
+      textarea()!.value = 'Curry + Batata Rústica; Soyu e alho + Batata Rústica';
+      textarea()!.dispatchEvent(new Event('input', { bubbles: true }));
+      c.updateRowField(0, 'title', 'Pedido 8547');
+
+      expect(c.importRows()[0].valid).toBe(true);
+      expect(c.importRows()[0].included).toBe(true);
+      c.confirmImportPreview();
+      await fixture.whenStable();
+      expect(confirmImport).toHaveBeenCalledTimes(1);
+      expect(confirmImport.mock.calls[0][0][0]).toMatchObject({
+        title: 'Pedido 8547',
+        notes: 'Curry + Batata Rústica; Soyu e alho + Batata Rústica',
+      });
+    });
+
+    it('observações acima de 500: o campo abre sozinho, com o erro escrito e o contador', async () => {
+      await load('', 'Pedido');
+      c.updateRowField(0, 'notes', 'y'.repeat(501));
+      fixture.detectChanges();
+      expect(c.importRows()[0].valid).toBe(false);
+      expect(textarea()).not.toBeNull(); // abriu à força: o erro precisa de onde corrigir
+      const msgs = Array.from(root().querySelectorAll('[data-testid="erro-linha"]')).map(flat);
+      expect(msgs).toEqual(['observações passam de 500 caracteres (têm 501): encurte']);
+      expect(flat(root().querySelector('[data-testid="linha-obs"]')!)).toContain('501/500');
+    });
+
+    it('fechar a revisão recolhe todos os campos (a próxima importação começa recolhida)', async () => {
+      await load('', 'Pedido 1');
+      button().click();
+      fixture.detectChanges();
+      c.closeImportPreview();
+      await load('', 'Pedido 2');
+      expect(textarea()).toBeNull();
     });
   });
 
