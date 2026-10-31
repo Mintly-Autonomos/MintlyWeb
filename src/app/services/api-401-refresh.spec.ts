@@ -41,9 +41,12 @@ const SERVICES: ProviderToken<unknown>[] = [
 
 describe('401 da API: renova o token e tenta de novo (erro no formato da lib)', () => {
   let refresh: ReturnType<typeof vi.fn>;
+  let onApiError: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     refresh = vi.fn().mockResolvedValue(true);
+    // 402 (assinatura vencida): o AuthService decide se leva à tela de assinatura.
+    onApiError = vi.fn().mockReturnValue(false);
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -52,6 +55,7 @@ describe('401 da API: renova o token e tenta de novo (erro no formato da lib)', 
           useValue: {
             getAccessToken: () => 'token',
             refresh,
+            onApiError,
             currentUser: () => ({ nome: 'Dono' }),
           },
         },
@@ -73,6 +77,19 @@ describe('401 da API: renova o token e tenta de novo (erro no formato da lib)', 
       expect(fn).toHaveBeenCalledTimes(2);
     },
   );
+
+  it('assinatura vencida (402): o erro é repassado ao AuthService, que leva à tela de assinatura', async () => {
+    const svc = TestBed.inject(ContasService) as unknown as {
+      call: <T>(fn: (h: unknown) => Promise<T>) => Promise<T>;
+    };
+    const err = Object.assign(new Error('Assinatura necessária.'), {
+      code: 'SUBSCRIPTION-0001',
+      status: 402,
+    });
+    await expect(svc.call(() => Promise.reject(err))).rejects.toBe(err);
+    expect(onApiError).toHaveBeenCalledWith(err);
+    expect(refresh).not.toHaveBeenCalled();
+  });
 
   it('outros erros (ex.: 409) sobem sem renovar token', async () => {
     const svc = TestBed.inject(ContasService) as unknown as {
