@@ -15,6 +15,8 @@ interface Internals {
   importRows: () => Row[];
   submitImport(): Promise<void>;
   confirmImportPreview(): void;
+  setRowValue(index: number, text: string): void;
+  padRowValue(index: number): void;
   closeImportPreview(): void;
   toggleRowIncluded(index: number, included: boolean): void;
   importFile: { set(f: File | null): void };
@@ -25,6 +27,8 @@ interface Internals {
   importCategoriesFor(row: Row): { name: string }[];
 }
 interface Row {
+  value: number;
+  valueText: string;
   notes: string | null;
   type: string | null;
   categoryName: string;
@@ -536,6 +540,104 @@ describe('MovimentacoesComponent', () => {
       c.closeImportPreview();
       await load('', 'Pedido 2');
       expect(textarea()).toBeNull();
+    });
+  });
+
+  describe('campo Valor da revisão: sempre com ,00', () => {
+    const root = () => fixture.nativeElement as HTMLElement;
+    const field = () => root().querySelector<HTMLInputElement>('input[data-testid="valor-linha"]')!;
+    const load = async (value: number | string) => {
+      previewImport.mockResolvedValue(
+        buildImportPreview('x.xlsx', [
+          {
+            row: 1,
+            cells: [
+              'Tipo',
+              'Título',
+              'Valor',
+              'Data',
+              'Categoria',
+              'Conta',
+              'Forma de pagamento',
+              'Status',
+            ],
+          },
+          {
+            row: 2,
+            cells: [
+              'Receita',
+              'Pedido 1',
+              value,
+              '2026-10-29',
+              'Venda Delivery',
+              'Keeta',
+              'Pix',
+              'Recebido',
+            ],
+          },
+        ]),
+      );
+      c.importFile.set(new File(['x'], 'base.xlsx'));
+      await c.submitImport();
+      fixture.detectChanges();
+    };
+
+    it('o valor lido da planilha já aparece com duas casas (125 -> 125,00)', async () => {
+      await load(125);
+      expect(field().value).toBe('125,00');
+    });
+
+    it('valor com milhar e centavos aparece formatado', async () => {
+      await load(1234.5);
+      expect(field().value).toBe('1.234,50');
+    });
+
+    it('digitar aplica a máscara, o número da linha acompanha e ao sair fecha com ,00', async () => {
+      await load(125);
+      field().focus();
+      field().value = '14500';
+      field().dispatchEvent(new Event('input', { bubbles: true }));
+      fixture.detectChanges();
+      expect(field().value).toBe('14.500');
+      expect(c.importRows()[0].value).toBe(14500);
+
+      field().dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+      expect(field().value).toBe('14.500,00');
+      expect(c.importRows()[0].valueText).toBe('14.500,00');
+      expect(c.importRows()[0].value).toBe(14500);
+    });
+
+    it('centavos: 12,5 ao sair vira 12,50 (valor 12.5)', async () => {
+      await load(125);
+      field().value = '12,5';
+      field().dispatchEvent(new Event('input', { bubbles: true }));
+      field().dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+      expect(field().value).toBe('12,50');
+      expect(c.importRows()[0].value).toBe(12.5);
+    });
+
+    it('apagar o campo vira erro "valor deve ser maior que zero" e continua vazio ao sair', async () => {
+      await load(125);
+      field().value = '';
+      field().dispatchEvent(new Event('input', { bubbles: true }));
+      field().dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+      expect(field().value).toBe('');
+      expect(c.importRows()[0].value).toBe(0);
+      expect(c.importRows()[0].valid).toBe(false);
+      expect(c.importRows()[0].error).toContain('valor deve ser maior que zero');
+    });
+
+    it('o valor digitado é o que vai para a API', async () => {
+      await load(125);
+      field().value = '99,9';
+      field().dispatchEvent(new Event('input', { bubbles: true }));
+      field().dispatchEvent(new Event('blur'));
+      c.confirmImportPreview();
+      await fixture.whenStable();
+      expect(confirmImport.mock.calls[0][0][0].value).toBe(99.9);
     });
   });
 
