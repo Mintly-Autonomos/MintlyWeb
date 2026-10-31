@@ -28,10 +28,14 @@ let modalSeq = 0;
           [attr.aria-labelledby]="titleId"
           [class]="
             'bg-card rounded-3xl border border-border w-full shadow-2xl overflow-hidden ' +
-            (size === 'lg' ? 'max-w-3xl' : 'max-w-xl')
+            (size === 'xl'
+              ? 'max-w-[min(1320px,96vw)] h-[min(860px,94dvh)] flex flex-col'
+              : size === 'lg'
+                ? 'max-w-3xl'
+                : 'max-w-xl')
           "
         >
-          <div class="px-6 pt-6 pb-4 flex items-start justify-between">
+          <div class="px-6 pt-6 pb-4 flex items-start justify-between shrink-0">
             <div>
               <h3 [id]="titleId" class="text-[18px] font-bold tracking-tight">{{ title }}</h3>
               @if (subtitle) {
@@ -47,12 +51,19 @@ let modalSeq = 0;
               <app-icon name="close" [style]="{ fontSize: '20px' }" />
             </button>
           </div>
-          <div class="px-6 pb-6 max-h-[min(70vh,calc(100dvh-12rem))] overflow-y-auto">
+          <!-- xl: o conteúdo ocupa a altura toda e rola por conta própria (cabeçalho e rodapé ficam sempre à vista). -->
+          <div
+            [class]="
+              size === 'xl'
+                ? 'px-6 pb-4 flex-1 min-h-0 overflow-hidden'
+                : 'px-6 pb-6 max-h-[min(70vh,calc(100dvh-12rem))] overflow-y-auto'
+            "
+          >
             <ng-content />
           </div>
           @if (hasFooter) {
             <div
-              class="px-6 py-4 border-t border-border bg-muted/40 flex items-center justify-end gap-2"
+              class="px-6 py-4 border-t border-border bg-muted/40 flex items-center justify-end gap-2 shrink-0"
             >
               <ng-content select="[slot=footer]" />
             </div>
@@ -66,7 +77,7 @@ export class ModalComponent implements OnChanges, OnDestroy {
   @Input() open = true;
   @Input() title = '';
   @Input() subtitle = '';
-  @Input() size: 'md' | 'lg' = 'md';
+  @Input() size: 'md' | 'lg' | 'xl' = 'md';
   @Input() hasFooter = true;
   @Output() closed = new EventEmitter<void>();
 
