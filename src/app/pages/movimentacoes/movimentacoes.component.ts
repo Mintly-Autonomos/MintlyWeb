@@ -28,7 +28,7 @@ import { CategoriasService } from '../../services/categorias.service';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtDateTime, fmtShortDate, localISODate } from '../../shared/format';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
-import { moneyToInput } from '../../shared/money-input';
+import { moneyToInput, padMoneyInput } from '../../shared/money-input';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
 import { matchName } from '../../shared/import-parse';
 
@@ -53,6 +53,8 @@ interface EditableImportRow {
   type: MovType | null;
   title: string;
   value: number;
+  /** O que aparece no campo Valor ("1.234,00"); `value` é o número lido dele. */
+  valueText: string;
   date: string;
   dateRaw?: string;
   categoryName: string;
@@ -312,6 +314,24 @@ export class MovimentacoesComponent implements OnInit {
   }
 
   protected readonly TITLE_MAX = 120;
+  protected readonly NOTES_MAX = 500;
+
+  /** Linhas da revisão com o campo de Observações aberto (as demais ficam recolhidas para a tabela caber na tela). */
+  protected notesOpen = signal<ReadonlySet<number>>(new Set());
+
+  toggleNotes(rowNumber: number): void {
+    this.notesOpen.update((open) => {
+      const next = new Set(open);
+      if (next.has(rowNumber)) next.delete(rowNumber);
+      else next.add(rowNumber);
+      return next;
+    });
+  }
+
+  /** Aberto pela pessoa; ou aberto à força quando as observações estouram o limite (o erro precisa de onde corrigir). */
+  notesVisible(row: EditableImportRow): boolean {
+    return this.notesOpen().has(row.row) || (row.notes?.length ?? 0) > this.NOTES_MAX;
+  }
 
   protected readonly tipoOpts: { value: MovType; label: string; desc: string; icon: string }[] = [
     { value: 'income', label: 'Entrada', desc: 'Aumenta o caixa do negócio', icon: 'trending_up' },
@@ -695,6 +715,7 @@ export class MovimentacoesComponent implements OnInit {
             type: item.type,
             title: item.title,
             value: item.value,
+            valueText: item.value > 0 ? moneyToInput(item.value) : '',
             date: item.date,
             dateRaw: item.dateRaw,
             categoryName: category?.name ?? item.categoryName,
@@ -769,6 +790,7 @@ export class MovimentacoesComponent implements OnInit {
   }
 
   closeImportPreview(): void {
+    this.notesOpen.set(new Set());
     this.importPreviewOpen.set(false);
     this.importConfirmWarningOpen.set(false);
     this.importRows.set([]);
@@ -781,7 +803,12 @@ export class MovimentacoesComponent implements OnInit {
     if (!row.title.trim()) errors.push('título vazio');
     else if (row.title.length > this.TITLE_MAX) {
       errors.push(
-        `título passa de ${this.TITLE_MAX} caracteres (tem ${row.title.length}): encurte`,
+        `título passa de ${this.TITLE_MAX} caracteres (tem ${row.title.length}): encurte e coloque os detalhes em Observações`,
+      );
+    }
+    if (row.notes && row.notes.length > this.NOTES_MAX) {
+      errors.push(
+        `observações passam de ${this.NOTES_MAX} caracteres (têm ${row.notes.length}): encurte`,
       );
     }
     if (!(row.value > 0)) errors.push('valor deve ser maior que zero');
@@ -883,6 +910,22 @@ export class MovimentacoesComponent implements OnInit {
   /** Quantas linhas ainda têm esse campo em branco (mostra/esconde a barra de preenchimento). */
   blankCount(field: 'type' | 'categoryName' | 'accountName' | 'paymentMethod' | 'status'): number {
     return this.importRows().filter((r) => !r[field]).length;
+  }
+
+  /** Digitou no campo Valor da revisão: guarda o texto como está (já com máscara) e o número lido dele. */
+  setRowValue(index: number, text: string): void {
+    this.importRows.update((rows) =>
+      rows.map((r, i) =>
+        i === index ? this.revalidateRow({ ...r, valueText: text, value: parseNumberBR(text) }) : r,
+      ),
+    );
+  }
+
+  /** Saiu do campo: o texto fecha com ",00" (o número não muda). */
+  padRowValue(index: number): void {
+    this.importRows.update((rows) =>
+      rows.map((r, i) => (i === index ? { ...r, valueText: padMoneyInput(r.valueText) } : r)),
+    );
   }
 
   toggleRowIncluded(index: number, included: boolean): void {

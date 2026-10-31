@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { parseNumberBR } from '../services/movimentacoes.service';
-import { formatMoneyInput, moneyToInput } from './money-input';
+import { formatMoneyInput, moneyToInput, padMoneyInput } from './money-input';
 import { MoneyInputDirective } from './money-input.directive';
 
 describe('formatMoneyInput', () => {
@@ -28,6 +28,31 @@ describe('formatMoneyInput', () => {
   it('o texto formatado volta para o mesmo número', () => {
     for (const n of [0.5, 12.5, 1234.5, 14500, 14500.5, 1234567.89]) {
       expect(parseNumberBR(moneyToInput(n))).toBe(n);
+    }
+  });
+});
+
+describe('padMoneyInput (sempre fecha com as duas casas)', () => {
+  it.each([
+    ['145', '145,00'],
+    ['145,5', '145,50'],
+    ['145,50', '145,50'],
+    ['145,', '145,00'],
+    ['14500', '14.500,00'],
+    ['14500,5', '14.500,50'],
+    [',5', '0,50'],
+    ['0', '0,00'],
+    ['R$ 1.234,5', '1.234,50'],
+    ['1234.5', '1.234,50'],
+    ['', ''],
+    ['abc', ''],
+  ])('"%s" -> "%s"', (raw, expected) => {
+    expect(padMoneyInput(raw)).toBe(expected);
+  });
+
+  it('o texto completado volta para o mesmo número', () => {
+    for (const raw of ['145', '14500,5', '0,5']) {
+      expect(parseNumberBR(padMoneyInput(raw))).toBe(parseNumberBR(raw));
     }
   });
 });
@@ -88,6 +113,43 @@ describe('MoneyInputDirective', () => {
     await type('1.2534', 4);
     expect(input.value).toBe('12.534');
     expect(input.selectionStart).toBe(4);
+  });
+
+  describe('ao sair do campo (blur)', () => {
+    it('145 fecha com ,00 e o modelo recebe o texto completo', async () => {
+      const { fixture, input, type } = await setup();
+      await type('145');
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+      expect(input.value).toBe('145,00');
+      expect(fixture.componentInstance.value()).toBe('145,00');
+      expect(parseNumberBR(fixture.componentInstance.value())).toBe(145);
+    });
+
+    it('14500,5 vira 14.500,50', async () => {
+      const { fixture, input, type } = await setup();
+      await type('14500,5');
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+      expect(input.value).toBe('14.500,50');
+      expect(fixture.componentInstance.value()).toBe('14.500,50');
+    });
+
+    it('campo vazio continua vazio (não inventa 0,00)', async () => {
+      const { fixture, input } = await setup();
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+      expect(input.value).toBe('');
+    });
+
+    it('já completo não muda, e voltar ao campo e sair de novo é inofensivo', async () => {
+      const { fixture, input, type } = await setup();
+      await type('1.234,56');
+      input.dispatchEvent(new Event('blur'));
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+      expect(input.value).toBe('1.234,56');
+    });
   });
 
   it('cursor no início continua no início', async () => {

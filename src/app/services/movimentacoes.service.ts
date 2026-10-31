@@ -281,6 +281,9 @@ export const IMPORT_CHUNK_ROWS = 20;
 /** Tamanho máximo do título de uma movimentação (a API recusa mais que isso). */
 export const MOVEMENT_TITLE_MAX = 120;
 
+/** Tamanho máximo das observações (os detalhes do pedido vão aqui, não no título). */
+export const MOVEMENT_NOTES_MAX = 500;
+
 /**
  * Número como o brasileiro digita: "1.234,50", "R$ 1.234,50", "184,5", "1234.5". Vírgula é o
  * decimal; ponto só é decimal quando não parece separador de milhar ("1.234" = 1234, "1.5" = 1,5).
@@ -778,7 +781,12 @@ export function buildImportPreview(
     if (!title) errors.push('título vazio');
     else if (title.length > MOVEMENT_TITLE_MAX) {
       errors.push(
-        `título passa de ${MOVEMENT_TITLE_MAX} caracteres (tem ${title.length}): encurte`,
+        `título passa de ${MOVEMENT_TITLE_MAX} caracteres (tem ${title.length}): encurte e coloque os detalhes em Observações`,
+      );
+    }
+    if (notes && notes.length > MOVEMENT_NOTES_MAX) {
+      errors.push(
+        `observações passam de ${MOVEMENT_NOTES_MAX} caracteres (têm ${notes.length}): encurte`,
       );
     }
     if (!(value > 0)) errors.push('valor deve ser maior que zero');

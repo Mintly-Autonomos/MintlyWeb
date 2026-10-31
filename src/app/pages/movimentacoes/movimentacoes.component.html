@@ -896,19 +896,20 @@
 
       <!-- Uma só área de rolagem: no computador a tabela cabe na largura (sem barra lateral); no celular rola para o lado. -->
       <div class="flex-1 min-h-0 rounded-xl border border-border overflow-auto bg-card">
-        <div class="min-w-[1080px]">
+        <div class="min-w-[1120px]">
           <table class="w-full text-[12.5px] table-fixed">
             <colgroup>
-              <col class="w-10" />
-              <col class="w-12" />
-              <col class="w-[104px]" />
+              <col class="w-9" />
+              <col class="w-11" />
+              <col class="w-[96px]" />
               <col />
-              <col class="w-[92px]" />
-              <col class="w-[140px]" />
-              <col class="w-[160px]" />
-              <col class="w-[128px]" />
-              <col class="w-[124px]" />
+              <col class="w-[84px]" />
+              <col class="w-[132px]" />
+              <col class="w-[150px]" />
+              <col class="w-[118px]" />
               <col class="w-[116px]" />
+              <col class="w-[108px]" />
+              <col class="w-[52px]" />
             </colgroup>
             <thead class="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--color-border)]">
               <tr class="text-left text-muted-foreground">
@@ -922,6 +923,7 @@
                 <th class="px-2 py-2.5 font-medium">Conta</th>
                 <th class="px-2 py-2.5 font-medium">Forma pgto.</th>
                 <th class="px-2 py-2.5 font-medium">Status</th>
+                <th class="px-1 py-2.5 font-medium text-center" title="Observações">Obs.</th>
               </tr>
             </thead>
             <tbody>
@@ -974,12 +976,14 @@
                   </td>
                   <td class="px-2 py-1.5">
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      [value]="row.value"
-                      (input)="updateRowField(i, 'value', $any($event.target).valueAsNumber || 0)"
-                      class="h-8 w-full rounded-lg border border-border bg-card px-2 text-[12px] text-right outline-none focus:ring-2 focus:ring-mint/40"
+                      appMoneyInput
+                      type="text"
+                      inputmode="decimal"
+                      data-testid="valor-linha"
+                      [value]="row.valueText"
+                      (input)="setRowValue(i, $any($event.target).value)"
+                      (blur)="padRowValue(i)"
+                      class="h-8 w-full rounded-lg border border-border bg-card px-2 text-[12px] text-right tabular-nums outline-none focus:ring-2 focus:ring-mint/40"
                     />
                   </td>
                   <td class="px-2 py-1.5">
@@ -1072,13 +1076,67 @@
                       }
                     </select>
                   </td>
+                  <td class="px-1 py-1.5 text-center">
+                    <!-- Observações ficam recolhidas: o botão abre uma linha extra logo abaixo (o texto pode ser grande). -->
+                    <button
+                      type="button"
+                      data-testid="btn-obs"
+                      (click)="toggleNotes(row.row)"
+                      [attr.aria-expanded]="notesVisible(row)"
+                      [attr.aria-label]="'Observações da linha ' + (row.row - 1)"
+                      [title]="row.notes ? 'Observações: ' + row.notes : 'Adicionar observações'"
+                      [class]="
+                        'relative h-8 w-8 rounded-lg border grid place-items-center cursor-pointer transition ' +
+                        (notesVisible(row)
+                          ? 'border-mint bg-mint-soft text-ocean'
+                          : row.notes
+                            ? 'border-mint/60 text-ocean hover:bg-mint-soft'
+                            : 'border-border bg-card text-muted-foreground hover:bg-muted')
+                      "
+                    >
+                      <app-icon
+                        [name]="row.notes ? 'sticky_note_2' : 'edit_note'"
+                        [style]="{ fontSize: '18px' }"
+                      />
+                      @if (row.notes) {
+                        <span
+                          class="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-mint border border-card"
+                        ></span>
+                      }
+                    </button>
+                  </td>
                 </tr>
                 @if (!row.valid && row.error) {
                   <!-- O que está errado e o que corrigir, na própria linha (antes só aparecia ao passar o mouse). -->
                   <tr class="bg-error/5" data-testid="erro-linha">
                     <td></td>
-                    <td colspan="9" class="px-2 pb-2 text-error text-[12px] leading-snug">
+                    <td colspan="10" class="px-2 pb-2 text-error text-[12px] leading-snug">
                       {{ row.error }}
+                    </td>
+                  </tr>
+                }
+                @if (notesVisible(row)) {
+                  <tr class="bg-muted/30" data-testid="linha-obs">
+                    <td></td>
+                    <td colspan="10" class="px-2 pb-2.5">
+                      <label class="block">
+                        <span class="block text-[11.5px] text-muted-foreground mb-1"
+                          >Observações da linha {{ row.row - 1 }} · detalhes do pedido (itens,
+                          acompanhamentos…)</span
+                        >
+                        <textarea
+                          data-testid="obs-linha"
+                          rows="2"
+                          [value]="row.notes ?? ''"
+                          [maxLength]="NOTES_MAX"
+                          placeholder="Escreva aqui os detalhes do pedido"
+                          (input)="updateRowField(i, 'notes', $any($event.target).value || null)"
+                          class="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] leading-snug outline-none focus:ring-2 focus:ring-mint/40 resize-y placeholder:text-muted-foreground/70"
+                        ></textarea>
+                      </label>
+                      <div class="text-right text-[11px] text-muted-foreground">
+                        {{ (row.notes ?? '').length }}/{{ NOTES_MAX }}
+                      </div>
                     </td>
                   </tr>
                 }
