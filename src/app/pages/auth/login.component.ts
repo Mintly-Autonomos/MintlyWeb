@@ -126,7 +126,7 @@ import { apiErrorInfo } from '../../shared/api-error';
           class="w-full h-12 rounded-xl border border-border bg-card text-foreground font-medium text-sm hover:bg-muted transition flex items-center justify-center gap-2 cursor-pointer"
         >
           <app-icon name="person_add" [style]="{ fontSize: '20px' }" />
-          <span>Criar uma conta gratuita</span>
+          <span>Criar uma conta</span>
         </button>
 
         <p class="flex items-start gap-2 text-[12px] text-muted-foreground pt-1">
@@ -142,7 +142,7 @@ import { apiErrorInfo } from '../../shared/api-error';
       <div slot="footer">
         Não tem conta?
         <a routerLink="/auth/cadastro" class="text-ocean font-semibold hover:underline"
-          >Criar gratuitamente</a
+          >Criar conta</a
         >
       </div>
     </app-auth-card>

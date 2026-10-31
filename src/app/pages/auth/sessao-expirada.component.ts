@@ -1,18 +1,15 @@
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
+import { IDLE_TIMEOUT_MINUTES } from '../../services/idle-session.service';
 
 @Component({
   selector: 'app-sessao-expirada',
   standalone: true,
   imports: [AuthCardComponent, IconComponent],
   template: `
-    <app-auth-card
-      [wide]="true"
-      title="Sua sessão expirou"
-      subtitle="Por segurança, encerramos sua sessão após um período sem atividade. Faça login novamente para continuar."
-    >
+    <app-auth-card [wide]="true" [title]="title" [subtitle]="subtitle">
       <div class="flex items-center justify-center mb-2">
         <div class="h-16 w-16 rounded-2xl bg-warning/15 grid place-items-center text-warning">
           <app-icon name="schedule" [style]="{ fontSize: '32px' }" />
@@ -27,14 +24,16 @@ import { IconComponent } from '../../shared/icon.component';
           <span>Entrar novamente</span>
           <app-icon name="login" [style]="{ fontSize: '20px' }" />
         </button>
-        <button
-          type="button"
-          (click)="router.navigate(['/auth/esqueci-senha'])"
-          class="w-full h-12 rounded-xl border border-border bg-card text-foreground font-medium text-sm hover:bg-muted transition flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <app-icon name="help" [style]="{ fontSize: '20px' }" />
-          <span>Esqueci minha senha</span>
-        </button>
+        @if (!inactivity) {
+          <button
+            type="button"
+            (click)="router.navigate(['/auth/esqueci-senha'])"
+            class="w-full h-12 rounded-xl border border-border bg-card text-foreground font-medium text-sm hover:bg-muted transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <app-icon name="help" [style]="{ fontSize: '20px' }" />
+            <span>Esqueci minha senha</span>
+          </button>
+        }
       </div>
       <p
         class="mt-6 text-[12px] text-muted-foreground text-center flex items-center justify-center gap-1.5"
@@ -47,4 +46,13 @@ import { IconComponent } from '../../shared/icon.component';
 })
 export class SessaoExpiradaComponent {
   protected router = inject(Router);
+  private route = inject(ActivatedRoute);
+
+  /** Veio do encerramento por inatividade (`?motivo=inatividade`) e não de um token vencido. */
+  protected inactivity = this.route.snapshot.queryParamMap.get('motivo') === 'inatividade';
+
+  protected title = this.inactivity ? 'Sessão encerrada por inatividade' : 'Sua sessão expirou';
+  protected subtitle = this.inactivity
+    ? `Você ficou ${IDLE_TIMEOUT_MINUTES} minutos sem usar o Mintly, então encerramos sua sessão para proteger seus dados. Entre novamente para continuar.`
+    : 'Por segurança, encerramos sua sessão após um período sem atividade. Faça login novamente para continuar.';
 }

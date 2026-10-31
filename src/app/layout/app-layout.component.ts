@@ -9,6 +9,7 @@ import { LogoComponent } from '../shared/logo.component';
 import { IconComponent } from '../shared/icon.component';
 import { ToastService } from '../shared/toast.service';
 import { AVATAR_ACCEPT, readAvatarFile } from '../shared/avatar-file';
+import { fmtEndsAt, tierLabel } from '../pages/assinatura/assinatura.format';
 
 const NAV = [
   { to: '/visao-geral', label: 'Visão Geral', icon: 'space_dashboard' },
@@ -212,7 +213,10 @@ const NAV = [
                             <span
                               class="h-8 w-8 shrink-0 rounded-xl grid place-items-center bg-warning/10 text-warning"
                             >
-                              <app-icon name="sell" [style]="{ fontSize: '16px' }" />
+                              <app-icon
+                                [name]="n.kind === 'subscription' ? 'credit_card' : 'sell'"
+                                [style]="{ fontSize: '16px' }"
+                              />
                             </span>
                             <div class="min-w-0 flex-1">
                               <div class="text-[13px] font-semibold leading-snug">
@@ -303,6 +307,22 @@ const NAV = [
                       Remover foto
                     </button>
                   }
+                  <a
+                    routerLink="/assinatura"
+                    role="menuitem"
+                    (click)="userMenuOpen.set(false)"
+                    class="flex items-center gap-3 px-4 py-2.5 text-[13.5px] hover:bg-muted no-underline text-foreground"
+                  >
+                    <app-icon name="credit_card" [style]="{ fontSize: '19px' }" />
+                    <span class="leading-tight">
+                      Minha assinatura
+                      @if (subscriptionEnds) {
+                        <span class="block text-[11px] text-muted-foreground">{{
+                          subscriptionSummary
+                        }}</span>
+                      }
+                    </span>
+                  </a>
                   <div class="my-1.5 border-t border-border"></div>
                   <a
                     routerLink="/auth/logout"
@@ -412,6 +432,11 @@ export class AppLayoutComponent implements OnInit {
 
   /** "Não quero mudar": mantém o preço e o aviso some (só volta daqui a ~5,5 meses). */
   async dismissNotification(n: AppNotification): Promise<void> {
+    if (n.kind === 'subscription') {
+      this.notifications.dismissSubscriptionNotice();
+      this.toast.info('Tudo bem. Lembramos de novo na próxima vez que você entrar.');
+      return;
+    }
     try {
       await this.notifications.keepPrice(n);
       this.toast.info(
@@ -429,6 +454,16 @@ export class AppLayoutComponent implements OnInit {
   // Dinâmico: vem do usuário autenticado quando disponível; senão, fallback.
   get userBusiness(): string {
     return this.auth.currentUser()?.empresa?.trim() || 'Meu negócio';
+  }
+  /** Data limite da assinatura, para o menu da conta ("30/11/2026"). */
+  /** "Pro · até 30/11/2026" — o tipo da assinatura e até quando vale. */
+  get subscriptionSummary(): string {
+    const label = tierLabel(this.auth.subscriptionState().tier);
+    return label ? `${label} · até ${this.subscriptionEnds}` : `Até ${this.subscriptionEnds}`;
+  }
+
+  get subscriptionEnds(): string {
+    return fmtEndsAt(this.auth.subscriptionState().endsAt);
   }
   get userInitials(): string {
     const parts = this.userName.split(/\s+/).filter(Boolean);
