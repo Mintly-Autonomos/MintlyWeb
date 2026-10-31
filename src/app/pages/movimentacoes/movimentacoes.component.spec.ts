@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import type { ComponentFixture } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { MovimentacoesComponent } from './movimentacoes.component';
 import { MovimentacoesService, buildImportPreview } from '../../services/movimentacoes.service';
@@ -13,6 +14,8 @@ interface Internals {
   setTypeFilter(type: string): void;
   importRows: () => Row[];
   submitImport(): Promise<void>;
+  confirmImportPreview(): void;
+  toggleRowIncluded(index: number, included: boolean): void;
   importFile: { set(f: File | null): void };
   fillBlank(field: string, raw: string): void;
   blankCount(field: string): number;
@@ -51,6 +54,7 @@ const account = (id: string, name: string) => ({
 
 describe('MovimentacoesComponent', () => {
   let c: Internals;
+  let fixture: ComponentFixture<MovimentacoesComponent>;
   let previewImport: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -86,7 +90,8 @@ describe('MovimentacoesComponent', () => {
         },
       ],
     });
-    c = TestBed.createComponent(MovimentacoesComponent).componentInstance as unknown as Internals;
+    fixture = TestBed.createComponent(MovimentacoesComponent);
+    c = fixture.componentInstance as unknown as Internals;
   });
 
   /** Mesmas linhas da base do Keeta: categoria e formas escritas "do jeito do dono". */
@@ -279,6 +284,114 @@ describe('MovimentacoesComponent', () => {
       c.updateRowField(0, 'title', 'x'.repeat(100));
       expect(c.importRows()[0].valid).toBe(true);
       expect(c.importRows()[0].included).toBe(true);
+    });
+  });
+
+  describe('telas da importação em massa mostram o ERRO de cada linha', () => {
+    const text = (el: ParentNode, selector: string) =>
+      Array.from(el.querySelectorAll(selector)).map((e) =>
+        (e.textContent ?? '').split(/\s+/).join(' ').trim(),
+      );
+
+    /** Uma linha boa, uma com título de 125 caracteres e uma sem categoria. */
+    const preview = () =>
+      buildImportPreview('x.xlsx', [
+        {
+          row: 1,
+          cells: [
+            'Tipo',
+            'Título',
+            'Valor',
+            'Data',
+            'Categoria',
+            'Conta',
+            'Forma de pagamento',
+            'Status',
+          ],
+        },
+        {
+          row: 2,
+          cells: [
+            'Receita',
+            'Pedido ok',
+            125,
+            '2026-10-29',
+            'Venda Delivery',
+            'Keeta',
+            'Pix',
+            'Recebido',
+          ],
+        },
+        {
+          row: 3,
+          cells: [
+            'Receita',
+            'x'.repeat(125),
+            135,
+            '2026-10-29',
+            'Venda Delivery',
+            'Keeta',
+            'Pix',
+            'Recebido',
+          ],
+        },
+        {
+          row: 4,
+          cells: ['Receita', 'Sem categoria', 135, '2026-10-29', '', 'Keeta', 'Pix', 'Recebido'],
+        },
+      ]);
+
+    beforeEach(async () => {
+      previewImport.mockResolvedValue(preview());
+      c.importFile.set(new File(['x'], 'base.xlsx'));
+      await c.submitImport();
+      fixture.detectChanges();
+    });
+
+    it('na revisão: cada linha com erro mostra o motivo escrito, sem depender de passar o mouse', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const messages = text(root, '[data-testid="erro-linha"]');
+      expect(messages).toHaveLength(2);
+      expect(messages[0]).toBe('título passa de 120 caracteres (tem 125): encurte');
+      expect(messages[1]).toBe('falta a categoria');
+    });
+
+    it('na revisão: a linha válida não tem mensagem de erro', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      expect(text(root, '[data-testid="erro-linha"]').join(' ')).not.toContain('Pedido ok');
+      expect(root.querySelectorAll('[data-testid="erro-linha"]')).toHaveLength(2);
+    });
+
+    it('corrigir o campo faz a mensagem sumir', () => {
+      c.updateRowField(1, 'title', 'x'.repeat(100));
+      fixture.detectChanges();
+      const messages = text(fixture.nativeElement as HTMLElement, '[data-testid="erro-linha"]');
+      expect(messages).toEqual(['falta a categoria']);
+    });
+
+    it('no aviso de linhas que ficam de fora: o motivo de cada uma e a dica de como corrigir', () => {
+      c.confirmImportPreview();
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      const reasons = text(root, '[data-testid="motivo-excluida"]');
+      expect(reasons).toHaveLength(2);
+      expect(reasons[0]).toBe('título passa de 120 caracteres (tem 125): encurte');
+      expect(reasons[1]).toBe('falta a categoria');
+      expect(root.textContent).toContain('clique em Revisar');
+    });
+
+    it('no aviso: linha desmarcada à mão diz que foi desmarcada, e não mostra a dica de erro', async () => {
+      c.updateRowField(1, 'title', 'x'.repeat(100));
+      c.updateRowField(2, 'categoryName', 'Venda Balcão');
+      (c as unknown as { toggleRowIncluded(i: number, v: boolean): void }).toggleRowIncluded(
+        0,
+        false,
+      );
+      c.confirmImportPreview();
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(text(root, '[data-testid="motivo-excluida"]')).toEqual(['Você desmarcou esta linha.']);
+      expect(root.textContent).not.toContain('clique em Revisar');
     });
   });
 

@@ -6,6 +6,13 @@ import { routes } from './app.routes';
 import { AuthService } from './services/auth.service';
 import { IdleSessionService } from './services/idle-session.service';
 
+// A lib lê a URL da API ao instanciar os clients (no app, o main.ts define antes do bootstrap). Sem isto o
+// teste só passava se outro arquivo tivesse definido a variável antes — dependia da ordem de execução.
+declare const process: { env: Record<string, string | undefined> };
+beforeAll(() => {
+  process.env['BACK_END_URL'] = 'http://api.test';
+});
+
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({

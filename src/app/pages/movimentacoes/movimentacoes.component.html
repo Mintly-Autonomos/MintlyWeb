@@ -786,11 +786,11 @@
   <app-modal
     title="Confirmar importação"
     [subtitle]="importFileName()"
-    size="lg"
+    size="xl"
     (closed)="closeImportPreview()"
   >
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center gap-2 text-[13px]">
+    <div class="h-full min-h-0 flex flex-col gap-3">
+      <div class="shrink-0 flex flex-wrap items-center gap-2 text-[13px]">
         <app-chip tone="mint" icon="check_circle"
           >{{ importIncludedCount() }} serão importadas</app-chip
         >
@@ -818,7 +818,7 @@
           blankCount('status') >
         0
       ) {
-        <div class="rounded-xl border border-border bg-muted/40 p-3">
+        <div class="shrink-0 rounded-xl border border-border bg-muted/40 p-3">
           <p class="text-[12.5px] font-medium">
             Faltou algo na planilha? Preencha de uma vez as linhas em branco:
           </p>
@@ -894,29 +894,41 @@
         </div>
       }
 
-      <div class="rounded-xl border border-border overflow-hidden">
-        <div class="overflow-x-auto max-h-[420px]">
-          <table class="w-full text-[12px]">
-            <thead class="bg-muted/60 sticky top-0 z-10">
+      <!-- Uma só área de rolagem: no computador a tabela cabe na largura (sem barra lateral); no celular rola para o lado. -->
+      <div class="flex-1 min-h-0 rounded-xl border border-border overflow-auto bg-card">
+        <div class="min-w-[1080px]">
+          <table class="w-full text-[12.5px] table-fixed">
+            <colgroup>
+              <col class="w-10" />
+              <col class="w-12" />
+              <col class="w-[104px]" />
+              <col />
+              <col class="w-[92px]" />
+              <col class="w-[140px]" />
+              <col class="w-[160px]" />
+              <col class="w-[128px]" />
+              <col class="w-[124px]" />
+              <col class="w-[116px]" />
+            </colgroup>
+            <thead class="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--color-border)]">
               <tr class="text-left text-muted-foreground">
-                <th class="px-2 py-2 font-medium"></th>
-                <th class="px-2 py-2 font-medium">Linha</th>
-                <th class="px-2 py-2 font-medium">Tipo</th>
-                <th class="px-2 py-2 font-medium">Título</th>
-                <th class="px-2 py-2 font-medium">Valor</th>
-                <th class="px-2 py-2 font-medium">Data</th>
-                <th class="px-2 py-2 font-medium">Categoria</th>
-                <th class="px-2 py-2 font-medium">Conta</th>
-                <th class="px-2 py-2 font-medium">Forma pgto.</th>
-                <th class="px-2 py-2 font-medium">Status</th>
-                <th class="px-2 py-2 font-medium"></th>
+                <th class="px-2 py-2.5 font-medium"></th>
+                <th class="px-2 py-2.5 font-medium">Linha</th>
+                <th class="px-2 py-2.5 font-medium">Tipo</th>
+                <th class="px-2 py-2.5 font-medium">Título</th>
+                <th class="px-2 py-2.5 font-medium">Valor</th>
+                <th class="px-2 py-2.5 font-medium">Data</th>
+                <th class="px-2 py-2.5 font-medium">Categoria</th>
+                <th class="px-2 py-2.5 font-medium">Conta</th>
+                <th class="px-2 py-2.5 font-medium">Forma pgto.</th>
+                <th class="px-2 py-2.5 font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
               @for (row of importRows(); track row.row; let i = $index) {
                 <tr
                   [class]="
-                    'border-t border-border/60 ' +
+                    'border-t border-border/60 hover:bg-muted/30 ' +
                     (!row.valid ? 'bg-error/5' : !row.included ? 'opacity-50' : '')
                   "
                 >
@@ -926,7 +938,7 @@
                       [checked]="row.included"
                       [disabled]="!row.valid"
                       (change)="toggleRowIncluded(i, $any($event.target).checked)"
-                      class="h-6 w-6 sm:h-4 sm:w-4 cursor-pointer disabled:cursor-not-allowed"
+                      class="h-6 w-6 sm:h-4 sm:w-4 accent-mint cursor-pointer disabled:cursor-not-allowed"
                       title="Incluir esta linha na importação"
                     />
                   </td>
@@ -938,7 +950,7 @@
                       [value]="row.type ?? ''"
                       (change)="updateRowField(i, 'type', $any($event.target).value || null)"
                       [class]="
-                        'h-8 rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
+                        'h-8 w-full rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
                         (row.type ? 'border-border' : 'border-error/60')
                       "
                     >
@@ -957,7 +969,7 @@
                       type="text"
                       [value]="row.title"
                       (input)="updateRowField(i, 'title', $any($event.target).value)"
-                      class="h-8 w-36 rounded-lg border border-border bg-card px-2 text-[12px] outline-none focus:ring-2 focus:ring-mint/40"
+                      class="h-8 w-full rounded-lg border border-border bg-card px-2 text-[12px] outline-none focus:ring-2 focus:ring-mint/40"
                     />
                   </td>
                   <td class="px-2 py-1.5">
@@ -967,7 +979,7 @@
                       step="0.01"
                       [value]="row.value"
                       (input)="updateRowField(i, 'value', $any($event.target).valueAsNumber || 0)"
-                      class="h-8 w-24 rounded-lg border border-border bg-card px-2 text-[12px] text-right outline-none focus:ring-2 focus:ring-mint/40"
+                      class="h-8 w-full rounded-lg border border-border bg-card px-2 text-[12px] text-right outline-none focus:ring-2 focus:ring-mint/40"
                     />
                   </td>
                   <td class="px-2 py-1.5">
@@ -975,7 +987,7 @@
                       type="date"
                       [value]="row.date"
                       (change)="updateRowField(i, 'date', $any($event.target).value)"
-                      class="h-8 w-[136px] rounded-lg border border-border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40"
+                      class="h-8 w-full rounded-lg border border-border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40"
                     />
                   </td>
                   <td class="px-2 py-1.5">
@@ -983,7 +995,7 @@
                       [value]="row.categoryName"
                       (change)="updateRowField(i, 'categoryName', $any($event.target).value)"
                       [class]="
-                        'h-8 w-36 rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
+                        'h-8 w-full rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
                         (categoryMatches(row.categoryName) ? 'border-border' : 'border-error/60')
                       "
                     >
@@ -1004,7 +1016,7 @@
                       [value]="row.accountName"
                       (change)="updateRowField(i, 'accountName', $any($event.target).value)"
                       [class]="
-                        'h-8 w-36 rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
+                        'h-8 w-full rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
                         (accountMatches(row.accountName) ? 'border-border' : 'border-error/60')
                       "
                     >
@@ -1031,7 +1043,7 @@
                         )
                       "
                       [class]="
-                        'h-8 w-28 rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
+                        'h-8 w-full rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
                         (row.paymentMethod ? 'border-border' : 'border-error/60')
                       "
                     >
@@ -1046,7 +1058,7 @@
                       [value]="row.status ?? ''"
                       (change)="updateRowField(i, 'status', $any($event.target).value || null)"
                       [class]="
-                        'h-8 w-28 rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
+                        'h-8 w-full rounded-lg border bg-card px-1.5 text-[12px] outline-none focus:ring-2 focus:ring-mint/40 cursor-pointer ' +
                         (row.status ? 'border-border' : 'border-error/60')
                       "
                     >
@@ -1060,17 +1072,16 @@
                       }
                     </select>
                   </td>
-                  <td class="px-2 py-1.5">
-                    @if (!row.valid) {
-                      <span
-                        class="inline-flex items-center gap-1 text-error text-[11.5px] whitespace-nowrap"
-                        [title]="row.error ?? ''"
-                      >
-                        <app-icon name="error" [style]="{ fontSize: '14px' }" />Erro
-                      </span>
-                    }
-                  </td>
                 </tr>
+                @if (!row.valid && row.error) {
+                  <!-- O que está errado e o que corrigir, na própria linha (antes só aparecia ao passar o mouse). -->
+                  <tr class="bg-error/5" data-testid="erro-linha">
+                    <td></td>
+                    <td colspan="9" class="px-2 pb-2 text-error text-[12px] leading-snug">
+                      {{ row.error }}
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
@@ -1122,19 +1133,48 @@
         class="rounded-xl border border-border divide-y divide-border max-h-[220px] overflow-y-auto"
       >
         @for (row of importExcludedRows(); track row.row) {
-          <div class="px-3 py-2 flex items-center gap-2">
-            <span class="text-muted-foreground text-[11.5px] shrink-0"
-              >Linha {{ row.row - 1 }}</span
+          <div class="px-3 py-2">
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground text-[11.5px] shrink-0"
+                >Linha {{ row.row - 1 }}</span
+              >
+              <span class="font-medium truncate" [title]="row.title">{{
+                row.title || '(sem título)'
+              }}</span>
+              @if (!row.valid) {
+                <span class="text-error text-[11.5px] ml-auto shrink-0">com erro</span>
+              } @else if (row.possibleDuplicate) {
+                <span class="text-warning text-[11.5px] ml-auto shrink-0">já lançada?</span>
+              } @else {
+                <span class="text-muted-foreground text-[11.5px] ml-auto shrink-0">desmarcada</span>
+              }
+            </div>
+            <!-- O motivo: sem ele a pessoa não sabe o que corrigir. -->
+            <p
+              data-testid="motivo-excluida"
+              [class]="
+                'mt-1 text-[12px] leading-snug ' +
+                (!row.valid ? 'text-error' : 'text-muted-foreground')
+              "
             >
-            <span class="font-medium truncate">{{ row.title || '(sem título)' }}</span>
-            @if (!row.valid) {
-              <span class="text-error text-[11.5px] ml-auto shrink-0">com erro</span>
-            } @else {
-              <span class="text-muted-foreground text-[11.5px] ml-auto shrink-0">desmarcada</span>
-            }
+              @if (!row.valid) {
+                {{ row.error }}
+              } @else if (row.possibleDuplicate) {
+                Parece já lançada (mesma conta, título, valor e data). Marque a linha na tabela se
+                quiser importar mesmo assim.
+              } @else {
+                Você desmarcou esta linha.
+              }
+            </p>
           </div>
         }
       </div>
+      @if (importExcludedRows().some((r) => !r.valid)) {
+        <p class="text-[12px] text-muted-foreground">
+          Para importar as linhas com erro, clique em <strong>Revisar</strong>, corrija o campo
+          indicado na tabela e a linha volta a ser marcada sozinha.
+        </p>
+      }
     </div>
     <ng-container ngProjectAs="[slot=footer]">
       <div class="flex justify-end gap-3">
