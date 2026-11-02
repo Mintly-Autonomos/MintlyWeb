@@ -29,6 +29,15 @@ import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtDateTime, fmtShortDate, localISODate } from '../../shared/format';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { CardapioService } from '../../services/cardapio.service';
+import { AuthService } from '../../services/auth.service';
+import {
+  DISH_IGNORE,
+  DishAliases,
+  matchDishLines,
+  recognizedItems,
+  splitDishText,
+} from '../../shared/dish-match';
+import { loadDishAliases, saveDishAlias } from '../../shared/dish-aliases';
 import { moneyToInput } from '../../shared/money-input';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
 import { matchName } from '../../shared/import-parse';
@@ -107,6 +116,7 @@ export class MovimentacoesComponent implements OnInit {
   private categoriasSvc = inject(CategoriasService);
   private toast = inject(ToastService);
   private cardapioSvc = inject(CardapioService);
+  private auth = inject(AuthService);
 
   // ── UI state ──────────────────────────────────────────────────────────
   protected creating = signal(false);
@@ -436,6 +446,55 @@ export class MovimentacoesComponent implements OnInit {
       .filter((p) => p.active)
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
   );
+
+  // ── Pratos da importação ────────────────────────────────────────────
+  /** Escolhas guardadas na revisão ("Batata grande" = prato Batata Rústica). */
+  protected dishAliases = signal<DishAliases>(
+    loadDishAliases(this.auth.currentUser()?.restaurantId),
+  );
+
+  /** Os pratos de cada linha, lidos das Observações (entradas): igualdade exata com o cardápio. */
+  private importDishLines = computed(() =>
+    this.importRows().map((r) =>
+      r.type === 'income'
+        ? matchDishLines(splitDishText(r.notes), this.dishOptions(), this.dishAliases())
+        : [],
+    ),
+  );
+
+  /** Textos das Observações que não são nenhum prato do cardápio, agrupados (o mesmo texto em várias linhas conta uma vez). */
+  protected importUnmatched = computed(() => {
+    const groups = new Map<
+      string,
+      { key: string; text: string; rows: number; suggestion: { id: string; name: string } | null }
+    >();
+    for (const lines of this.importDishLines()) {
+      for (const l of lines) {
+        if (l.menuItemId || l.ignored) continue;
+        const g = groups.get(l.key);
+        if (g) g.rows += 1;
+        else groups.set(l.key, { key: l.key, text: l.text, rows: 1, suggestion: l.suggestion });
+      }
+    }
+    return [...groups.values()].sort((a, b) => b.rows - a.rows);
+  });
+
+  /** Quantas linhas já têm algum prato reconhecido. */
+  protected importDishRowCount = computed(
+    () => this.importDishLines().filter((lines) => lines.some((l) => l.menuItemId)).length,
+  );
+
+  /** Escolheu na revisão: o texto vira esse prato (ou "ignorar") em todas as linhas, e fica guardado. */
+  resolveUnmatched(key: string, value: string): void {
+    if (!value) return;
+    this.dishAliases.set(
+      saveDishAlias(
+        this.auth.currentUser()?.restaurantId,
+        key,
+        value === 'ignore' ? DISH_IGNORE : value,
+      ),
+    );
+  }
 
   /** Prato escolhido na lista: entra com quantidade 1, ou soma 1 se já estava. */
   addDish(menuItemId: string): void {
@@ -1018,6 +1077,12 @@ export class MovimentacoesComponent implements OnInit {
         paymentMethod: r.paymentMethod,
         status: r.status,
         notes: r.notes,
+        items:
+          r.type === 'income'
+            ? recognizedItems(
+                matchDishLines(splitDishText(r.notes), this.dishOptions(), this.dishAliases()),
+              )
+            : [],
         valid: r.valid,
         error: r.error,
       }));

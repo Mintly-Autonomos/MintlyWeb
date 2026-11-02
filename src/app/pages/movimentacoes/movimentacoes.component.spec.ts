@@ -7,6 +7,7 @@ import type { ImportGridRow } from '../../services/movimentacoes.service';
 import { ContasService } from '../../services/contas.service';
 import { CategoriasService } from '../../services/categorias.service';
 import { CardapioService } from '../../services/cardapio.service';
+import { AuthService } from '../../services/auth.service';
 
 interface Internals {
   form: () => {
@@ -19,6 +20,9 @@ interface Internals {
   removeDish(id: string): void;
   dishOptions: () => { id: string; name: string }[];
   openCreate(type?: string): void;
+  importUnmatched: () => { key: string; text: string; rows: number; suggestion: unknown }[];
+  importDishRowCount: () => number;
+  resolveUnmatched(key: string, value: string): void;
   statusOpts: () => { value: string; label: string }[];
   statusFilter: (() => string) & { set(v: string): void };
   typeFilter: () => string;
@@ -82,6 +86,7 @@ describe('MovimentacoesComponent', () => {
   let confirmImport: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    localStorage.clear(); // as escolhas de pratos da importação ficam no navegador
     previewImport = vi.fn();
     confirmImport = vi.fn().mockResolvedValue({ insertedCount: 1, items: [], failedRows: [] });
     TestBed.configureTestingModule({
@@ -103,6 +108,7 @@ describe('MovimentacoesComponent', () => {
             refresh: vi.fn().mockResolvedValue(undefined),
           },
         },
+        { provide: AuthService, useValue: { currentUser: () => ({ restaurantId: 'rest-1' }) } },
         {
           provide: CardapioService,
           useValue: {
@@ -691,6 +697,119 @@ describe('MovimentacoesComponent', () => {
 
     it('reenvio de uma importação já feita: título próprio', () => {
       expect(c.importResultTitle(res(53, 0, true))).toBe('Importação já realizada');
+    });
+  });
+
+  describe('pratos lidos das Observações na importação', () => {
+    const header = [
+      'Tipo',
+      'Título',
+      'Valor',
+      'Data',
+      'Categoria',
+      'Conta',
+      'Forma de pagamento',
+      'Status',
+      'Observações',
+    ];
+    const linha = (n: number, notes: string) => ({
+      row: n,
+      cells: [
+        'Receita',
+        `Pedido ${n}`,
+        50,
+        '2026-10-29',
+        'Venda Delivery',
+        'Keeta',
+        'Pix',
+        'Recebido',
+        notes,
+      ],
+    });
+    const load = async (...notes: string[]) => {
+      previewImport.mockResolvedValue(
+        buildImportPreview('x.xlsx', [
+          { row: 1, cells: header },
+          ...notes.map((n, i) => linha(i + 2, n)),
+        ]),
+      );
+      c.importFile.set(new File(['x'], 'base.xlsx'));
+      await c.submitImport();
+      fixture.detectChanges();
+    };
+    const sentItems = () => confirmImport.mock.calls[0][0].map((r: { items?: unknown }) => r.items);
+
+    it('reconhece os pratos do cardápio e lista o que não é nenhum', async () => {
+      await load('Arroz + Batata Rústica + Sorvete', 'arróz; sorvete');
+      expect(c.importDishRowCount()).toBe(2);
+      // "Sorvete" aparece em 2 linhas e conta uma vez
+      expect(c.importUnmatched().map((u) => [u.text, u.rows])).toEqual([['Sorvete', 2]]);
+    });
+
+    it('"arroz com batata" não é "arroz": fica não reconhecido', async () => {
+      await load('Arroz com Batata');
+      expect(c.importUnmatched().map((u) => u.text)).toEqual(['Arroz com Batata']);
+      expect(c.importDishRowCount()).toBe(0);
+    });
+
+    it('escolher um prato para o texto vale em todas as linhas e vai para a API', async () => {
+      await load('Arroz + Sorvete', 'Sorvete + Batata Rústica');
+      const [u] = c.importUnmatched();
+      c.resolveUnmatched(u.key, 'm2');
+      fixture.detectChanges();
+      expect(c.importUnmatched()).toEqual([]);
+
+      c.confirmImportPreview();
+      await fixture.whenStable();
+      expect(sentItems()).toEqual([
+        [
+          { menuItemId: 'm1', qty: 1 },
+          { menuItemId: 'm2', qty: 1 },
+        ],
+        [{ menuItemId: 'm2', qty: 2 }], // Sorvete (= Batata Rústica) + Batata Rústica
+      ]);
+    });
+
+    it('"Ignorar este texto" tira o item da lista e não vira prato', async () => {
+      await load('Arroz + Sem cebola');
+      c.resolveUnmatched(c.importUnmatched()[0].key, 'ignore');
+      expect(c.importUnmatched()).toEqual([]);
+      c.confirmImportPreview();
+      await fixture.whenStable();
+      expect(sentItems()).toEqual([[{ menuItemId: 'm1', qty: 1 }]]);
+    });
+
+    it('a escolha fica guardada: a próxima planilha já reconhece o mesmo texto', async () => {
+      await load('Batata grande');
+      c.resolveUnmatched(c.importUnmatched()[0].key, 'm2');
+      expect(c.importUnmatched()).toEqual([]);
+      c.closeImportPreview();
+      await load('Batata grande');
+      expect(c.importUnmatched()).toEqual([]);
+      expect(c.importDishRowCount()).toBe(1);
+    });
+
+    it('quantidade escrita na observação ("2x") vai junto', async () => {
+      await load('2x Arroz');
+      c.confirmImportPreview();
+      await fixture.whenStable();
+      expect(sentItems()).toEqual([[{ menuItemId: 'm1', qty: 2 }]]);
+    });
+
+    it('despesa não tem pratos', async () => {
+      previewImport.mockResolvedValue(
+        buildImportPreview('x.xlsx', [
+          { row: 1, cells: header },
+          {
+            row: 2,
+            cells: ['Despesa', 'Gás', 50, '2026-10-29', 'Aluguel', 'Keeta', 'Pix', 'Pago', 'Arroz'],
+          },
+        ]),
+      );
+      c.importFile.set(new File(['x'], 'base.xlsx'));
+      await c.submitImport();
+      expect(c.importDishRowCount()).toBe(0);
+      expect(c.importUnmatched()).toEqual([]);
     });
   });
 
