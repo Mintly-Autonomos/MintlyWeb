@@ -13,6 +13,7 @@ import {
   DuplicateMovementError,
   ImportMovementItem,
   ImportMovementsResult,
+  ImportRejectedError,
 } from '../../services/movimentacoes.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -990,17 +991,35 @@ export class MovimentacoesComponent implements OnInit {
       this.importResult.set(result);
       this.closeModal();
     } catch (err) {
-      // Pode ter gravado parte das linhas antes de o erro chegar: atualiza a lista e avisa.
+      if (err instanceof ImportRejectedError) {
+        // Tudo ou nada: nada foi gravado. A revisão continua aberta, com o motivo em cada linha.
+        this.markImportFailures(err.failedRows);
+        this.toast.error(
+          `${err.message} Nenhuma movimentação foi gravada: corrija as linhas em vermelho e confirme de novo.`,
+        );
+        return;
+      }
+      // A importação é tudo ou nada, mas a resposta pode ter se perdido depois de gravar: atualiza a lista e avisa.
       await this.svc.refresh().catch(() => undefined);
       this.toast.error(
         isNoResponseError(err)
-          ? 'A conexão caiu ou demorou demais durante a importação. Atualizei a lista: confira o que já entrou antes de tentar de novo (reenviar as mesmas linhas não duplica).'
+          ? 'A conexão caiu ou demorou demais durante a importação. Atualizei a lista: confira se as movimentações já entraram antes de tentar de novo (reenviar o mesmo arquivo não duplica).'
           : this.errMsg(err),
       );
     } finally {
       this.confirmingImport.set(false);
       this.importProgress.set(null);
     }
+  }
+
+  /** Marca na revisão as linhas que a API recusou: ficam em vermelho, fora da importação, até serem corrigidas. */
+  private markImportFailures(failed: { row: number; error: string }[]): void {
+    const byRow = new Map(failed.map((f) => [f.row, f.error]));
+    this.importRows.update((rows) =>
+      rows.map((r) =>
+        byRow.has(r.row) ? { ...r, valid: false, included: false, error: byRow.get(r.row)! } : r,
+      ),
+    );
   }
 
   closeImportResult(): void {
