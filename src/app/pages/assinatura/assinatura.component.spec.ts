@@ -239,6 +239,7 @@ describe('AssinaturaComponent', () => {
       expect(texts[1]).toContain('Pro');
       expect(texts[1]).toContain('R$ 229,00 por mês');
       expect(texts[1]).toContain('análises do Mintly aprimoradas por IA');
+      expect(texts[1]).toContain('recomendações para cada prato do cardápio');
       expect(texts[0]).not.toContain('IA');
     });
 

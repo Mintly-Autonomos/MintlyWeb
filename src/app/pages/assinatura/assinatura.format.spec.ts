@@ -96,6 +96,7 @@ describe('tierLabel e tierBlurb', () => {
     expect(tierBlurb('basic')).not.toContain('IA');
     expect(tierBlurb('pro')).toContain('Tudo do Básico');
     expect(tierBlurb('pro')).toContain('aprimoradas por IA');
+    expect(tierBlurb('pro')).toContain('recomendações para cada prato do cardápio');
   });
 });
 
