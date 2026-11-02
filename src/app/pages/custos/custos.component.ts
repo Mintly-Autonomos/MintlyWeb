@@ -18,13 +18,7 @@ import { ToggleGroupComponent, ToggleGroupOption } from '../../shared/toggle-gro
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtMonthLong, fmtMonthShort } from '../../shared/format';
-import { MonthOpt, defaultMonthOpt, monthStr } from './custos-month';
-
-const MONTH_OPTS: { key: MonthOpt; label: string }[] = [
-  { key: 'esteMes', label: 'Este mês' },
-  { key: 'mesPassado', label: 'Mês passado' },
-  { key: 'personalizado', label: 'Personalizado' },
-];
+import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
 const abrev = (v: number) =>
   Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v));

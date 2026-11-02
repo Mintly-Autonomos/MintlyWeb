@@ -15,13 +15,7 @@ import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-ch
 import { AreaChartComponent, AreaSeries } from '../../shared/area-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtMonthLong, fmtMonthShort } from '../../shared/format';
-
-type MonthOpt = 'esteMes' | 'mesPassado' | 'personalizado';
-const MONTH_OPTS: { key: MonthOpt; label: string }[] = [
-  { key: 'esteMes', label: 'Este mês' },
-  { key: 'mesPassado', label: 'Mês passado' },
-  { key: 'personalizado', label: 'Personalizado' },
-];
+import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
 const abrev = (v: number) => `${Math.round(v / 1000)}k`;
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
@@ -42,12 +36,6 @@ const PILLAR_LABEL: Record<string, string> = {
   primeCost: 'Prime Cost',
   revenueTrend: 'Tendência de vendas',
 };
-
-function currentMonthStr(offset = 0): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
 
 function pillarDetail(key: string, value: number | null): string {
   if (value === null) return 'sem dado suficiente';
@@ -90,8 +78,9 @@ export class VisaoGeralComponent implements OnInit {
   private router = inject(Router);
 
   protected monthOpts = MONTH_OPTS;
-  protected monthSel = signal<MonthOpt>('esteMes');
-  protected customMonth = signal(currentMonthStr(-1));
+  // Do dia 1 ao 12 abre no mês passado (já fechado); depois, no mês atual.
+  protected monthSel = signal<MonthOpt>(defaultMonthOpt());
+  protected customMonth = signal(monthStr(-1));
   protected scoreOpen = signal(false);
 
   protected data = this.svc.data;
@@ -213,7 +202,7 @@ export class VisaoGeralComponent implements OnInit {
   private monthQuery(): string | undefined {
     const sel = this.monthSel();
     if (sel === 'esteMes') return undefined;
-    if (sel === 'mesPassado') return currentMonthStr(-1);
+    if (sel === 'mesPassado') return monthStr(-1);
     return this.customMonth();
   }
 
