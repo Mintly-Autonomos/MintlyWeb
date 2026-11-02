@@ -94,15 +94,19 @@ export class IdleSessionService {
   private check(): void {
     if (!this.running) return;
     if (Date.now() - this.lastActivity() >= IDLE_TIMEOUT_MS) void this.expire();
+    // Em uso: mantém o token de acesso novo sem a pessoa perceber (nunca bate num 401 nem é deslogada).
+    else void this.auth.renewIfDue();
   }
 
   private async expire(): Promise<void> {
     this.stop();
+    // Guarda onde a pessoa estava: ao entrar de novo ela volta para a mesma tela.
+    this.auth.rememberReturnUrl();
     await this.zone.run(async () => {
       // O token de acesso dura 15 min e já venceu: sem renovar antes, o servidor recusaria o logout e o
-      // token de renovação continuaria válido por lá.
-      await this.auth.refresh();
-      await this.auth.logout(false);
+      // token de renovação continuaria válido por lá. Sem rede, sai do mesmo jeito.
+      await this.auth.refresh().catch(() => false);
+      await this.auth.logout(false, true);
       await this.router.navigate(['/auth/sessao-expirada'], {
         queryParams: { motivo: 'inatividade' },
       });

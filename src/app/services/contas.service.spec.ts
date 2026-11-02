@@ -1,3 +1,4 @@
+import { SettlementRuleKind } from 'mintly-lib';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ContasService } from './contas.service';
@@ -30,14 +31,30 @@ describe('ContasService.update (modo real)', () => {
     expect(corpo()).not.toHaveProperty('type');
   });
 
-  it('conta de plataforma continua mandando taxa e prazo', async () => {
+  it('conta de plataforma continua mandando taxa e prazo (agora como regra "N dias")', async () => {
     await svc.update('acc1', {
       name: 'iFood',
       type: 'Financial Platform',
       taxPct: 14,
       settlementDays: 7,
     });
-    expect(corpo()).toMatchObject({ name: 'iFood', feePercent: 14, settlementDays: 7 });
+    expect(corpo()).toMatchObject({
+      name: 'iFood',
+      feePercent: 14,
+      settlementRule: { kind: SettlementRuleKind.AfterDays, days: 7 },
+    });
+  });
+
+  it('a regra de repasse escolhida (toda quarta) vai no PATCH', async () => {
+    await svc.update('acc1', {
+      type: 'Financial Platform',
+      taxPct: 12,
+      settlementRule: { kind: SettlementRuleKind.Weekly, weekday: 3 },
+    });
+    expect(corpo()).toMatchObject({
+      feePercent: 12,
+      settlementRule: { kind: SettlementRuleKind.Weekly, weekday: 3 },
+    });
   });
 
   it('conta que não é de plataforma não manda taxa nem prazo', async () => {

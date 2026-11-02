@@ -1,7 +1,7 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { FinancialAccountType, RecordStatus } from 'mintly-lib';
-import type { FinancialAccount, Headers } from 'mintly-lib';
+import type { FinancialAccount, Headers, SettlementRule } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { apiErrorInfo } from '../shared/api-error';
@@ -29,6 +29,8 @@ export interface Account {
   predictedBalance: number;
   taxPct?: number;
   settlementDays?: number;
+  /** Quando a plataforma repassa (semana, quinzena, mês ou N dias). Contas antigas só têm `settlementDays`. */
+  settlementRule?: SettlementRule;
   createdBy: string;
   createdAt: string;
   updatedBy: string;
@@ -134,6 +136,10 @@ function toAccount(raw: FinancialAccount): Account {
     taxPct: 'feePercent' in raw ? (raw as { feePercent?: number }).feePercent : undefined,
     settlementDays:
       'settlementDays' in raw ? (raw as { settlementDays?: number }).settlementDays : undefined,
+    settlementRule:
+      'settlementRule' in raw
+        ? ((raw as { settlementRule?: SettlementRule | null }).settlementRule ?? undefined)
+        : undefined,
     createdBy: audit?.createdByName ?? audit?.createdBy ?? '—',
     createdAt: toISO(audit?.createdAt),
     updatedBy: audit?.updatedByName ?? audit?.updatedBy ?? '—',
@@ -157,6 +163,7 @@ export interface CreateAccountInput {
   type: AccType;
   taxPct?: number;
   settlementDays?: number;
+  settlementRule?: SettlementRule;
 }
 
 export interface UpdateAccountInput {
@@ -164,6 +171,7 @@ export interface UpdateAccountInput {
   type?: AccType;
   taxPct?: number;
   settlementDays?: number;
+  settlementRule?: SettlementRule;
   active?: boolean;
 }
 
@@ -253,7 +261,11 @@ export class ContasService {
         balance: 0,
         predictedBalance: 0,
         ...(isPlatform
-          ? { taxPct: input.taxPct ?? 0, settlementDays: input.settlementDays ?? 0 }
+          ? {
+              taxPct: input.taxPct ?? 0,
+              settlementDays: input.settlementDays ?? 0,
+              settlementRule: input.settlementRule,
+            }
           : {}),
         createdBy: this.by,
         createdAt: now,
@@ -276,7 +288,14 @@ export class ContasService {
       type: TYPE_TO_LIB[input.type],
       status: RecordStatus.Active,
       ...(isPlatform
-        ? { feePercent: input.taxPct ?? 0, settlementDays: input.settlementDays ?? 0 }
+        ? {
+            feePercent: input.taxPct ?? 0,
+            // A API também aceita só o prazo antigo; a regra sempre vence quando vem.
+            settlementRule: input.settlementRule ?? {
+              kind: 'afterDays',
+              days: input.settlementDays ?? 0,
+            },
+          }
         : {}),
     } as unknown as FinancialAccount;
     const response = await this.call((headers) => this.accountClient.insert(body, headers));
@@ -299,6 +318,7 @@ export class ContasService {
       if (isPlatform) {
         if (input.taxPct !== undefined) acc.taxPct = input.taxPct;
         if (input.settlementDays !== undefined) acc.settlementDays = input.settlementDays;
+        if (input.settlementRule !== undefined) acc.settlementRule = input.settlementRule;
       }
       acc.updatedBy = this.by;
       acc.updatedAt = now;
@@ -320,7 +340,10 @@ export class ContasService {
       ...(isPlatform
         ? {
             feePercent: input.taxPct ?? 0,
-            settlementDays: input.settlementDays ?? 0,
+            settlementRule: input.settlementRule ?? {
+              kind: 'afterDays',
+              days: input.settlementDays ?? 0,
+            },
           }
         : {}),
     };

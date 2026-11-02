@@ -13,6 +13,7 @@ import {
   DuplicateMovementError,
   ImportMovementItem,
   ImportMovementsResult,
+  ImportRejectedError,
 } from '../../services/movimentacoes.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -39,6 +40,8 @@ import {
 } from '../../shared/dish-match';
 import { loadDishAliases, saveDishAlias } from '../../shared/dish-aliases';
 import { moneyToInput } from '../../shared/money-input';
+import { describeSettlementRule, resolveSettlementRule, settlementDueDate } from 'mintly-lib';
+import type { SettlementRule } from 'mintly-lib';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
 import { matchName } from '../../shared/import-parse';
 
@@ -394,26 +397,34 @@ export class MovimentacoesComponent implements OnInit {
     return this.form().date ? '' : 'Selecione uma data.';
   }
 
-  /** Previsão de repasse: data do lançamento + prazo da conta de plataforma (só em entradas). */
+  /** Previsão de repasse: a regra da conta de plataforma aplicada à data do lançamento (só em entradas). */
   protected get settlementDate(): string | null {
     const f = this.form();
     if (f.type !== 'income' || !this.isPlatformAccount || !f.date) return null;
-    const days = this.contasSvc.accounts().find((a) => a.id === f.accountId)?.settlementDays;
-    if (!days) return null;
+    const rule = this.accountRule();
+    if (!rule) return null;
     const [y, m, d] = f.date.split('-').map(Number);
-    const dt = new Date(y, m - 1, d + days);
-    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    const due = settlementDueDate(rule, new Date(Date.UTC(y, m - 1, d)));
+    return due ? due.toISOString().slice(0, 10) : null;
+  }
+
+  private accountRule(): SettlementRule | null {
+    const acc = this.contasSvc.accounts().find((x) => x.id === this.form().accountId);
+    return acc ? resolveSettlementRule(acc) : null;
+  }
+
+  /** A regra em palavras, para a nota abaixo da previsão ("após 2 dias", "toda quarta-feira"). */
+  protected get settlementText(): string {
+    const rule = this.accountRule();
+    if (!rule) return '';
+    return rule.kind === 'afterDays'
+      ? `após ${rule.days} ${rule.days === 1 ? 'dia' : 'dias'}`
+      : describeSettlementRule(rule).toLowerCase();
   }
 
   protected get platformRate(): number {
     const acc = this.contasSvc.accounts().find((x) => x.id === this.form().accountId);
     return acc?.taxPct ?? FEE_RATES[acc?.name ?? ''] ?? 0;
-  }
-
-  protected get settlementDays(): number {
-    return (
-      this.contasSvc.accounts().find((x) => x.id === this.form().accountId)?.settlementDays ?? 0
-    );
   }
 
   get netValue(): number {
@@ -1103,17 +1114,35 @@ export class MovimentacoesComponent implements OnInit {
       this.importResult.set(result);
       this.closeModal();
     } catch (err) {
-      // Pode ter gravado parte das linhas antes de o erro chegar: atualiza a lista e avisa.
+      if (err instanceof ImportRejectedError) {
+        // Tudo ou nada: nada foi gravado. A revisão continua aberta, com o motivo em cada linha.
+        this.markImportFailures(err.failedRows);
+        this.toast.error(
+          `${err.message} Nenhuma movimentação foi gravada: corrija as linhas em vermelho e confirme de novo.`,
+        );
+        return;
+      }
+      // A importação é tudo ou nada, mas a resposta pode ter se perdido depois de gravar: atualiza a lista e avisa.
       await this.svc.refresh().catch(() => undefined);
       this.toast.error(
         isNoResponseError(err)
-          ? 'A conexão caiu ou demorou demais durante a importação. Atualizei a lista: confira o que já entrou antes de tentar de novo (reenviar as mesmas linhas não duplica).'
+          ? 'A conexão caiu ou demorou demais durante a importação. Atualizei a lista: confira se as movimentações já entraram antes de tentar de novo (reenviar o mesmo arquivo não duplica).'
           : this.errMsg(err),
       );
     } finally {
       this.confirmingImport.set(false);
       this.importProgress.set(null);
     }
+  }
+
+  /** Marca na revisão as linhas que a API recusou: ficam em vermelho, fora da importação, até serem corrigidas. */
+  private markImportFailures(failed: { row: number; error: string }[]): void {
+    const byRow = new Map(failed.map((f) => [f.row, f.error]));
+    this.importRows.update((rows) =>
+      rows.map((r) =>
+        byRow.has(r.row) ? { ...r, valid: false, included: false, error: byRow.get(r.row)! } : r,
+      ),
+    );
   }
 
   closeImportResult(): void {

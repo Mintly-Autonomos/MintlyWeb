@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
+import { AuthService } from '../../services/auth.service';
 import { IDLE_TIMEOUT_MINUTES } from '../../services/idle-session.service';
 
 @Component({
@@ -47,12 +48,15 @@ import { IDLE_TIMEOUT_MINUTES } from '../../services/idle-session.service';
 export class SessaoExpiradaComponent {
   protected router = inject(Router);
   private route = inject(ActivatedRoute);
+  private auth = inject(AuthService);
 
   /** Veio do encerramento por inatividade (`?motivo=inatividade`) e não de um token vencido. */
   protected inactivity = this.route.snapshot.queryParamMap.get('motivo') === 'inatividade';
 
   protected title = this.inactivity ? 'Sessão encerrada por inatividade' : 'Sua sessão expirou';
-  protected subtitle = this.inactivity
-    ? `Você ficou ${IDLE_TIMEOUT_MINUTES} minutos sem usar o Mintly, então encerramos sua sessão para proteger seus dados. Entre novamente para continuar.`
-    : 'Por segurança, encerramos sua sessão após um período sem atividade. Faça login novamente para continuar.';
+  protected subtitle =
+    (this.inactivity
+      ? `Você ficou ${IDLE_TIMEOUT_MINUTES} minutos sem usar o Mintly, então encerramos sua sessão para proteger seus dados. Entre novamente para continuar.`
+      : 'Por segurança, precisamos que você entre de novo.') +
+    (this.auth.hasReturnUrl() ? ' Depois de entrar, você volta para a tela em que estava.' : '');
 }
