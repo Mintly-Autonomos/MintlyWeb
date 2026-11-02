@@ -381,6 +381,71 @@
           }
         </label>
 
+        <!-- Pratos vendidos (só entradas) -->
+        @if (form().type === 'income') {
+          <div class="space-y-2" data-testid="pratos-venda">
+            <span class="text-[13px] font-medium block"
+              >Pratos vendidos <span class="text-muted-foreground">(opcional)</span></span
+            >
+            @if (dishOptions().length > 0) {
+              <select
+                (change)="addDish($any($event.target).value); $any($event.target).value = ''"
+                aria-label="Adicionar prato"
+                class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition cursor-pointer"
+              >
+                <option value="">Adicionar prato…</option>
+                @for (p of dishOptions(); track p.id) {
+                  <option [value]="p.id">{{ p.name }}</option>
+                }
+              </select>
+            } @else {
+              <p class="text-[12px] text-muted-foreground">
+                Cadastre os pratos em Previsões &gt; Meu cardápio para escolher aqui o que foi
+                vendido.
+              </p>
+            }
+            @for (it of form().items; track it.menuItemId) {
+              <div
+                class="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2"
+                data-testid="prato-linha"
+              >
+                <span class="min-w-0 flex-1 truncate text-[13px] font-medium" [title]="it.name">{{
+                  it.name
+                }}</span>
+                <button
+                  type="button"
+                  (click)="setDishQty(it.menuItemId, it.qty - 1)"
+                  [disabled]="it.qty <= 1"
+                  [attr.aria-label]="'Diminuir quantidade de ' + it.name"
+                  class="h-8 w-8 rounded-lg border border-border text-[16px] cursor-pointer disabled:opacity-40"
+                >
+                  −
+                </button>
+                <span class="w-7 text-center text-[13px] font-semibold tabular-nums">{{
+                  it.qty
+                }}</span>
+                <button
+                  type="button"
+                  (click)="setDishQty(it.menuItemId, it.qty + 1)"
+                  [disabled]="it.qty >= 99"
+                  [attr.aria-label]="'Aumentar quantidade de ' + it.name"
+                  class="h-8 w-8 rounded-lg border border-border text-[16px] cursor-pointer disabled:opacity-40"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  (click)="removeDish(it.menuItemId)"
+                  [attr.aria-label]="'Remover ' + it.name"
+                  class="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted cursor-pointer"
+                >
+                  <app-icon name="close" [style]="{ fontSize: '18px' }" />
+                </button>
+              </div>
+            }
+          </div>
+        }
+
         <!-- Valor + Data -->
         <div class="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4">
           <label class="block">

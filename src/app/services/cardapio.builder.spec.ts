@@ -12,6 +12,7 @@ import {
   recalcular,
   tempoLabel,
   toPrato,
+  aplicarVendidos,
 } from './cardapio.builder';
 
 const NOW = new Date('2026-10-28T12:00:00.000Z');
@@ -173,5 +174,97 @@ describe('analisar (menu engineering, igual ao protótipo)', () => {
     const a = analisar([]);
     expect(a.itens).toEqual([]);
     expect(a.grupos.estrela).toEqual([]);
+  });
+});
+
+describe('aplicarVendidos (vendidos no mês vêm das vendas)', () => {
+  const hoje = '2026-11-02';
+  const prato = (id: string, soldPerMonth = 0): Prato => ({
+    id,
+    name: id,
+    category: null,
+    price: 20,
+    cost: 8,
+    soldPerMonth,
+    active: true,
+    priceUpdatedAt: '2026-01-01',
+    priceReviewedAt: '2026-01-01',
+  });
+  const venda = (date: string, items: { menuItemId: string; qty: number }[], over = {}) => ({
+    type: 'income' as const,
+    status: 'received',
+    date,
+    items,
+    ...over,
+  });
+
+  it('soma as unidades dos últimos 30 dias, de todas as vendas', () => {
+    const r = aplicarVendidos(
+      [prato('arroz'), prato('batata')],
+      [
+        venda('2026-11-01', [{ menuItemId: 'arroz', qty: 2 }]),
+        venda('2026-10-20', [
+          { menuItemId: 'arroz', qty: 3 },
+          { menuItemId: 'batata', qty: 1 },
+        ]),
+      ],
+      hoje,
+    );
+    expect(r.map((p) => [p.id, p.soldPerMonth, p.vendidosDasVendas])).toEqual([
+      ['arroz', 5, true],
+      ['batata', 1, true],
+    ]);
+  });
+
+  it('vale a janela de 30 dias contando hoje (04/10 entra, 03/10 não)', () => {
+    const r = aplicarVendidos(
+      [prato('arroz')],
+      [
+        venda('2026-10-04', [{ menuItemId: 'arroz', qty: 1 }]),
+        venda('2026-10-03', [{ menuItemId: 'arroz', qty: 10 }]),
+      ],
+      hoje,
+    );
+    expect(r[0].soldPerMonth).toBe(1);
+  });
+
+  it('venda cancelada, saída e venda futura não contam', () => {
+    const r = aplicarVendidos(
+      [prato('arroz')],
+      [
+        venda('2026-11-01', [{ menuItemId: 'arroz', qty: 1 }]),
+        venda('2026-11-01', [{ menuItemId: 'arroz', qty: 9 }], { status: 'cancelled' }),
+        venda('2026-11-01', [{ menuItemId: 'arroz', qty: 9 }], { type: 'expense' }),
+        venda('2026-11-20', [{ menuItemId: 'arroz', qty: 9 }]),
+      ],
+      hoje,
+    );
+    expect(r[0].soldPerMonth).toBe(1);
+  });
+
+  it('venda pendente (ex.: repasse da plataforma ainda não caiu) conta: o prato foi vendido', () => {
+    const r = aplicarVendidos(
+      [prato('arroz')],
+      [venda('2026-11-01', [{ menuItemId: 'arroz', qty: 4 }], { status: 'pending' })],
+      hoje,
+    );
+    expect(r[0].soldPerMonth).toBe(4);
+  });
+
+  it('com vendas que informam pratos, o prato sem nenhuma venda vale 0 (o número antigo é ignorado)', () => {
+    const r = aplicarVendidos(
+      [prato('arroz', 99), prato('batata', 50)],
+      [venda('2026-11-01', [{ menuItemId: 'arroz', qty: 2 }])],
+      hoje,
+    );
+    expect(r.map((p) => p.soldPerMonth)).toEqual([2, 0]);
+  });
+
+  it('sem NENHUMA venda com pratos, mantém o número antigo digitado (transição)', () => {
+    const pratos = [prato('arroz', 99)];
+    const r = aplicarVendidos(pratos, [venda('2026-11-01', [])], hoje);
+    expect(r).toBe(pratos);
+    expect(r[0].soldPerMonth).toBe(99);
+    expect(r[0].vendidosDasVendas).toBeUndefined();
   });
 });

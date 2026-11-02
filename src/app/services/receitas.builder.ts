@@ -20,6 +20,8 @@ export interface ReceitaMov {
   canal: Canal;
   /** Forma de pagamento como o usuário escolheu (Pix, Débito, Crédito…). */
   payment: string;
+  /** Pratos vendidos nesta entrada (cópia do cardápio no dia). Ausente: a venda não informou os pratos. */
+  pratos?: { menuItemId: string; name: string; qty: number; unitPrice: number }[];
 }
 
 export interface ItemReceita {
@@ -53,7 +55,10 @@ export interface ReceitasDataset {
     pedidos: number[];
   };
   waterfall: { label: string; value: number; kind: 'start' | 'down' | 'end' }[];
+  /** Ranking de pratos: só entram vendas que informaram os pratos (preço do prato × quantidade). */
   itens: ItemReceita[];
+  /** Vendas do período sem pratos informados: ficam fora do ranking de itens. */
+  semPratos: number;
   porCategoria: { categoria: string; receita: number }[];
   canais: { canal: string; receita: number; liquida: number; nota: string }[];
   formasPagamento: { forma: string; valor: number }[];
@@ -351,10 +356,24 @@ export function buildReceitas(
     tendenciaDescricao = 'Semana a semana no período';
   }
 
-  const itens = porGrupo(sel, (m) => `${m.item}\u0000${m.category}` as string).map((g) => {
-    const [nome, categoria] = g.chave.split('\u0000');
-    return { nome, categoria, qtd: g.qtd, receita: g.receita };
-  });
+  // Ranking de pratos: cada prato vale o PREÇO DELE × a quantidade (isolado, sem dividir o total do
+  // pedido). Venda sem pratos informados não entra: o título do pedido não é um prato.
+  const porPrato = new Map<string, ItemReceita>();
+  for (const m of sel) {
+    for (const p of m.pratos ?? []) {
+      const cur = porPrato.get(p.menuItemId) ?? {
+        nome: p.name,
+        categoria: m.category,
+        qtd: 0,
+        receita: 0,
+      };
+      cur.qtd += p.qty;
+      cur.receita = money(cur.receita + p.qty * p.unitPrice);
+      porPrato.set(p.menuItemId, cur);
+    }
+  }
+  const itens = [...porPrato.values()].sort((a, b) => b.receita - a.receita);
+  const semPratos = sel.filter((m) => !m.pratos?.length).length;
   const porCategoriaTodas = porGrupo(sel, (m) => m.category);
   const porCategoria = porCategoriaTodas.slice(0, 5).map((g) => ({
     categoria: g.chave,
@@ -397,6 +416,7 @@ export function buildReceitas(
       { label: 'Receita líquida', value: liquida, kind: 'end' },
     ],
     itens,
+    semPratos,
     porCategoria,
     canais,
     formasPagamento: [...pagamentos.entries()]

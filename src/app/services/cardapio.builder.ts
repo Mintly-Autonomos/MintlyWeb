@@ -1,4 +1,5 @@
 import { PRICE_REVIEW_ALERT_DAYS } from 'mintly-lib';
+import { addDays } from './previsoes.builder';
 
 /** Prato do cardápio, na forma que as telas usam. */
 export interface Prato {
@@ -8,8 +9,14 @@ export interface Prato {
   price: number;
   /** Custo unitário (ingredientes e embalagem): base da margem. 0 = ainda não informado. */
   cost: number;
-  /** Unidades vendidas por mês, informado pelo dono: base da popularidade. 0 = ainda não informado. */
+  /**
+   * Unidades vendidas nos últimos 30 dias, somadas das vendas que informaram os pratos (base da
+   * popularidade). Enquanto nenhuma venda tiver pratos, vale o número antigo digitado pelo dono.
+   * 0 = nenhuma venda registrada com o prato.
+   */
   soldPerMonth: number;
+  /** `true` quando `soldPerMonth` veio das vendas (e não do número antigo digitado). */
+  vendidosDasVendas?: boolean;
   active: boolean;
   /** Última vez que o VALOR mudou. */
   priceUpdatedAt: string;
@@ -148,10 +155,43 @@ export interface ItemAnalise {
   alterado: boolean;
 }
 
+/** O mínimo da venda que o cálculo de "vendidos" precisa. */
+export interface VendaParaVendidos {
+  type: 'income' | 'expense';
+  status: string;
+  /** AAAA-MM-DD */
+  date: string;
+  items?: { menuItemId: string; qty: number }[];
+}
+
+/** Janela de "vendidos no mês": os últimos 30 dias, contando hoje. */
+export const JANELA_VENDIDOS_DIAS = 30;
+
+/**
+ * "Vendidos no mês" de cada prato = unidades vendidas nos últimos 30 dias, somadas dos pratos que as
+ * vendas informaram (entradas não canceladas). Ninguém digita. Enquanto NENHUMA venda da janela tiver
+ * pratos, devolve os pratos como estão (o número antigo continua valendo e a análise não esvazia de uma vez).
+ */
+export function aplicarVendidos(
+  pratos: Prato[],
+  vendas: VendaParaVendidos[],
+  hoje: string,
+): Prato[] {
+  const ini = addDays(hoje, -(JANELA_VENDIDOS_DIAS - 1));
+  const somas = new Map<string, number>();
+  for (const v of vendas) {
+    if (v.type !== 'income' || v.status === 'cancelled') continue;
+    if (v.date < ini || v.date > hoje) continue;
+    for (const i of v.items ?? []) somas.set(i.menuItemId, (somas.get(i.menuItemId) ?? 0) + i.qty);
+  }
+  if (somas.size === 0) return pratos;
+  return pratos.map((p) => ({ ...p, soldPerMonth: somas.get(p.id) ?? 0, vendidosDasVendas: true }));
+}
+
 /** Só entra na análise o prato ativo com custo e vendidos informados (sem eles a margem e a popularidade não existem). */
 export const analisavel = (p: Prato): boolean => p.active && p.cost > 0 && p.soldPerMonth > 0;
 
-/** Prato ativo ao qual ainda falta custo ou vendidos no mês. */
+/** Prato ativo ao qual ainda falta custo ou vendas registradas com ele. */
 export const incompleto = (p: Prato): boolean => p.active && !analisavel(p);
 
 export function recalcular(p: Prato, preco: number): ItemAnalise {

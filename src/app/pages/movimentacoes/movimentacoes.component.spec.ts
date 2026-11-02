@@ -6,8 +6,19 @@ import { MovimentacoesService, buildImportPreview } from '../../services/movimen
 import type { ImportGridRow } from '../../services/movimentacoes.service';
 import { ContasService } from '../../services/contas.service';
 import { CategoriasService } from '../../services/categorias.service';
+import { CardapioService } from '../../services/cardapio.service';
 
 interface Internals {
+  form: () => {
+    date: string;
+    type: string;
+    items: { menuItemId: string; name: string; qty: number }[];
+  };
+  addDish(id: string): void;
+  setDishQty(id: string, qty: number): void;
+  removeDish(id: string): void;
+  dishOptions: () => { id: string; name: string }[];
+  openCreate(type?: string): void;
   statusOpts: () => { value: string; label: string }[];
   statusFilter: (() => string) & { set(v: string): void };
   typeFilter: () => string;
@@ -24,7 +35,6 @@ interface Internals {
   fillBlank(field: string, raw: string): void;
   blankCount(field: string): number;
   updateRowField(i: number, field: string, value: unknown): void;
-  form: () => { date: string };
   importCategoriesFor(row: Row): { name: string }[];
 }
 interface Result {
@@ -90,6 +100,17 @@ describe('MovimentacoesComponent', () => {
           provide: ContasService,
           useValue: {
             accounts: signal([account('a1', 'Keeta'), account('a2', 'Caixa')]),
+            refresh: vi.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: CardapioService,
+          useValue: {
+            pratos: signal([
+              { id: 'm1', name: 'Arroz', active: true },
+              { id: 'm2', name: 'Batata Rústica', active: true },
+              { id: 'm3', name: 'Prato antigo', active: false },
+            ]),
             refresh: vi.fn().mockResolvedValue(undefined),
           },
         },
@@ -670,6 +691,39 @@ describe('MovimentacoesComponent', () => {
 
     it('reenvio de uma importação já feita: título próprio', () => {
       expect(c.importResultTitle(res(53, 0, true))).toBe('Importação já realizada');
+    });
+  });
+
+  describe('pratos vendidos na entrada', () => {
+    it('só os pratos ativos do cardápio podem ser escolhidos, em ordem alfabética', () => {
+      expect(c.dishOptions().map((p) => p.name)).toEqual(['Arroz', 'Batata Rústica']);
+    });
+
+    it('escolher o mesmo prato de novo soma 1; a quantidade fica entre 1 e 99', () => {
+      c.openCreate('income');
+      c.addDish('m1');
+      c.addDish('m1');
+      expect(c.form().items).toEqual([{ menuItemId: 'm1', name: 'Arroz', qty: 2 }]);
+      c.setDishQty('m1', 0);
+      expect(c.form().items[0].qty).toBe(1);
+      c.setDishQty('m1', 500);
+      expect(c.form().items[0].qty).toBe(99);
+    });
+
+    it('remover tira o prato da venda; prato desconhecido é ignorado', () => {
+      c.openCreate('income');
+      c.addDish('m1');
+      c.addDish('m2');
+      c.addDish('nao-existe');
+      c.removeDish('m1');
+      expect(c.form().items.map((i) => i.menuItemId)).toEqual(['m2']);
+    });
+
+    it('uma nova entrada começa sem pratos', () => {
+      c.openCreate('income');
+      c.addDish('m1');
+      c.openCreate('income');
+      expect(c.form().items).toEqual([]);
     });
   });
 

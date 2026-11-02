@@ -150,7 +150,7 @@ export class CardapioInterativoComponent {
   protected busyId = signal<string | null>(null);
   protected editandoId = signal<string | null>(null);
   protected precoEditandoId = signal<string | null>(null);
-  protected f = signal({ nome: '', categoria: '', preco: '', custo: '', vendidos: '' });
+  protected f = signal({ nome: '', categoria: '', preco: '', custo: '' });
   protected precoEditado = signal('');
 
   private pendingFocus: string | null = null;
@@ -240,10 +240,7 @@ export class CardapioInterativoComponent {
     return (e.target as HTMLInputElement).value;
   }
 
-  protected setF(
-    campo: 'nome' | 'categoria' | 'preco' | 'custo' | 'vendidos',
-    valor: string,
-  ): void {
+  protected setF(campo: 'nome' | 'categoria' | 'preco' | 'custo', valor: string): void {
     this.f.update((v) => ({ ...v, [campo]: valor }));
   }
 
@@ -253,20 +250,19 @@ export class CardapioInterativoComponent {
 
   toggleAdd(): void {
     this.adding.update((v) => !v);
-    this.f.set({ nome: '', categoria: '', preco: '', custo: '', vendidos: '' });
+    this.f.set({ nome: '', categoria: '', preco: '', custo: '' });
   }
 
   async adicionar(): Promise<void> {
     const v = this.f();
     const preco = this.num(v.preco);
     const custo = v.custo.trim() === '' ? 0 : this.num(v.custo);
-    const vendidos = v.vendidos.trim() === '' ? 0 : Math.round(this.num(v.vendidos));
     if (!v.nome.trim() || v.preco.trim() === '' || !(preco >= 0)) {
       this.toast.error('Informe o nome e o preço do prato.');
       return;
     }
-    if (!(custo >= 0) || !(vendidos >= 0)) {
-      this.toast.error('Custo e vendidos no mês não podem ser negativos.');
+    if (!(custo >= 0)) {
+      this.toast.error('O custo não pode ser negativo.');
       return;
     }
     this.busyId.set('novo');
@@ -276,7 +272,6 @@ export class CardapioInterativoComponent {
         price: preco,
         category: v.categoria.trim() || undefined,
         cost: custo,
-        soldPerMonth: vendidos,
       });
       this.adding.set(false);
       this.toast.success('Prato adicionado ao cardápio.');
@@ -295,7 +290,6 @@ export class CardapioInterativoComponent {
       categoria: p.category ?? '',
       preco: moneyToInput(p.price),
       custo: p.cost ? moneyToInput(p.cost) : '',
-      vendidos: p.soldPerMonth ? String(p.soldPerMonth) : '',
     });
   }
 
@@ -306,7 +300,6 @@ export class CardapioInterativoComponent {
   async salvarEdicao(p: Prato): Promise<void> {
     const v = this.f();
     const custo = v.custo.trim() === '' ? 0 : this.num(v.custo);
-    const vendidos = v.vendidos.trim() === '' ? 0 : Math.round(this.num(v.vendidos));
     const preco = this.num(v.preco);
     if (!v.nome.trim()) {
       this.toast.error('O prato precisa de um nome.');
@@ -316,8 +309,8 @@ export class CardapioInterativoComponent {
       this.toast.error('Informe um preço válido.');
       return;
     }
-    if (!(custo >= 0) || !(vendidos >= 0)) {
-      this.toast.error('Custo e vendidos no mês não podem ser negativos.');
+    if (!(custo >= 0)) {
+      this.toast.error('O custo não pode ser negativo.');
       return;
     }
     this.busyId.set(p.id);
@@ -326,7 +319,6 @@ export class CardapioInterativoComponent {
         name: v.nome.trim(),
         category: v.categoria.trim(),
         cost: custo,
-        soldPerMonth: vendidos,
       });
       // Preço só vai pelo endpoint próprio quando mudou: é ele que conta como revisão de preço.
       if (preco !== p.price) {

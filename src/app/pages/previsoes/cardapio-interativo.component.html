@@ -280,7 +280,8 @@
       <p class="text-[12.5px] text-warning mb-3">
         {{ incompletos() }}
         {{ incompletos() === 1 ? 'prato ainda está' : 'pratos ainda estão' }} sem custo ou sem
-        vendidos no mês, e por isso {{ incompletos() === 1 ? 'fica' : 'ficam' }} fora da análise.
+        vendas registradas nos últimos 30 dias (escolha os pratos ao registrar a entrada), e por
+        isso {{ incompletos() === 1 ? 'fica' : 'ficam' }} fora da análise.
       </p>
     }
 
@@ -321,17 +322,6 @@
             [value]="f().custo"
             (input)="setF('custo', inputValue($event))"
             placeholder="0,00"
-            [class]="inputClass + ' w-full'"
-          />
-        </label>
-        <label class="block">
-          <span class="text-[12px] font-medium block mb-1">Vendidos/mês</span>
-          <input
-            type="text"
-            inputmode="numeric"
-            [value]="f().vendidos"
-            (input)="setF('vendidos', inputValue($event))"
-            placeholder="0"
             [class]="inputClass + ' w-full'"
           />
         </label>
@@ -379,7 +369,12 @@
               <th class="py-2 pr-3 font-semibold">Categoria</th>
               <th class="py-2 pr-3 font-semibold text-right">Preço</th>
               <th class="py-2 pr-3 font-semibold text-right">Custo</th>
-              <th class="py-2 pr-3 font-semibold text-right">Vendidos/mês</th>
+              <th
+                class="py-2 pr-3 font-semibold text-right"
+                title="Unidades vendidas nos últimos 30 dias, somadas das vendas que informaram os pratos"
+              >
+                Vendidos (30 dias)
+              </th>
               <th class="py-2 pr-3 font-semibold">Preço revisado</th>
               <th class="py-2 font-semibold text-right">Ações</th>
             </tr>
@@ -451,17 +446,9 @@
                     class="py-2 pr-3 text-right max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
                   >
                     <span class="sm:hidden block text-[11px] text-muted-foreground"
-                      >Vendidos/mês</span
+                      >Vendidos (30 dias)</span
                     >
-                    <input
-                      type="text"
-                      inputmode="numeric"
-                      [value]="f().vendidos"
-                      (input)="setF('vendidos', inputValue($event))"
-                      [attr.aria-label]="'Vendidos por mês de ' + p.name"
-                      placeholder="0"
-                      [class]="inputClass + ' w-20 max-sm:w-full !h-8 text-right'"
-                    />
+                    {{ p.soldPerMonth > 0 ? p.soldPerMonth : '—' }}
                   </td>
                 } @else {
                   <td class="py-2 pr-3 font-medium max-sm:w-full max-sm:p-0">
@@ -503,7 +490,7 @@
                     class="py-2 pr-3 text-right tabular-nums max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
                   >
                     <span class="sm:hidden block text-[11px] text-muted-foreground"
-                      >Vendidos/mês</span
+                      >Vendidos (30 dias)</span
                     >
                     {{ p.soldPerMonth > 0 ? p.soldPerMonth : '—' }}
                   </td>

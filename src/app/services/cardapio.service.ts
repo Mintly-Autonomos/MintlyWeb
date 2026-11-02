@@ -7,7 +7,16 @@ import { apiErrorInfo } from '../shared/api-error';
 import { apiErrorMessage } from '../shared/api-error-message';
 import { MintlyClientService } from './mintly-client.service';
 import mockCardapio from '../mocks/mock_cardapio.json';
-import { Prato, PratoAlerta, diasSemRevisao, precisaRevisar, toPrato } from './cardapio.builder';
+import {
+  Prato,
+  PratoAlerta,
+  aplicarVendidos,
+  diasSemRevisao,
+  precisaRevisar,
+  toPrato,
+} from './cardapio.builder';
+import { MovimentacoesService } from './movimentacoes.service';
+import { localISODate } from '../shared/format';
 
 export type { Prato, PratoAlerta } from './cardapio.builder';
 
@@ -54,7 +63,12 @@ export class CardapioService {
     };
   });
 
-  readonly pratos = signal<Prato[]>([]);
+  private movimentacoes = inject(MovimentacoesService);
+  private readonly pratosBase = signal<Prato[]>([]);
+  /** Os pratos do cardápio, com "vendidos no mês" somado das vendas que informaram os pratos. */
+  readonly pratos = computed(() =>
+    aplicarVendidos(this.pratosBase(), this.movimentacoes.movements(), localISODate()),
+  );
   readonly alertas = signal<PratoAlerta[]>([]);
   readonly loading = signal(false);
   readonly categorias = computed(() =>
@@ -100,7 +114,12 @@ export class CardapioService {
   async refresh(): Promise<void> {
     this.loading.set(true);
     try {
-      await Promise.all([this.refreshPratos(), this.refreshAlertas()]);
+      await Promise.all([
+        this.refreshPratos(),
+        this.refreshAlertas(),
+        // "Vendidos no mês" sai das vendas: sem elas carregadas o número ficaria zerado.
+        this.movimentacoes.refresh().catch(() => undefined),
+      ]);
     } finally {
       this.loading.set(false);
     }
@@ -109,13 +128,13 @@ export class CardapioService {
   async refreshPratos(): Promise<void> {
     if (environment.useMocks) {
       await delay();
-      this.pratos.set(this.mockStore.map((p) => ({ ...p })));
+      this.pratosBase.set(this.mockStore.map((p) => ({ ...p })));
       return;
     }
     const response = await this.call((headers) =>
       this.menuClient.findAll({ page: 1, size: 100 }, headers),
     );
-    this.pratos.set((response.payload ?? []).map(toPrato));
+    this.pratosBase.set((response.payload ?? []).map(toPrato));
   }
 
   /** Só os avisos (usado pelo sino, que não precisa da lista inteira). */

@@ -101,6 +101,54 @@ describe('buildReceitas', () => {
     expect(Number.isNaN(d.receitaLiquida)).toBe(false);
   });
 
+  describe('ranking de pratos (itens mais vendidos)', () => {
+    const pratos = (...p: [string, string, number, number][]) =>
+      p.map(([menuItemId, name, qty, unitPrice]) => ({ menuItemId, name, qty, unitPrice }));
+
+    it('cada prato vale o preço dele × a quantidade, sem dividir o total do pedido', () => {
+      const d = buildReceitas(
+        [
+          mov({
+            gross: 100,
+            pratos: pratos(['arroz', 'Arroz', 2, 12.5], ['batata', 'Batata Rústica', 1, 18]),
+          }),
+          mov({ gross: 40, pratos: pratos(['arroz', 'Arroz', 1, 12.5]) }),
+        ],
+        win,
+        0,
+      );
+      expect(d.itens.map((i) => [i.nome, i.qtd, i.receita])).toEqual([
+        ['Arroz', 3, 37.5],
+        ['Batata Rústica', 1, 18],
+      ]);
+      expect(d.semPratos).toBe(0);
+    });
+
+    it('ordena pela receita do prato, do maior para o menor', () => {
+      const d = buildReceitas(
+        [mov({ pratos: pratos(['a', 'Barato', 10, 5], ['b', 'Caro', 1, 90]) })],
+        win,
+        0,
+      );
+      expect(d.itens.map((i) => i.nome)).toEqual(['Caro', 'Barato']);
+    });
+
+    it('vendas sem pratos ficam fora do ranking e são contadas no aviso', () => {
+      const d = buildReceitas(
+        [
+          mov({ item: 'Pedido 8547 Curry + Batata', gross: 150 }),
+          mov({ gross: 30, pratos: pratos(['arroz', 'Arroz', 1, 12.5]) }),
+        ],
+        win,
+        0,
+      );
+      expect(d.itens.map((i) => i.nome)).toEqual(['Arroz']);
+      expect(d.semPratos).toBe(1);
+      // mas continuam somando na receita total
+      expect(d.receitaBruta).toBe(180);
+    });
+  });
+
   it('agrupa itens, categorias e formas de pagamento', () => {
     const d = buildReceitas(
       [
@@ -117,7 +165,9 @@ describe('buildReceitas', () => {
       win,
       0,
     );
-    expect(d.itens[0]).toEqual({ nome: 'Frango', categoria: 'Venda Balcão', qtd: 2, receita: 400 });
+    // Sem pratos informados, o título do pedido NÃO vira "item": fica fora do ranking.
+    expect(d.itens).toEqual([]);
+    expect(d.semPratos).toBe(3);
     expect(d.porCategoria.map((c) => c.categoria)).toEqual(['Venda Balcão', 'Venda Delivery']);
     expect(d.formasPagamento).toEqual([
       { forma: 'Cartão', valor: 400 },

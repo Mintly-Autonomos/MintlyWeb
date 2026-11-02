@@ -43,6 +43,14 @@ export type PaymentMethod =
   | 'Boleto'
   | 'Carteira Digital';
 
+/** Prato vendido numa venda: cópia do cardápio no dia (reajustar o prato depois não muda a venda). */
+export interface SaleItem {
+  menuItemId: string;
+  name: string;
+  qty: number;
+  unitPrice: number;
+}
+
 export interface Movement {
   id: string;
   title: string;
@@ -64,6 +72,8 @@ export interface Movement {
   /** Canal (fatia 5) — ausente: usa o canal efetivo nos relatórios. */
   channel: Channel | null;
   notes: string | null;
+  /** Pratos vendidos (só vendas que informaram). Base do ranking de mais vendidos. */
+  items?: SaleItem[];
   createdBy: string;
   createdAt: string;
   updatedBy: string;
@@ -179,6 +189,7 @@ function toMovement(raw: FinancialMovement): Movement {
     channel?: MovementChannel;
     paymentMethod: LibPaymentMethod;
     description?: string;
+    items?: SaleItem[];
     audit?: {
       createdAt?: unknown;
       updatedAt?: unknown;
@@ -205,6 +216,7 @@ function toMovement(raw: FinancialMovement): Movement {
     paymentMethod: PAYMENT_FROM_LIB[r.paymentMethod] ?? null,
     channel: r.channel ? CHANNEL_FROM_LIB[r.channel] : null,
     notes: r.description ?? null,
+    ...(r.items?.length ? { items: r.items.map((i) => ({ ...i })) } : {}),
     createdBy: r.audit?.createdByName ?? r.audit?.createdBy ?? '—',
     createdAt: toISO(r.audit?.createdAt),
     updatedBy: r.audit?.updatedByName ?? r.audit?.updatedBy ?? '—',
@@ -225,6 +237,8 @@ export interface MovementInput {
   status: MovStatus;
   channel?: Channel | null;
   notes: string | null;
+  /** Pratos vendidos (prato e quantidade; o servidor copia nome e preço do cardápio). Só em entradas. */
+  items?: { menuItemId: string; qty: number }[];
 }
 
 /** Erro específico de duplicidade (409) — a UI decide se reenvia com confirmDuplicate. */
@@ -426,6 +440,7 @@ export class MovimentacoesService {
       ...(input.subcategoryId ? { subcategoryId: input.subcategoryId } : {}),
       ...(input.channel ? { channel: CHANNEL_TO_LIB[input.channel] } : {}),
       ...(input.notes ? { description: input.notes } : {}),
+      ...(input.items?.length ? { items: input.items } : {}),
       ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
       ...(input.dueDate ? { dueDate: input.dueDate } : {}),
     } satisfies RegisterMovementRequest;
@@ -468,6 +483,8 @@ export class MovimentacoesService {
       categoryId: input.categoryId,
       paymentMethod: PAYMENT_TO_LIB[input.paymentMethod],
       description: input.notes ?? undefined,
+      // Lista (mesmo vazia) troca os pratos da venda; ausente mantém.
+      ...(input.items ? { items: input.items } : {}),
       subcategoryId: input.subcategoryId ?? null,
       channel: input.channel ? CHANNEL_TO_LIB[input.channel] : null,
       ...(input.dueDate ? { dueDate: input.dueDate } : {}),
