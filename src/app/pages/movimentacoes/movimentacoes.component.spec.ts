@@ -11,7 +11,6 @@ import type { ImportGridRow } from '../../services/movimentacoes.service';
 import { ContasService } from '../../services/contas.service';
 import { CategoriasService } from '../../services/categorias.service';
 import { CardapioService } from '../../services/cardapio.service';
-import { AuthService } from '../../services/auth.service';
 
 interface Internals {
   form: () => {
@@ -91,7 +90,6 @@ describe('MovimentacoesComponent', () => {
   let confirmImport: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    localStorage.clear(); // as escolhas de pratos da importação ficam no navegador
     previewImport = vi.fn();
     confirmImport = vi.fn().mockResolvedValue({ insertedCount: 1, items: [], failedRows: [] });
     TestBed.configureTestingModule({
@@ -113,7 +111,6 @@ describe('MovimentacoesComponent', () => {
             refresh: vi.fn().mockResolvedValue(undefined),
           },
         },
-        { provide: AuthService, useValue: { currentUser: () => ({ restaurantId: 'rest-1' }) } },
         {
           provide: CardapioService,
           useValue: {
@@ -838,14 +835,20 @@ describe('MovimentacoesComponent', () => {
       expect(sentItems()).toEqual([[{ menuItemId: 'm1', qty: 1 }]]);
     });
 
-    it('a escolha fica guardada: a próxima planilha já reconhece o mesmo texto', async () => {
+    it('a escolha NÃO fica guardada: na próxima planilha o mesmo texto volta a perguntar', async () => {
       await load('Batata grande');
       c.resolveUnmatched(c.importUnmatched()[0].key, 'm2');
       expect(c.importUnmatched()).toEqual([]);
       c.closeImportPreview();
       await load('Batata grande');
-      expect(c.importUnmatched()).toEqual([]);
-      expect(c.importDishRowCount()).toBe(1);
+      expect(c.importUnmatched().map((u) => u.text)).toEqual(['Batata grande']);
+      expect(c.importDishRowCount()).toBe(0);
+    });
+
+    it('nada é gravado no navegador', async () => {
+      await load('Batata grande');
+      c.resolveUnmatched(c.importUnmatched()[0].key, 'm2');
+      expect(Object.keys(localStorage).filter((k) => k.includes('dish'))).toEqual([]);
     });
 
     it('quantidade escrita na observação ("2x") vai junto', async () => {

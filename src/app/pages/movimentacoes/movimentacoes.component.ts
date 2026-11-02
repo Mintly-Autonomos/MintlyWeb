@@ -30,7 +30,6 @@ import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtDateTime, fmtShortDate, localISODate } from '../../shared/format';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { CardapioService } from '../../services/cardapio.service';
-import { AuthService } from '../../services/auth.service';
 import {
   DISH_IGNORE,
   DishAliases,
@@ -38,7 +37,6 @@ import {
   recognizedItems,
   splitDishText,
 } from '../../shared/dish-match';
-import { loadDishAliases, saveDishAlias } from '../../shared/dish-aliases';
 import { moneyToInput } from '../../shared/money-input';
 import { describeSettlementRule, resolveSettlementRule, settlementDueDate } from 'mintly-lib';
 import type { SettlementRule } from 'mintly-lib';
@@ -119,7 +117,6 @@ export class MovimentacoesComponent implements OnInit {
   private categoriasSvc = inject(CategoriasService);
   private toast = inject(ToastService);
   private cardapioSvc = inject(CardapioService);
-  private auth = inject(AuthService);
 
   // ── UI state ──────────────────────────────────────────────────────────
   protected creating = signal(false);
@@ -459,10 +456,11 @@ export class MovimentacoesComponent implements OnInit {
   );
 
   // ── Pratos da importação ────────────────────────────────────────────
-  /** Escolhas guardadas na revisão ("Batata grande" = prato Batata Rústica). */
-  protected dishAliases = signal<DishAliases>(
-    loadDishAliases(this.auth.currentUser()?.restaurantId),
-  );
+  /**
+   * Escolhas feitas NESTA revisão ("Batata grande" = prato Batata Rústica). Não são guardadas: o nome da
+   * planilha só vale se for igual ao do cardápio; senão a pessoa indica qual é, a cada importação.
+   */
+  protected dishAliases = signal<DishAliases>({});
 
   /** Os pratos de cada linha, lidos das Observações (entradas): igualdade exata com o cardápio. */
   private importDishLines = computed(() =>
@@ -495,16 +493,10 @@ export class MovimentacoesComponent implements OnInit {
     () => this.importDishLines().filter((lines) => lines.some((l) => l.menuItemId)).length,
   );
 
-  /** Escolheu na revisão: o texto vira esse prato (ou "ignorar") em todas as linhas, e fica guardado. */
+  /** Escolheu na revisão: o texto vira esse prato (ou "ignorar") em todas as linhas desta importação. */
   resolveUnmatched(key: string, value: string): void {
     if (!value) return;
-    this.dishAliases.set(
-      saveDishAlias(
-        this.auth.currentUser()?.restaurantId,
-        key,
-        value === 'ignore' ? DISH_IGNORE : value,
-      ),
-    );
+    this.dishAliases.update((a) => ({ ...a, [key]: value === 'ignore' ? DISH_IGNORE : value }));
   }
 
   /** Prato escolhido na lista: entra com quantidade 1, ou soma 1 se já estava. */
@@ -912,6 +904,7 @@ export class MovimentacoesComponent implements OnInit {
     this.importPreviewOpen.set(false);
     this.importConfirmWarningOpen.set(false);
     this.importRows.set([]);
+    this.dishAliases.set({});
   }
 
   /** Reavalia uma linha editada — recalcula erro/validade e ajusta `included`. */
