@@ -85,6 +85,31 @@ describe('AuthService — renovação do token', () => {
     expect(localStorage.getItem('mintly-refresh-token')).toBeNull();
   });
 
+  describe('"sessão expirada" só para quem tinha sessão', () => {
+    it('token de renovação recusado: avisa que uma sessão acabou, uma vez só', async () => {
+      refreshCall.mockRejectedValue(httpError(401));
+      await auth.refresh();
+      expect(auth.consumeSessionEnded()).toBe(true);
+      expect(auth.consumeSessionEnded()).toBe(false);
+    });
+
+    it('visitante sem sessão (sem token de renovação): NÃO conta como sessão que acabou', async () => {
+      localStorage.clear();
+      sessionStorage.clear();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [provideRouter([])] });
+      const visitor = TestBed.inject(AuthService);
+      await expect(visitor.refresh()).resolves.toBe(false);
+      expect(visitor.consumeSessionEnded()).toBe(false);
+    });
+
+    it('queda de rede ou erro 500: a sessão não acabou', async () => {
+      refreshCall.mockRejectedValue(httpError());
+      await expect(auth.refresh()).rejects.toBeDefined();
+      expect(auth.consumeSessionEnded()).toBe(false);
+    });
+  });
+
   it('outra aba já renovou: usa os tokens novos sem gastar o token de renovação', async () => {
     localStorage.setItem('mintly-access-token', 'access-9');
     localStorage.setItem('mintly-refresh-token', 'refresh-9');

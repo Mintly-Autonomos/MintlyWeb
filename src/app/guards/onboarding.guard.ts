@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
 import { RestauranteService } from '../services/restaurante.service';
 
 /**
@@ -8,8 +9,11 @@ import { RestauranteService } from '../services/restaurante.service';
  * app não tem nada pendente. Se não der para consultar, não barra ninguém.
  */
 export const onboardingGuard: CanActivateFn = async () => {
+  const auth = inject(AuthService);
   const restaurante = inject(RestauranteService);
   const router = inject(Router);
+  // Sem login não há o que consultar (e as guardas rodam em paralelo): quem manda para o login é a guarda de login.
+  if (!auth.isAuthenticated()) return true;
   return (await restaurante.isOnboardingPending())
     ? router.createUrlTree(['/auth/onboarding'])
     : true;
