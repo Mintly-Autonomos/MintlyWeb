@@ -157,7 +157,9 @@
           <!-- Platform fields -->
           @if (
             a.type === 'Financial Platform' &&
-            (a.taxPct !== undefined || a.settlementDays !== undefined)
+            (a.taxPct !== undefined ||
+              a.settlementDays !== undefined ||
+              a.settlementRule !== undefined)
           ) {
             <div class="flex gap-3 text-[12px] text-muted-foreground">
               @if (a.taxPct !== undefined) {
@@ -166,11 +168,11 @@
                   taxa</span
                 >
               }
-              @if (a.settlementDays !== undefined) {
+              @if (a.settlementRule !== undefined || a.settlementDays !== undefined) {
                 <span class="flex items-center gap-1"
                   ><app-icon name="schedule" [style]="{ fontSize: '14px' }" />{{
-                    a.settlementDays
-                  }}d repasse</span
+                    repasseLabel(a)
+                  }}</span
                 >
               }
             </div>
@@ -265,43 +267,142 @@
 
       <!-- Platform fields -->
       @if (isPlatform) {
-        <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-[13px] font-medium flex items-end mb-1.5 min-h-[2.5rem] sm:min-h-0"
-              >Taxa cobrada (%)</span
-            >
-            <input
-              [value]="form().taxPct"
-              (input)="setFormTaxPct($any($event.target).value)"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              placeholder="Ex.: 12.5"
-              class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
-            />
-            <p class="text-[12px] text-muted-foreground mt-1">
-              Quanto a plataforma cobra por venda.
+        <label class="block">
+          <span class="text-[13px] font-medium block mb-1.5">Taxa cobrada (%)</span>
+          <input
+            [value]="form().taxPct"
+            (input)="setFormTaxPct($any($event.target).value)"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            placeholder="Ex.: 12.5"
+            class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
+          />
+          <p class="text-[12px] text-muted-foreground mt-1">Quanto a plataforma cobra por venda.</p>
+        </label>
+
+        <fieldset class="space-y-3" data-testid="repasse">
+          <legend class="text-[13px] font-medium mb-1.5">Quando a plataforma repassa</legend>
+          <div class="grid grid-cols-2 gap-2">
+            @for (k of settlementKinds; track k.kind) {
+              <button
+                type="button"
+                (click)="setSettlementKind(k.kind)"
+                [attr.aria-pressed]="form().settlement.kind === k.kind"
+                [class]="
+                  'h-11 rounded-xl border text-[13px] font-semibold transition cursor-pointer ' +
+                  (form().settlement.kind === k.kind
+                    ? 'border-mint bg-mint-soft text-ocean'
+                    : 'border-border bg-card text-muted-foreground hover:bg-muted')
+                "
+              >
+                {{ k.label }}
+              </button>
+            }
+          </div>
+
+          @switch (form().settlement.kind) {
+            @case ('weekly') {
+              <div>
+                <span class="text-[12px] text-muted-foreground block mb-1.5"
+                  >Em que dia da semana?</span
+                >
+                <div class="flex flex-wrap gap-1.5" role="group" aria-label="Dia da semana">
+                  @for (d of weekdays; track d.value) {
+                    <button
+                      type="button"
+                      (click)="setWeekday(d.value)"
+                      [attr.aria-pressed]="form().settlement.weekday === d.value"
+                      [attr.aria-label]="d.full"
+                      [class]="
+                        'h-10 min-w-[3.1rem] px-3 rounded-xl border text-[13px] font-semibold transition cursor-pointer ' +
+                        (form().settlement.weekday === d.value
+                          ? 'border-mint bg-mint text-primary-foreground'
+                          : 'border-border bg-card text-muted-foreground hover:bg-muted')
+                      "
+                    >
+                      {{ d.short }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+            @case ('biweekly') {
+              <div class="grid grid-cols-2 gap-3">
+                <label class="block">
+                  <span class="text-[12px] text-muted-foreground block mb-1">1º dia do mês</span>
+                  <input
+                    [value]="form().settlement.firstDay"
+                    (input)="setSettlementField('firstDay', $any($event.target).value)"
+                    type="number"
+                    min="1"
+                    max="31"
+                    step="1"
+                    placeholder="Ex.: 5"
+                    class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
+                  />
+                </label>
+                <label class="block">
+                  <span class="text-[12px] text-muted-foreground block mb-1">2º dia do mês</span>
+                  <input
+                    [value]="form().settlement.secondDay"
+                    (input)="setSettlementField('secondDay', $any($event.target).value)"
+                    type="number"
+                    min="1"
+                    max="31"
+                    step="1"
+                    placeholder="Ex.: 20"
+                    class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
+                  />
+                </label>
+              </div>
+            }
+            @case ('monthly') {
+              <label class="block">
+                <span class="text-[12px] text-muted-foreground block mb-1">Dia do mês</span>
+                <input
+                  [value]="form().settlement.monthDay"
+                  (input)="setSettlementField('monthDay', $any($event.target).value)"
+                  type="number"
+                  min="1"
+                  max="31"
+                  step="1"
+                  placeholder="Ex.: 10"
+                  class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
+                />
+              </label>
+            }
+            @default {
+              <label class="block">
+                <span class="text-[12px] text-muted-foreground block mb-1"
+                  >Quantos dias depois da venda?</span
+                >
+                <input
+                  [value]="form().settlement.days"
+                  (input)="setSettlementField('days', $any($event.target).value)"
+                  type="number"
+                  min="0"
+                  max="365"
+                  step="1"
+                  placeholder="Ex.: 2"
+                  class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
+                />
+              </label>
+            }
+          }
+
+          @if (settlementError) {
+            <p class="text-error text-[12px]" data-testid="repasse-erro">{{ settlementError }}</p>
+          } @else if (settlementPreview) {
+            <p class="text-[12px] text-muted-foreground" data-testid="repasse-exemplo">
+              {{ settlementPreview }}
+              @if (form().settlement.kind !== 'afterDays') {
+                Venda feita no próprio dia do repasse só cai no repasse seguinte.
+              }
             </p>
-          </label>
-          <label class="block">
-            <span class="text-[13px] font-medium flex items-end mb-1.5 min-h-[2.5rem] sm:min-h-0"
-              >Prazo de repasse (dias)</span
-            >
-            <input
-              [value]="form().settlementDays"
-              (input)="setFormDays($any($event.target).value)"
-              type="number"
-              min="0"
-              step="1"
-              placeholder="Ex.: 2"
-              class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
-            />
-            <p class="text-[12px] text-muted-foreground mt-1">
-              Em quantos dias o valor cai na conta.
-            </p>
-          </label>
-        </div>
+          }
+        </fieldset>
       }
 
       <!-- Toggles -->
@@ -597,8 +698,8 @@
             <span class="font-medium">{{ details()!.taxPct ?? 0 }}%</span>
           </div>
           <div class="p-3 rounded-xl bg-muted/60">
-            <span class="text-muted-foreground block">Prazo de repasse</span>
-            <span class="font-medium">{{ details()!.settlementDays ?? 0 }} dia(s)</span>
+            <span class="text-muted-foreground block">Repasse</span>
+            <span class="font-medium">{{ repasseLabel(details()!) }}</span>
           </div>
         }
       </div>

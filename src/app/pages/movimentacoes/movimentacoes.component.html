@@ -540,10 +540,11 @@
                 </div>
               </div>
             </div>
-            @if (settlementDays) {
+            @if (settlementText) {
               <div class="text-[11px] text-muted-foreground mt-2">
-                O valor líquido é o que efetivamente entra na sua conta após
-                {{ settlementDays }} dias.
+                O valor líquido é o que efetivamente entra na sua conta no repasse da plataforma ({{
+                  settlementText
+                }}).
               </div>
             }
           </div>
