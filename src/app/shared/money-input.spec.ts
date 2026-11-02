@@ -2,25 +2,32 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { parseNumberBR } from '../services/movimentacoes.service';
-import { formatMoneyInput, moneyToInput, padMoneyInput } from './money-input';
+import { formatMoneyInput, moneyToInput, pasteMoneyInput } from './money-input';
 import { MoneyInputDirective } from './money-input.directive';
 
-describe('formatMoneyInput', () => {
+describe('formatMoneyInput (centavos primeiro, como caixa eletrônico)', () => {
+  it('digitar 4, 5, 1 em sequência: 0,04 -> 0,45 -> 4,51', () => {
+    expect(formatMoneyInput('4')).toBe('0,04');
+    expect(formatMoneyInput('0,045')).toBe('0,45');
+    expect(formatMoneyInput('0,451')).toBe('4,51');
+  });
+
   it.each([
     ['', ''],
-    ['1', '1'],
-    ['14500', '14.500'],
-    ['1234567', '1.234.567'],
-    ['14500,5', '14.500,5'],
-    ['14500,50', '14.500,50'],
-    ['14500,509', '14.500,50'],
-    [',5', '0,5'],
-    ['0014500', '14.500'],
+    ['abc', ''],
+    ['0', '0,00'],
+    ['00', '0,00'],
+    ['4', '0,04'],
+    ['45', '0,45'],
+    ['451', '4,51'],
+    ['14500', '145,00'],
+    ['1450000', '14.500,00'],
+    ['123456789', '1.234.567,89'],
+    ['0,04', '0,04'],
     ['R$ 1.234,56', '1.234,56'],
-    ['1234.56', '1.234,56'],
-    ['1.234', '1.234'],
-    ['abc12x3', '123'],
-    ['12,3,4', '12,34'],
+    ['12a3', '1,23'],
+    ['000123', '1,23'],
+    ['1234567890123456', '1.234.567.890,12'],
   ])('"%s" -> "%s"', (raw, expected) => {
     expect(formatMoneyInput(raw)).toBe(expected);
   });
@@ -32,7 +39,7 @@ describe('formatMoneyInput', () => {
   });
 });
 
-describe('padMoneyInput (sempre fecha com as duas casas)', () => {
+describe('pasteMoneyInput (colar vale como número, não como centavos)', () => {
   it.each([
     ['145', '145,00'],
     ['145,5', '145,50'],
@@ -44,15 +51,16 @@ describe('padMoneyInput (sempre fecha com as duas casas)', () => {
     ['0', '0,00'],
     ['R$ 1.234,5', '1.234,50'],
     ['1234.5', '1.234,50'],
+    ['1.234', '1.234,00'],
     ['', ''],
     ['abc', ''],
   ])('"%s" -> "%s"', (raw, expected) => {
-    expect(padMoneyInput(raw)).toBe(expected);
+    expect(pasteMoneyInput(raw)).toBe(expected);
   });
 
-  it('o texto completado volta para o mesmo número', () => {
+  it('o texto colado volta para o mesmo número', () => {
     for (const raw of ['145', '14500,5', '0,5']) {
-      expect(parseNumberBR(padMoneyInput(raw))).toBe(parseNumberBR(raw));
+      expect(parseNumberBR(pasteMoneyInput(raw))).toBe(parseNumberBR(raw));
     }
   });
 });
@@ -61,6 +69,8 @@ describe('moneyToInput', () => {
   it('número -> texto do campo, sempre com 2 casas', () => {
     expect(moneyToInput(155)).toBe('155,00');
     expect(moneyToInput(14500.5)).toBe('14.500,50');
+    expect(moneyToInput(0.07)).toBe('0,07');
+    expect(moneyToInput(0)).toBe('0,00');
     expect(moneyToInput(null)).toBe('');
     expect(moneyToInput(NaN)).toBe('');
   });
@@ -81,81 +91,116 @@ describe('MoneyInputDirective', () => {
     fixture.detectChanges();
     await fixture.whenStable(); // o ngModel grava o valor inicial de forma assíncrona
     const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
-    const type = async (text: string, caret = text.length) => {
-      input.value = text;
-      input.setSelectionRange(caret, caret);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+    const fire = async (inputType?: string) => {
+      input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType }));
       fixture.detectChanges();
       await fixture.whenStable();
     };
-    return { fixture, input, type };
+    /** Como o navegador: o dígito entra na posição do cursor e o evento dispara. */
+    const press = async (key: string) => {
+      const pos = input.selectionStart ?? input.value.length;
+      input.value = input.value.slice(0, pos) + key + input.value.slice(pos);
+      input.setSelectionRange(pos + 1, pos + 1);
+      await fire('insertText');
+    };
+    const backspace = async () => {
+      const pos = input.selectionStart ?? input.value.length;
+      if (pos === 0) return;
+      input.value = input.value.slice(0, pos - 1) + input.value.slice(pos);
+      input.setSelectionRange(pos - 1, pos - 1);
+      await fire('deleteContentBackward');
+    };
+    const paste = (text: string) => {
+      const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+      Object.defineProperty(event, 'clipboardData', { value: { getData: () => text } });
+      input.dispatchEvent(event);
+      fixture.detectChanges();
+      return event;
+    };
+    return { fixture, input, press, backspace, paste };
   }
 
-  it('digitar 14500 mostra 14.500 e o modelo recebe o texto formatado', async () => {
-    const { fixture, input, type } = await setup();
-    await type('14500');
-    expect(input.value).toBe('14.500');
-    expect(fixture.componentInstance.value()).toBe('14.500');
-    expect(parseNumberBR(fixture.componentInstance.value())).toBe(14500);
+  it('digitar 4, 5, 1 mostra 0,04, depois 0,45, depois 4,51', async () => {
+    const { fixture, input, press } = await setup();
+    await press('4');
+    expect(input.value).toBe('0,04');
+    await press('5');
+    expect(input.value).toBe('0,45');
+    await press('1');
+    expect(input.value).toBe('4,51');
+    expect(fixture.componentInstance.value()).toBe('4,51');
+    expect(parseNumberBR(fixture.componentInstance.value())).toBe(4.51);
   });
 
-  it('centavos com vírgula, no máximo 2 casas', async () => {
-    const { input, type } = await setup();
-    await type('14.500,5');
-    expect(input.value).toBe('14.500,5');
-    await type('14.500,567');
-    expect(input.value).toBe('14.500,56');
+  it('milhar com ponto conforme os dígitos entram', async () => {
+    const { input, press } = await setup();
+    for (const d of '1450000') await press(d);
+    expect(input.value).toBe('14.500,00');
   });
 
-  it('mantém o cursor no lugar ao digitar no meio', async () => {
-    const { input, type } = await setup();
-    // "1.234" com um 5 digitado depois do "2": "1.2534" -> "12.534", cursor logo depois do 5
-    await type('1.2534', 4);
-    expect(input.value).toBe('12.534');
-    expect(input.selectionStart).toBe(4);
+  it('o cursor fica no fim ao digitar no fim', async () => {
+    const { input, press } = await setup();
+    await press('4');
+    await press('5');
+    expect(input.selectionStart).toBe(input.value.length);
   });
 
-  describe('ao sair do campo (blur)', () => {
-    it('145 fecha com ,00 e o modelo recebe o texto completo', async () => {
-      const { fixture, input, type } = await setup();
-      await type('145');
-      input.dispatchEvent(new Event('blur'));
-      fixture.detectChanges();
+  it('apagar tira o último dígito (4,51 -> 0,45) e zerar esvazia o campo', async () => {
+    const { fixture, input, press, backspace } = await setup();
+    for (const d of '451') await press(d);
+    await backspace();
+    expect(input.value).toBe('0,45');
+    await backspace();
+    expect(input.value).toBe('0,04');
+    await backspace();
+    expect(input.value).toBe('');
+    expect(fixture.componentInstance.value()).toBe('');
+  });
+
+  it('digitar o zero mantém 0,00 (só apagar esvazia)', async () => {
+    const { input, press } = await setup();
+    await press('0');
+    expect(input.value).toBe('0,00');
+  });
+
+  it('letras e símbolos são ignorados', async () => {
+    const { input, press } = await setup();
+    await press('a');
+    expect(input.value).toBe('');
+    await press('7');
+    await press('-');
+    expect(input.value).toBe('0,07');
+  });
+
+  it('editar no meio mantém o cursor no mesmo ponto contado da direita', async () => {
+    const { input, press } = await setup();
+    for (const d of '1234') await press(d); // 12,34
+    input.setSelectionRange(2, 2); // 12|,34
+    await press('9');
+    expect(input.value).toBe('129,34');
+    expect(input.selectionStart).toBe(3); // 129|,34
+  });
+
+  describe('colar', () => {
+    it('colar 145 vale R$ 145,00 (e não 1,45)', async () => {
+      const { fixture, input, paste } = await setup();
+      const event = paste('145');
+      expect(event.defaultPrevented).toBe(true);
       expect(input.value).toBe('145,00');
-      expect(fixture.componentInstance.value()).toBe('145,00');
       expect(parseNumberBR(fixture.componentInstance.value())).toBe(145);
     });
 
-    it('14500,5 vira 14.500,50', async () => {
-      const { fixture, input, type } = await setup();
-      await type('14500,5');
-      input.dispatchEvent(new Event('blur'));
-      fixture.detectChanges();
-      expect(input.value).toBe('14.500,50');
-      expect(fixture.componentInstance.value()).toBe('14.500,50');
+    it('colar "R$ 1.234,5" vira 1.234,50', async () => {
+      const { input, paste } = await setup();
+      paste('R$ 1.234,5');
+      expect(input.value).toBe('1.234,50');
     });
 
-    it('campo vazio continua vazio (não inventa 0,00)', async () => {
-      const { fixture, input } = await setup();
-      input.dispatchEvent(new Event('blur'));
-      fixture.detectChanges();
+    it('colar texto sem número deixa o navegador seguir (nada muda)', async () => {
+      const { input, paste } = await setup();
+      const event = paste('abc');
+      expect(event.defaultPrevented).toBe(false);
       expect(input.value).toBe('');
     });
-
-    it('já completo não muda, e voltar ao campo e sair de novo é inofensivo', async () => {
-      const { fixture, input, type } = await setup();
-      await type('1.234,56');
-      input.dispatchEvent(new Event('blur'));
-      input.dispatchEvent(new Event('blur'));
-      fixture.detectChanges();
-      expect(input.value).toBe('1.234,56');
-    });
-  });
-
-  it('cursor no início continua no início', async () => {
-    const { input, type } = await setup();
-    await type('1234', 0);
-    expect(input.value).toBe('1.234');
-    expect(input.selectionStart).toBe(0);
   });
 });

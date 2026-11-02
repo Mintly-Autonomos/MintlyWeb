@@ -28,7 +28,7 @@ import { CategoriasService } from '../../services/categorias.service';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtDateTime, fmtShortDate, localISODate } from '../../shared/format';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
-import { moneyToInput, padMoneyInput } from '../../shared/money-input';
+import { moneyToInput } from '../../shared/money-input';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
 import { matchName } from '../../shared/import-parse';
 
@@ -912,19 +912,12 @@ export class MovimentacoesComponent implements OnInit {
     return this.importRows().filter((r) => !r[field]).length;
   }
 
-  /** Digitou no campo Valor da revisão: guarda o texto como está (já com máscara) e o número lido dele. */
+  /** Digitou no campo Valor da revisão: guarda o texto como está (já com máscara, "4,51") e o número lido dele. */
   setRowValue(index: number, text: string): void {
     this.importRows.update((rows) =>
       rows.map((r, i) =>
         i === index ? this.revalidateRow({ ...r, valueText: text, value: parseNumberBR(text) }) : r,
       ),
-    );
-  }
-
-  /** Saiu do campo: o texto fecha com ",00" (o número não muda). */
-  padRowValue(index: number): void {
-    this.importRows.update((rows) =>
-      rows.map((r, i) => (i === index ? { ...r, valueText: padMoneyInput(r.valueText) } : r)),
     );
   }
 
@@ -1012,6 +1005,22 @@ export class MovimentacoesComponent implements OnInit {
 
   closeImportResult(): void {
     this.importResult.set(null);
+  }
+
+  /** Título do aviso que fecha a importação: diz o que de fato aconteceu, não só que terminou. */
+  importResultTitle(res: ImportMovementsResult): string {
+    if (res.replayed) return 'Importação já realizada';
+    if (res.insertedCount === 0) return 'Nenhuma movimentação incluída';
+    return res.failedRows.length > 0
+      ? 'Importação concluída com avisos'
+      : 'Importação concluída com sucesso';
+  }
+
+  /** "53 movimentações incluídas com sucesso" (ou o que ficou de fora, quando nada entrou). */
+  importResultSummary(res: ImportMovementsResult): string {
+    const n = res.insertedCount;
+    if (n === 0) return 'Nenhuma linha foi gravada.';
+    return `${n} ${n === 1 ? 'movimentação incluída' : 'movimentações incluídas'} com sucesso`;
   }
 
   async save(force = false): Promise<void> {

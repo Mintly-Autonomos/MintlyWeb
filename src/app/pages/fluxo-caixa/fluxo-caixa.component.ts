@@ -20,14 +20,9 @@ import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { AreaChartComponent, AreaSeries, AreaDot } from '../../shared/area-chart.component';
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { formatBRL } from '../../shared/format';
+import { formatBRL, formatCompact } from '../../shared/format';
 
 const HORIZONS = [30, 60, 90];
-const abrev = (v: number) => {
-  const abs = Math.abs(v);
-  if (abs >= 1000) return `${v < 0 ? '-' : ''}${Math.round(abs / 100) / 10}k`;
-  return String(Math.round(v));
-};
 
 type Tab = 'todos' | 'receber' | 'pagar' | 'vencidos';
 
@@ -116,7 +111,7 @@ export class FluxoCaixaComponent implements OnInit {
   protected data = this.svc.data;
   protected loading = this.svc.loading;
   protected fmtBRL = formatBRL;
-  protected abrev = abrev;
+  protected abrev = formatCompact;
   protected formatDia = formatDia;
   protected formatDiaLongo = formatDiaLongo;
   protected statusMeta = STATUS_META;

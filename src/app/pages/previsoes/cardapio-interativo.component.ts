@@ -6,8 +6,11 @@ import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { ChartCardComponent } from '../../shared/chart-card.component';
 import { ScatterChartComponent, ScatterPoint } from '../../shared/scatter-chart.component';
 import { ToastService } from '../../shared/toast.service';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
+import { moneyToInput } from '../../shared/money-input';
 import { formatBRL } from '../../shared/format';
 import { CardapioService, Prato } from '../../services/cardapio.service';
+import { parseNumberBR } from '../../services/movimentacoes.service';
 import {
   ORDEM_QUADRANTES,
   QUADRANTES,
@@ -49,6 +52,7 @@ const INPUT =
     EmptyStateComponent,
     ChartCardComponent,
     ScatterChartComponent,
+    MoneyInputDirective,
   ],
   templateUrl: './cardapio-interativo.component.html',
 })
@@ -244,7 +248,7 @@ export class CardapioInterativoComponent {
   }
 
   private num(v: string): number {
-    return Number(v.replace(',', '.'));
+    return parseNumberBR(v);
   }
 
   toggleAdd(): void {
@@ -289,8 +293,8 @@ export class CardapioInterativoComponent {
     this.f.set({
       nome: p.name,
       categoria: p.category ?? '',
-      preco: String(p.price).replace('.', ','),
-      custo: p.cost ? String(p.cost).replace('.', ',') : '',
+      preco: moneyToInput(p.price),
+      custo: p.cost ? moneyToInput(p.cost) : '',
       vendidos: p.soldPerMonth ? String(p.soldPerMonth) : '',
     });
   }
@@ -341,7 +345,7 @@ export class CardapioInterativoComponent {
   iniciarPreco(p: Prato): void {
     this.editandoId.set(null);
     this.precoEditandoId.set(p.id);
-    this.precoEditado.set(String(p.price).replace('.', ','));
+    this.precoEditado.set(moneyToInput(p.price));
   }
 
   async salvarPreco(p: Prato): Promise<void> {
