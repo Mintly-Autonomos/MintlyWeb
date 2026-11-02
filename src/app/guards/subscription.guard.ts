@@ -17,6 +17,10 @@ export const subscriptionGuard: CanActivateFn = async () => {
   const subscription = inject(SubscriptionService);
   const router = inject(Router);
 
+  // O Angular roda as guardas da rota em paralelo: sem login não se consulta a API (daria 401 e levaria a
+  // "sessão expirada" antes de a guarda de login mandar para o login).
+  if (!auth.isAuthenticated()) return router.createUrlTree(['/auth/login']);
+
   if (auth.hasActiveSubscription()) return true;
 
   try {

@@ -7,15 +7,20 @@ import { subscriptionGuard } from './subscription.guard';
 
 describe('subscriptionGuard', () => {
   let active: boolean;
+  let loggedIn: boolean;
   let refresh: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     active = false;
+    loggedIn = true;
     refresh = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { hasActiveSubscription: () => active } },
+        {
+          provide: AuthService,
+          useValue: { hasActiveSubscription: () => active, isAuthenticated: () => loggedIn },
+        },
         { provide: SubscriptionService, useValue: { refresh } },
       ],
     });
@@ -27,6 +32,12 @@ describe('subscriptionGuard', () => {
     ) as Promise<boolean | UrlTree>;
 
   const urlOf = (r: boolean | UrlTree) => TestBed.inject(Router).serializeUrl(r as UrlTree);
+
+  it('sem login: vai para o login e NÃO consulta a API (as guardas rodam em paralelo; o 401 levaria a "sessão expirada")', async () => {
+    loggedIn = false;
+    expect(urlOf(await run())).toBe('/auth/login');
+    expect(refresh).not.toHaveBeenCalled();
+  });
 
   it('assinatura ativa no estado guardado: entra sem consultar a API', async () => {
     active = true;

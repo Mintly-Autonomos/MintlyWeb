@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './guards/auth.guard';
+import { authGuard, guestGuard, sessionExpiredGuard } from './guards/auth.guard';
 import { subscriptionGuard } from './guards/subscription.guard';
 import { onboardingGuard } from './guards/onboarding.guard';
 
@@ -25,6 +25,7 @@ export const routes: Routes = [
       {
         path: 'sessao-expirada',
         title: 'Sessão expirada',
+        canActivate: [sessionExpiredGuard],
         loadComponent: () =>
           import('./pages/auth/sessao-expirada.component').then((m) => m.SessaoExpiradaComponent),
       },

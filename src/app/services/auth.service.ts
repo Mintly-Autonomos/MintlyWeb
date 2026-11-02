@@ -95,6 +95,12 @@ export class AuthService {
   /** Renovação em andamento: quem pede enquanto ela roda espera por ela, em vez de gastar o token de novo. */
   private refreshInFlight: Promise<boolean> | null = null;
 
+  /**
+   * Uma sessão que existia acabou agora (a API recusou o token de renovação). É o que diferencia "Sua sessão
+   * expirou" de quem simplesmente ainda não entrou: este visitante deve ver o login, não um aviso de expiração.
+   */
+  private sessionEnded = false;
+
   constructor() {
     // Outra aba renovou ou saiu: esta passa a usar os tokens novos. Com o token antigo ela tentaria
     // renovar de novo e a API (token de renovação é de uso único) derrubaria a sessão inteira.
@@ -416,6 +422,7 @@ export class AuthService {
       if (status === 401 || status === 403) {
         this.rememberReturnUrl();
         this.clearSession();
+        this.sessionEnded = true;
         return false;
       }
       throw err;
@@ -427,6 +434,13 @@ export class AuthService {
     this._accessToken.set(this.read(KEYS.access));
     this._refreshToken.set(this.read(KEYS.refresh));
     if (!this._accessToken()) this._user.set(null);
+  }
+
+  /** Uma sessão acabou agora? Responde uma vez só (a tela "sessão expirada" usa para abrir). */
+  consumeSessionEnded(): boolean {
+    const ended = this.sessionEnded;
+    this.sessionEnded = false;
+    return ended;
   }
 
   /** Guarda a tela atual para o login devolver a pessoa a ela depois que a sessão acabar sem ela pedir. */
