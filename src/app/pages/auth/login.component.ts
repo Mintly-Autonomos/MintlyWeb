@@ -169,7 +169,8 @@ export class LoginComponent {
     this.loading.set(true);
     try {
       await this.auth.login(this.email, this.password, this.remember);
-      this.router.navigate(['/']);
+      // Sessão que acabou sem a pessoa pedir: volta para a tela em que ela estava.
+      this.router.navigateByUrl(this.auth.consumeReturnUrl() ?? '/');
     } catch (err) {
       // 429: a conta foi bloqueada por excesso de tentativas (a API pausa o acesso por alguns minutos).
       if (apiErrorInfo(err).status === 429) {

@@ -14,6 +14,8 @@ describe('IdleSessionService', () => {
   let svc: IdleSessionService;
   let logout: ReturnType<typeof vi.fn>;
   let refresh: ReturnType<typeof vi.fn>;
+  let renewIfDue: ReturnType<typeof vi.fn>;
+  let rememberReturnUrl: ReturnType<typeof vi.fn>;
   let order: string[];
   let navigate: ReturnType<typeof vi.fn>;
 
@@ -29,10 +31,12 @@ describe('IdleSessionService', () => {
     logout = vi.fn().mockImplementation(async () => {
       order.push('logout');
     });
+    renewIfDue = vi.fn().mockResolvedValue(undefined);
+    rememberReturnUrl = vi.fn();
     navigate = vi.fn().mockResolvedValue(true);
     TestBed.configureTestingModule({
       providers: [
-        { provide: AuthService, useValue: { logout, refresh } },
+        { provide: AuthService, useValue: { logout, refresh, renewIfDue, rememberReturnUrl } },
         { provide: Router, useValue: { navigate } },
       ],
     });
@@ -60,7 +64,7 @@ describe('IdleSessionService', () => {
     await advance(2 * MIN);
 
     expect(logout).toHaveBeenCalledTimes(1);
-    expect(logout).toHaveBeenCalledWith(false);
+    expect(logout).toHaveBeenCalledWith(false, true);
     expect(navigate).toHaveBeenCalledWith(['/auth/sessao-expirada'], {
       queryParams: { motivo: 'inatividade' },
     });
@@ -70,6 +74,33 @@ describe('IdleSessionService', () => {
     svc.start();
     await advance(31 * MIN);
     expect(order).toEqual(['refresh', 'logout']);
+  });
+
+  it('guarda a tela em que a pessoa estava antes de encerrar', async () => {
+    svc.start();
+    await advance(IDLE_TIMEOUT_MS + 15_000);
+    expect(rememberReturnUrl).toHaveBeenCalledTimes(1);
+    expect(rememberReturnUrl.mock.invocationCallOrder[0]).toBeLessThan(
+      logout.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('sem rede na renovação, sai do mesmo jeito (não trava na tela)', async () => {
+    refresh.mockRejectedValue(new Error('sem rede'));
+    svc.start();
+    await advance(IDLE_TIMEOUT_MS + 15_000);
+    expect(logout).toHaveBeenCalledWith(false, true);
+    expect(navigate).toHaveBeenCalled();
+  });
+
+  it('em uso, a cada ciclo pede a renovação silenciosa do token', async () => {
+    svc.start();
+    await advance(15_000);
+    expect(renewIfDue).toHaveBeenCalledTimes(1);
+    act();
+    await advance(15_000);
+    expect(renewIfDue).toHaveBeenCalledTimes(2);
+    expect(logout).not.toHaveBeenCalled();
   });
 
   it('usar o app (tecla, mouse, toque, rolagem) recomeça a contagem', async () => {
