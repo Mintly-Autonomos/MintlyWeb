@@ -230,7 +230,7 @@ describe('AssinaturaComponent', () => {
   });
 
   describe('tipos: Básico e Pro', () => {
-    it('mostra Básico e Pro com o valor mensal, e o Pro sem promessa de recurso específico', async () => {
+    it('mostra Básico e Pro com o valor mensal, e o diferencial do Pro (análises aprimoradas por IA)', async () => {
       const f = await render();
       const texts = tierCards(f).map((r) => norm(r.textContent));
       expect(texts).toHaveLength(2);
@@ -238,7 +238,8 @@ describe('AssinaturaComponent', () => {
       expect(texts[0]).toContain('R$ 150,00 por mês');
       expect(texts[1]).toContain('Pro');
       expect(texts[1]).toContain('R$ 229,00 por mês');
-      expect(texts[1]).toContain('recursos exclusivos do Pro chegarão em breve');
+      expect(texts[1]).toContain('análises do Mintly aprimoradas por IA');
+      expect(texts[0]).not.toContain('IA');
     });
 
     it('sem assinatura começa no Básico', async () => {
