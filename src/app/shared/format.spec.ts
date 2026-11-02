@@ -1,4 +1,4 @@
-import { fmtShortDate, localISODate, localISOMonth, maskPhoneBR } from './format';
+import { fmtShortDate, localISODate, localISOMonth, maskPhoneBR, formatCompact } from './format';
 
 // O runner dos testes é Node; o tsconfig.spec não carrega @types/node.
 declare const process: { env: Record<string, string | undefined> };
@@ -54,5 +54,35 @@ describe('localISODate / localISOMonth', () => {
 
   it('completa com zero', () => {
     expect(localISODate(new Date(2026, 0, 5))).toBe('2026-01-05');
+  });
+});
+
+describe('formatCompact (eixo de gráfico)', () => {
+  it.each([
+    [0, '0'],
+    [20, '20'],
+    [60, '60'],
+    [850, '850'],
+    [2.5, '2,5'],
+    [0.5, '0,5'],
+    [1000, '1k'],
+    [1500, '1,5k'],
+    [12_345, '12,3k'],
+    [150_000, '150k'],
+    [999_999, '1.000k'],
+    [2_500_000, '2,5mi'],
+    [-1500, '-1,5k'],
+    [-20, '-20'],
+  ])('%s -> %s', (v, expected) => {
+    expect(formatCompact(v)).toBe(expected);
+  });
+
+  it('valores pequenos de um mês fraco continuam diferentes entre si (antes viravam "0k")', () => {
+    const labels = [0, 20, 40, 60].map(formatCompact);
+    expect(new Set(labels).size).toBe(4);
+  });
+
+  it('número inválido vira texto vazio', () => {
+    expect(formatCompact(NaN)).toBe('');
   });
 });

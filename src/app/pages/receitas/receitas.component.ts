@@ -14,11 +14,10 @@ import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { DonutChartComponent, DonutSlice } from '../../shared/donut-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { formatBRL } from '../../shared/format';
+import { formatBRL, formatCompact } from '../../shared/format';
 
 const PERIODS: PeriodKey[] = ['Hoje', '7 dias', 'Este mês', 'Mês passado', 'Personalizado'];
 
-const abrev = (v: number) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(v));
 const CAT_COLORS = ['var(--ocean)', 'var(--mint)', 'var(--warning)', 'var(--success)'];
 const PAY_COLORS = ['var(--mint)', 'var(--ocean)', 'var(--warning)'];
 
@@ -57,7 +56,7 @@ export class ReceitasComponent implements OnInit {
   protected fmtBRL = formatBRL;
   protected faixas = FAIXAS;
   protected diasSemana = DIAS_SEMANA;
-  protected abrev = abrev;
+  protected abrev = formatCompact;
   protected readonly Math = Math;
   protected readonly identityFormatter = (v: number) => String(v);
 
@@ -90,8 +89,12 @@ export class ReceitasComponent implements OnInit {
     },
   ]);
 
+  protected rankingTooltipFormatter = computed(() =>
+    this.rankMode() === 'receita' ? formatBRL : this.identityFormatter,
+  );
+
   protected rankingValueFormatter = computed(() =>
-    this.rankMode() === 'receita' ? abrev : this.identityFormatter,
+    this.rankMode() === 'receita' ? formatCompact : this.identityFormatter,
   );
 
   protected porCategoriaSlices = computed<DonutSlice[]>(() => {

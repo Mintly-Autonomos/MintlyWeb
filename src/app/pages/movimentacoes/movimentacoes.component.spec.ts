@@ -16,8 +16,9 @@ interface Internals {
   submitImport(): Promise<void>;
   confirmImportPreview(): void;
   setRowValue(index: number, text: string): void;
-  padRowValue(index: number): void;
   closeImportPreview(): void;
+  importResultTitle(res: Result): string;
+  importResultSummary(res: Result): string;
   toggleRowIncluded(index: number, included: boolean): void;
   importFile: { set(f: File | null): void };
   fillBlank(field: string, raw: string): void;
@@ -25,6 +26,12 @@ interface Internals {
   updateRowField(i: number, field: string, value: unknown): void;
   form: () => { date: string };
   importCategoriesFor(row: Row): { name: string }[];
+}
+interface Result {
+  insertedCount: number;
+  items: unknown[];
+  failedRows: { row: number; title: string; error: string }[];
+  replayed?: boolean;
 }
 interface Row {
   value: number;
@@ -543,7 +550,7 @@ describe('MovimentacoesComponent', () => {
     });
   });
 
-  describe('campo Valor da revisão: sempre com ,00', () => {
+  describe('campo Valor da revisão: centavos primeiro, sempre com ,00', () => {
     const root = () => fixture.nativeElement as HTMLElement;
     const field = () => root().querySelector<HTMLInputElement>('input[data-testid="valor-linha"]')!;
     const load = async (value: number | string) => {
@@ -592,37 +599,30 @@ describe('MovimentacoesComponent', () => {
       expect(field().value).toBe('1.234,50');
     });
 
-    it('digitar aplica a máscara, o número da linha acompanha e ao sair fecha com ,00', async () => {
+    it('digitar um dígito no fim desloca os centavos (125,00 + 5 = 1.250,05) e o número acompanha', async () => {
       await load(125);
       field().focus();
-      field().value = '14500';
+      field().value = '125,005';
       field().dispatchEvent(new Event('input', { bubbles: true }));
       fixture.detectChanges();
-      expect(field().value).toBe('14.500');
-      expect(c.importRows()[0].value).toBe(14500);
-
-      field().dispatchEvent(new Event('blur'));
-      fixture.detectChanges();
-      expect(field().value).toBe('14.500,00');
-      expect(c.importRows()[0].valueText).toBe('14.500,00');
-      expect(c.importRows()[0].value).toBe(14500);
+      expect(field().value).toBe('1.250,05');
+      expect(c.importRows()[0].valueText).toBe('1.250,05');
+      expect(c.importRows()[0].value).toBe(1250.05);
     });
 
-    it('centavos: 12,5 ao sair vira 12,50 (valor 12.5)', async () => {
-      await load(125);
-      field().value = '12,5';
+    it('apagar o último dígito volta o anterior (1.250,05 -> 125,00)', async () => {
+      await load(1250.05);
+      field().value = '1.250,0';
       field().dispatchEvent(new Event('input', { bubbles: true }));
-      field().dispatchEvent(new Event('blur'));
       fixture.detectChanges();
-      expect(field().value).toBe('12,50');
-      expect(c.importRows()[0].value).toBe(12.5);
+      expect(field().value).toBe('125,00');
+      expect(c.importRows()[0].value).toBe(125);
     });
 
-    it('apagar o campo vira erro "valor deve ser maior que zero" e continua vazio ao sair', async () => {
+    it('apagar o campo vira erro "valor deve ser maior que zero" e continua vazio', async () => {
       await load(125);
       field().value = '';
       field().dispatchEvent(new Event('input', { bubbles: true }));
-      field().dispatchEvent(new Event('blur'));
       fixture.detectChanges();
       expect(field().value).toBe('');
       expect(c.importRows()[0].value).toBe(0);
@@ -632,12 +632,44 @@ describe('MovimentacoesComponent', () => {
 
     it('o valor digitado é o que vai para a API', async () => {
       await load(125);
-      field().value = '99,9';
+      field().value = '999';
       field().dispatchEvent(new Event('input', { bubbles: true }));
-      field().dispatchEvent(new Event('blur'));
+      expect(field().value).toBe('9,99');
       c.confirmImportPreview();
       await fixture.whenStable();
-      expect(confirmImport.mock.calls[0][0][0].value).toBe(99.9);
+      expect(confirmImport.mock.calls[0][0][0].value).toBe(9.99);
+    });
+  });
+
+  describe('aviso ao fim da importação', () => {
+    const res = (insertedCount: number, failed = 0, replayed = false): Result => ({
+      insertedCount,
+      items: [],
+      failedRows: Array.from({ length: failed }, (_, i) => ({
+        row: i + 2,
+        title: 'x',
+        error: 'e',
+      })),
+      replayed,
+    });
+
+    it('tudo certo: título de sucesso e "53 movimentações incluídas com sucesso"', () => {
+      expect(c.importResultTitle(res(53))).toBe('Importação concluída com sucesso');
+      expect(c.importResultSummary(res(53))).toBe('53 movimentações incluídas com sucesso');
+      expect(c.importResultSummary(res(1))).toBe('1 movimentação incluída com sucesso');
+    });
+
+    it('com linhas que ficaram de fora: título com avisos', () => {
+      expect(c.importResultTitle(res(50, 3))).toBe('Importação concluída com avisos');
+    });
+
+    it('nada entrou: título e frase dizem isso', () => {
+      expect(c.importResultTitle(res(0, 2))).toBe('Nenhuma movimentação incluída');
+      expect(c.importResultSummary(res(0, 2))).toBe('Nenhuma linha foi gravada.');
+    });
+
+    it('reenvio de uma importação já feita: título próprio', () => {
+      expect(c.importResultTitle(res(53, 0, true))).toBe('Importação já realizada');
     });
   });
 

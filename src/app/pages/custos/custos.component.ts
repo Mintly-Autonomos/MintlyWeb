@@ -17,17 +17,15 @@ import { BulletComponent } from '../../shared/bullet.component';
 import { ToggleGroupComponent, ToggleGroupOption } from '../../shared/toggle-group.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { formatBRL, fmtMonthLong, fmtMonthShort } from '../../shared/format';
+import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
+import { MonthOpt, defaultMonthOpt, monthStr } from './custos-month';
 
-type MonthOpt = 'esteMes' | 'mesPassado' | 'personalizado';
 const MONTH_OPTS: { key: MonthOpt; label: string }[] = [
   { key: 'esteMes', label: 'Este mês' },
   { key: 'mesPassado', label: 'Mês passado' },
   { key: 'personalizado', label: 'Personalizado' },
 ];
 
-const abrev = (v: number) =>
-  Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v));
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
 type Compare = 'anterior' | 'media3';
@@ -36,12 +34,6 @@ type Canal = 'geral' | 'salao' | 'delivery';
 
 interface LinhaDespesa extends ExpenseItem {
   metric: number;
-}
-
-function currentMonthStr(offset = 0): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 const TREND_COLORS = [
@@ -74,8 +66,9 @@ export class CustosComponent implements OnInit {
   private toast = inject(ToastService);
 
   protected monthOpts = MONTH_OPTS;
-  protected monthSel = signal<MonthOpt>('esteMes');
-  protected customMonth = signal(currentMonthStr(-1));
+  // Do dia 1 ao 12 abre no mês passado (já fechado); depois, no mês atual.
+  protected monthSel = signal<MonthOpt>(defaultMonthOpt());
+  protected customMonth = signal(monthStr(-1));
 
   protected valueMode = signal<'brl' | 'pct'>('brl');
   protected compare = signal<Compare>('anterior');
@@ -89,7 +82,7 @@ export class CustosComponent implements OnInit {
   protected loading = this.svc.loading;
   protected fmtBRL = formatBRL;
   protected pctFmt = pctFmt;
-  protected abrev = abrev;
+  protected abrev = formatCompact;
   protected fmtMonthLong = fmtMonthLong;
   protected readonly Math = Math;
   protected readonly CategoryBehavior = CategoryBehavior;
@@ -171,7 +164,7 @@ export class CustosComponent implements OnInit {
   private monthQuery(): string | undefined {
     const sel = this.monthSel();
     if (sel === 'esteMes') return undefined;
-    if (sel === 'mesPassado') return currentMonthStr(-1);
+    if (sel === 'mesPassado') return monthStr(-1);
     return this.customMonth();
   }
 
