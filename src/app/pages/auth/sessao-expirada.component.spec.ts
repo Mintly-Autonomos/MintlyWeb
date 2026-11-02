@@ -5,6 +5,8 @@ import { SessaoExpiradaComponent } from './sessao-expirada.component';
 const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
 
 describe('SessaoExpiradaComponent', () => {
+  beforeEach(() => localStorage.removeItem('mintly-return-url'));
+
   function render(params: Record<string, string> = {}) {
     TestBed.configureTestingModule({
       providers: [
@@ -33,6 +35,23 @@ describe('SessaoExpiradaComponent', () => {
     expect(text).toContain('Sua sessão expirou');
     expect(text).not.toContain('por inatividade');
     expect(text).toContain('Esqueci minha senha');
+  });
+
+  it('token vencido: não fala em inatividade e diz que precisa entrar de novo', () => {
+    const text = render();
+    expect(text).toContain('Por segurança, precisamos que você entre de novo.');
+    expect(text).not.toContain('sem atividade');
+    expect(text).not.toContain('volta para a tela');
+  });
+
+  it('com uma tela guardada, avisa que depois de entrar volta para onde estava', () => {
+    localStorage.setItem('mintly-return-url', JSON.stringify({ url: '/custos', at: Date.now() }));
+    expect(render()).toContain('Depois de entrar, você volta para a tela em que estava.');
+  });
+
+  it('por inatividade e com tela guardada: o mesmo aviso', () => {
+    localStorage.setItem('mintly-return-url', JSON.stringify({ url: '/custos', at: Date.now() }));
+    expect(render({ motivo: 'inatividade' })).toContain('você volta para a tela em que estava');
   });
 
   it('um motivo desconhecido cai no texto padrão', () => {

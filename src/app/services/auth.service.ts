@@ -40,7 +40,18 @@ const KEYS = {
   subscriptionTier: 'mintly-subscription-tier',
   /** Recém-cadastrado: depois de pagar, ainda falta o onboarding. */
   pendingOnboarding: 'mintly-pending-onboarding',
+  /** Quando o token de acesso atual foi emitido (ms): é ele que diz quando renovar em silêncio. */
+  accessIssuedAt: 'mintly-access-issued-at',
 } as const;
+/** Onde a pessoa estava quando a sessão acabou sem ela pedir: o login devolve para lá. */
+const RETURN_URL_KEY = 'mintly-return-url';
+const RETURN_URL_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+/**
+ * O token de acesso dura 15 min. Renova a partir daqui, em silêncio, para a pessoa nunca bater num 401
+ * (a margem cobre o ciclo de 15 s do monitor e uma rede lenta).
+ */
+const RENEW_AFTER_MS = 10 * 60 * 1000;
+const TOKEN_KEYS: string[] = [KEYS.access, KEYS.refresh];
 const AVATAR_KEY = 'mintly-avatar';
 
 /**
@@ -82,6 +93,17 @@ export class AuthService {
 
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly currentUser = this._user.asReadonly();
+
+  /** Renovação em andamento: quem pede enquanto ela roda espera por ela, em vez de gastar o token de novo. */
+  private refreshInFlight: Promise<boolean> | null = null;
+
+  constructor() {
+    // Outra aba renovou ou saiu: esta passa a usar os tokens novos. Com o token antigo ela tentaria
+    // renovar de novo e a API (token de renovação é de uso único) derrubaria a sessão inteira.
+    window.addEventListener('storage', (e) => {
+      if (e.key === null || TOKEN_KEYS.includes(e.key)) this.syncTokensFromStorage();
+    });
+  }
 
   /**
    * Estado da assinatura NESTE instante (ativa só enquanto agora < data limite; mesma regra da API,
@@ -339,36 +361,133 @@ export class AuthService {
     return response.payload?.message ?? 'Senha redefinida com sucesso.';
   }
 
-  async refresh(): Promise<boolean> {
-    const rt = this._refreshToken();
-    if (!rt) return false;
+  /**
+   * Renova o token de acesso. `true`: renovou (ou outra aba já tinha renovado). `false`: a API
+   * recusou o token de renovação de vez (sessão acabou, já foi limpa). Se a rede ou o servidor falharem
+   * o erro SOBE e a sessão fica como está: queda de conexão não pode deslogar ninguém.
+   *
+   * Uma renovação por vez: o token de renovação é de uso único, e usá-lo duas vezes (duas requisições
+   * que vencem juntas, ou duas abas) faz a API revogar a sessão inteira por suspeita de roubo.
+   */
+  refresh(): Promise<boolean> {
+    this.refreshInFlight ??= this.withRefreshLock(() => this.doRefresh()).finally(() => {
+      this.refreshInFlight = null;
+    });
+    return this.refreshInFlight;
+  }
+
+  /** Renova em silêncio quando o token de acesso está perto de vencer. Falha de rede fica para o próximo ciclo. */
+  async renewIfDue(): Promise<void> {
+    if (environment.useMocks || !this._accessToken()) return;
+    const issuedAt = Number(this.read(KEYS.accessIssuedAt));
+    if (issuedAt && Date.now() - issuedAt < RENEW_AFTER_MS) return;
+    try {
+      await this.refresh();
+    } catch {
+      /* sem rede agora: a próxima checagem tenta de novo */
+    }
+  }
+
+  /** Entre abas, uma renovação por vez (Web Locks); sem o recurso, vale só a trava desta aba. */
+  private withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+    const locks = (navigator as Navigator & { locks?: LockManager }).locks;
+    return locks ? (locks.request('mintly-refresh', fn) as Promise<T>) : fn();
+  }
+
+  private async doRefresh(): Promise<boolean> {
+    const before = this._accessToken();
+    // Outra aba pode ter renovado enquanto esta esperava a vez: então já há token novo, é só usar.
+    this.syncTokensFromStorage();
+    if (!this._refreshToken()) return false;
+    if (this._accessToken() !== before) return true;
 
     if (environment.useMocks) {
       const at = fakeToken('mock-access');
       this._accessToken.set(at);
       this.write(KEYS.access, at);
+      this.write(KEYS.accessIssuedAt, String(Date.now()));
       return true;
     }
 
     try {
-      const response = await this.authClient.refresh(rt, this.headers);
+      const response = await this.authClient.refresh(this._refreshToken()!, this.headers);
       const result = response.payload;
       if (!result) throw new Error('Resposta de refresh sem payload.');
       this._accessToken.set(result.accessToken);
       this.write(KEYS.access, result.accessToken);
+      this.write(KEYS.accessIssuedAt, String(Date.now()));
       if (result.refreshToken) {
         this._refreshToken.set(result.refreshToken);
         this.write(KEYS.refresh, result.refreshToken);
       }
       return true;
+    } catch (err) {
+      const status = apiErrorInfo(err).status;
+      // Só a recusa da API encerra a sessão; rede fora, timeout ou erro 5xx tentam de novo depois.
+      if (status === 401 || status === 403) {
+        this.rememberReturnUrl();
+        this.clearSession();
+        return false;
+      }
+      throw err;
+    }
+  }
+
+  /** Alinha os tokens desta aba com o que está guardado (outra aba pode ter renovado ou saído). */
+  private syncTokensFromStorage(): void {
+    this._accessToken.set(this.read(KEYS.access));
+    this._refreshToken.set(this.read(KEYS.refresh));
+    if (!this._accessToken()) this._user.set(null);
+  }
+
+  /** Guarda a tela atual para o login devolver a pessoa a ela depois que a sessão acabar sem ela pedir. */
+  rememberReturnUrl(): void {
+    const url = this.router.url;
+    if (!url || url === '/' || url.startsWith('/auth') || url.startsWith('/assinatura')) return;
+    try {
+      localStorage.setItem(RETURN_URL_KEY, JSON.stringify({ url, at: Date.now() }));
     } catch {
-      this.clearSession();
+      /* sem storage: o login volta para o início */
+    }
+  }
+
+  /** A tela em que a pessoa estava (uma vez só); `null` se não há, é antiga ou não é um caminho do app. */
+  consumeReturnUrl(): string | null {
+    let url: string | null = null;
+    try {
+      const raw = localStorage.getItem(RETURN_URL_KEY);
+      localStorage.removeItem(RETURN_URL_KEY);
+      const saved = raw ? (JSON.parse(raw) as { url?: unknown; at?: unknown }) : null;
+      if (
+        saved &&
+        typeof saved.url === 'string' &&
+        typeof saved.at === 'number' &&
+        Date.now() - saved.at < RETURN_URL_MAX_AGE_MS &&
+        saved.url.startsWith('/') &&
+        !saved.url.startsWith('//')
+      ) {
+        url = saved.url;
+      }
+    } catch {
+      /* guardado estragado: ignora */
+    }
+    return url;
+  }
+
+  /** Há uma tela guardada para voltar? (só olha, não consome). */
+  hasReturnUrl(): boolean {
+    try {
+      return !!localStorage.getItem(RETURN_URL_KEY);
+    } catch {
       return false;
     }
   }
 
-  /** `redirect`: false quando a tela de despedida (`/auth/logout`) é o destino. */
-  async logout(redirect = true): Promise<void> {
+  /**
+   * `redirect`: false quando a tela de despedida (`/auth/logout`) é o destino. Sair a pedido da pessoa
+   * esquece a tela guardada; `keepReturnUrl` (sessão que acabou por inatividade) mantém para o login voltar nela.
+   */
+  async logout(redirect = true, keepReturnUrl = false): Promise<void> {
     if (!environment.useMocks) {
       const rt = this._refreshToken();
       const at = this._accessToken();
@@ -381,6 +500,7 @@ export class AuthService {
       }
     }
     this.clearSession();
+    if (!keepReturnUrl) localStorage.removeItem(RETURN_URL_KEY);
     if (redirect) this.router.navigate(['/auth/login']);
   }
 
@@ -389,6 +509,7 @@ export class AuthService {
     this._refreshToken.set(refreshToken);
     this._user.set(user);
     this.write(KEYS.access, accessToken);
+    this.write(KEYS.accessIssuedAt, String(Date.now()));
     if (refreshToken) this.write(KEYS.refresh, refreshToken);
     // A foto (até ~1,4 MB em base64) fica numa chave própria: se estourar a cota do storage,
     // só ela se perde (volta pras iniciais) — o login não pode quebrar por causa de um enfeite.
@@ -407,6 +528,7 @@ export class AuthService {
     this._refreshToken.set(null);
     this._user.set(null);
     this.remove(KEYS.access);
+    this.remove(KEYS.accessIssuedAt);
     this.remove(KEYS.refresh);
     this.remove(KEYS.user);
     this.remove(AVATAR_KEY);
