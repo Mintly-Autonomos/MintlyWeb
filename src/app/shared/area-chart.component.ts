@@ -8,6 +8,7 @@ import {
   computed,
   inject,
 } from '@angular/core';
+import { chartScale, roundTo, scaleTicks } from './chart-scale';
 
 export interface AreaSeries {
   key: string;
@@ -234,33 +235,29 @@ export class AreaChartComponent implements AfterViewInit, OnDestroy {
   protected size = signal({ w: 600, h: 300 });
   protected hoverIndex = signal<number | null>(null);
 
-  private domain = computed(() => {
-    let min = 0;
-    let max = 0;
+  /** Eixo dos valores: degraus redondos de qualquer tamanho; se ajusta aos dados quando a variação é pequena. */
+  private scale = computed(() => {
+    const values: number[] = [];
     for (const d of this.data) {
       for (const s of this.series) {
         const raw = field(d, s.key);
-        if (raw === null || raw === undefined) continue;
-        const v = Number(raw);
-        min = Math.min(min, v);
-        max = Math.max(max, v);
+        if (raw !== null && raw !== undefined) values.push(Number(raw));
       }
     }
-    if (min === max) max = min + 1;
-    return niceDomain(min, max);
+    return chartScale(values, 'auto');
   });
 
+  private domain = computed<[number, number]>(() => [this.scale().min, this.scale().max]);
+
   protected valueTicks = computed<AxisTick[]>(() => {
-    const [dMin, dMax] = this.domain();
-    const count = 4;
+    const scale = this.scale();
     const s = this.size();
     const plot = s.h - this.padTop - this.padBottom;
-    return Array.from({ length: count + 1 }, (_, i) => {
-      const value = dMin + ((dMax - dMin) / count) * i;
-      const frac = (value - dMin) / (dMax - dMin || 1);
+    return scaleTicks(scale).map((value) => {
+      const frac = (value - scale.min) / (scale.max - scale.min || 1);
       return {
         pos: s.h - this.padBottom - frac * plot,
-        label: this.valueFormatter(Math.round(value)),
+        label: this.valueFormatter(roundTo(value, scale.step)),
       };
     });
   });
@@ -400,9 +397,4 @@ export class AreaChartComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
   }
-}
-
-function niceDomain(min: number, max: number): [number, number] {
-  const pad = (max - min) * 0.08 || 1;
-  return [Math.floor((min - pad) / 100) * 100, Math.ceil((max + pad) / 100) * 100];
 }
