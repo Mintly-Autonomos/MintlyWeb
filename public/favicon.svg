@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="mintly-mark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2BB6D6" />
+      <stop offset="1" stop-color="#16FD66" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0E2A35" />
+  <!-- Símbolo do Mintly (public/logo/mintly-gradient.svg) com traço mais grosso para ler bem em 16 px -->
+  <g transform="translate(15.8 6.8) scale(0.62)">
+    <path
+      d="M29.6414 38.2445V69.7908C39.4173 64.9288 51.8467 47.2674 23.3569 15.5176V79.2886C43.8398 75.7834 72.5158 55.4762 23.3569 2.28857C8.92578 20.0404 -12.9537 58.3934 14.9775 69.7908"
+      fill="none"
+      stroke="url(#mintly-mark)"
+      stroke-width="4"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>
