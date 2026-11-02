@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Workbook } from 'exceljs';
+import { IMPORT_MOVEMENTS_MAX_ROWS } from 'mintly-lib';
 import {
   MovimentacoesService,
   ImportMovementItem,
-  IMPORT_CHUNK_ROWS,
+  ImportRejectedError,
   buildImportPreview,
   normalizeDate,
   parseNumberBR,
@@ -520,13 +521,13 @@ describe('Importar em massa — gravação', () => {
     expect(sentRows()[1].categoryId).toBe('catDX');
   });
 
-  it('categoria só existe no outro tipo: a linha falha sem ir para a API', async () => {
-    const result = await svc.confirmImport(
-      [item({ type: 'expense', categoryName: 'Venda Balcão' })],
-      lookup,
-    );
+  it('categoria só existe no outro tipo: nada vai para a API e a linha mostra o motivo', async () => {
+    const err = await svc
+      .confirmImport([item({ type: 'expense', categoryName: 'Venda Balcão' })], lookup)
+      .catch((e) => e);
     expect(importMovements).not.toHaveBeenCalled();
-    expect(result.failedRows[0].error).toMatch(/categoria ou conta/i);
+    expect(err).toBeInstanceOf(ImportRejectedError);
+    expect(err.failedRows[0].error).toMatch(/categoria ou conta/i);
   });
 
   it('linhas idênticas no mesmo arquivo: só a 1ª passa pela trava de duplicidade', async () => {
@@ -546,14 +547,25 @@ describe('Importar em massa — gravação', () => {
     ).toBe(true);
   });
 
-  it('uma linha com falha não interrompe as demais e mostra o motivo da API', async () => {
-    importMovements.mockImplementationOnce(async (body) => ({
+  it('tudo ou nada: uma linha com falha cancela a importação e mostra só as linhas que causaram', async () => {
+    const rolledBack = (row: number) => ({
+      row,
+      status: 'failed',
+      error: { code: 'ROLLED_BACK', message: 'Não foi importada: outra linha tem problema.' },
+    });
+    importMovements.mockImplementationOnce(async () => ({
       payload: {
         replayed: false,
         total: 3,
-        created: 1,
-        failed: 2,
+        created: 0,
+        failed: 3,
         results: [
+          {
+            row: 4,
+            status: 'failed',
+            error: { code: 'VALIDATION_ERROR', message: 'Dados inválidos (date: Data inválida).' },
+          },
+          rolledBack(3),
           {
             row: 2,
             status: 'failed',
@@ -562,26 +574,21 @@ describe('Importar em massa — gravação', () => {
               message: 'Conta inativa não pode receber lançamentos financeiros.',
             },
           },
-          created(body.rows[1]),
-          {
-            row: 4,
-            status: 'failed',
-            error: { code: 'VALIDATION_ERROR', message: 'Dados inválidos (date: Data inválida).' },
-          },
         ],
       },
     }));
-    const result = await svc.confirmImport(
-      [item({ row: 2, value: 1 }), item({ row: 3, value: 2 }), item({ row: 4, value: 3 })],
-      lookup,
-    );
-    expect(result.insertedCount).toBe(1);
-    expect(result.failedRows.map((f) => f.row)).toEqual([2, 4]);
-    expect(result.failedRows[0]).toMatchObject({ row: 2, title: 'Venda' });
-    expect(result.failedRows[0].error).toBe(
-      'Conta inativa não pode receber lançamentos financeiros.',
-    );
-    expect(result.failedRows[1].error).toBe(
+    const err = await svc
+      .confirmImport(
+        [item({ row: 2, value: 1 }), item({ row: 3, value: 2 }), item({ row: 4, value: 3 })],
+        lookup,
+      )
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(ImportRejectedError);
+    expect(err.message).toBe('Nada foi importado: 2 linhas têm problema.');
+    expect(err.failedRows.map((f: { row: number }) => f.row)).toEqual([2, 4]);
+    expect(err.failedRows[0]).toMatchObject({ row: 2, title: 'Venda' });
+    expect(err.failedRows[0].error).toBe('Conta inativa não pode receber lançamentos financeiros.');
+    expect(err.failedRows[1].error).toBe(
       'A API recusou os dados: Dados inválidos (date: Data inválida).',
     );
   });
@@ -596,8 +603,10 @@ describe('Importar em massa — gravação', () => {
         results: [{ row: 2, status: 'failed' }],
       },
     }));
-    const result = await svc.confirmImport([item()], lookup);
-    expect(result.failedRows[0].error).toBe('Falha ao gravar.');
+    const err = await svc.confirmImport([item()], lookup).catch((e) => e);
+    expect(err).toBeInstanceOf(ImportRejectedError);
+    expect(err.failedRows[0].error).toBe('Falha ao gravar.');
+    expect(err.message).toBe('Nada foi importado: 1 linha tem problema.');
   });
 
   it('se o pedido inteiro falhar, o erro sobe para a tela', async () => {
@@ -635,26 +644,29 @@ describe('Importar em massa — gravação', () => {
     expect(result.replayed).toBe(true);
   });
 
-  it('divide em pedidos pequenos, para cada um responder antes do limite de tempo', async () => {
-    const many = Array.from({ length: IMPORT_CHUNK_ROWS + 5 }, (_, i) =>
-      item({ row: i + 2, value: i + 1 }),
-    );
+  it('manda tudo num pedido só, por maior que seja o arquivo, e avisa o andamento', async () => {
+    const many = Array.from({ length: 120 }, (_, i) => item({ row: i + 2, value: i + 1 }));
     const progress: [number, number][] = [];
     const result = await svc.confirmImport(many, lookup, (done, total) =>
       progress.push([done, total]),
     );
-    expect(importMovements).toHaveBeenCalledTimes(2);
-    expect(sentRows(0)).toHaveLength(IMPORT_CHUNK_ROWS);
-    expect(sentRows(1)).toHaveLength(5);
+    expect(importMovements).toHaveBeenCalledTimes(1);
+    expect(sentRows()).toHaveLength(120);
     expect(progress).toEqual([
-      [0, IMPORT_CHUNK_ROWS + 5],
-      [IMPORT_CHUNK_ROWS, IMPORT_CHUNK_ROWS + 5],
-      [IMPORT_CHUNK_ROWS + 5, IMPORT_CHUNK_ROWS + 5],
+      [0, 120],
+      [120, 120],
     ]);
-    expect(importMovements.mock.calls[1][0].idempotencyKey).not.toBe(
-      importMovements.mock.calls[0][0].idempotencyKey,
+    expect(result.insertedCount).toBe(120);
+  });
+
+  it('passou do máximo de linhas da API: avisa para dividir e não envia nada', async () => {
+    const tooMany = Array.from({ length: IMPORT_MOVEMENTS_MAX_ROWS + 1 }, (_, i) =>
+      item({ row: i + 2, value: i + 1 }),
     );
-    expect(result.insertedCount).toBe(many.length);
+    await expect(svc.confirmImport(tooMany, lookup)).rejects.toThrow(
+      `no máximo ${IMPORT_MOVEMENTS_MAX_ROWS} linhas`,
+    );
+    expect(importMovements).not.toHaveBeenCalled();
   });
 });
 
@@ -681,9 +693,12 @@ describe('Importar em massa — linha sem tipo, forma de pagamento ou status', (
       valid: true,
       error: null,
     };
-    const result = await svc.confirmImport([incomplete], { categories: [], accounts: [] });
+    const err = await svc
+      .confirmImport([incomplete], { categories: [], accounts: [] })
+      .catch((e) => e);
     expect(importMovements).not.toHaveBeenCalled();
-    expect(result.failedRows[0].error).toContain('forma de pagamento');
+    expect(err).toBeInstanceOf(ImportRejectedError);
+    expect(err.failedRows[0].error).toContain('forma de pagamento');
   });
 });
 

@@ -2,6 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Workbook } from 'exceljs';
 import {
+  IMPORT_MOVEMENTS_MAX_ROWS,
   MovementDirection,
   MovementStatus,
   MovementChannel,
@@ -269,14 +270,20 @@ export interface ImportMovementsResult {
   replayed?: boolean;
 }
 
-const normalizeName = (name: string): string => name.trim().toLowerCase();
-
 /**
- * Linhas por pedido à API. A API grava uma a uma (cada uma numa transação) e o pedido tem limite de
- * tempo (15 s no cliente): um arquivo de 55 linhas num pedido só estourava o tempo mesmo gravando tudo.
- * Em lotes pequenos cada pedido responde rápido e a tela mostra o andamento.
+ * A importação é tudo ou nada: se qualquer linha tem problema, NADA é gravado e a tela recebe esta
+ * falha com o motivo de cada linha que causou o cancelamento (as boas não entram na lista).
  */
-export const IMPORT_CHUNK_ROWS = 20;
+export class ImportRejectedError extends Error {
+  constructor(readonly failedRows: { row: number; title: string; error: string }[]) {
+    super(
+      `Nada foi importado: ${failedRows.length} ${failedRows.length === 1 ? 'linha tem problema' : 'linhas têm problema'}.`,
+    );
+    this.name = 'ImportRejectedError';
+  }
+}
+
+const normalizeName = (name: string): string => name.trim().toLowerCase();
 
 /** Tamanho máximo do título de uma movimentação (a API recusa mais que isso). */
 export const MOVEMENT_TITLE_MAX = 120;
@@ -505,10 +512,10 @@ export class MovimentacoesService {
 
   /**
    * Grava de fato as linhas informadas (já filtradas/editadas na tela — inclusive linhas que o
-   * usuário corrigiu na hora, sem precisar reenviar a planilha). Em modo real, tudo vai junto para
-   * `POST /financial-movements/import` (em lotes de até `IMPORT_MOVEMENTS_MAX_ROWS`) e a API
-   * devolve o resultado de cada linha: a que falhar (ex.: duplicata) entra em `failedRows` e não
-   * interrompe as demais. Categoria/conta são resolvidas pelo nome contra os cadastros atuais.
+   * usuário corrigiu na hora, sem precisar reenviar a planilha). Em modo real, tudo vai num pedido só
+   * para `POST /financial-movements/import`, que é TUDO OU NADA: se qualquer linha tiver problema
+   * (ex.: duplicata) a API não grava nada e esta função lança `ImportRejectedError` com o motivo de
+   * cada linha. Categoria/conta são resolvidas pelo nome contra os cadastros atuais.
    */
   async confirmImport(
     items: ImportMovementItem[],
@@ -524,7 +531,6 @@ export class MovimentacoesService {
       return result;
     }
 
-    const inserted: Movement[] = [];
     const failedRows: { row: number; title: string; error: string }[] = [];
     // A prévia aceita nome de categoria/conta sem diferenciar caixa e espaços; a gravação tem que
     // achar pelo mesmo critério, senão a linha passa na prévia e falha na hora de gravar.
@@ -575,37 +581,49 @@ export class MovimentacoesService {
         ...(repeated ? { confirmDuplicate: true } : {}),
       });
     }
+    // Tudo ou nada: com linha impossível de enviar, nem chama a API.
+    if (failedRows.length > 0) throw new ImportRejectedError(failedRows);
+    if (rows.length > IMPORT_MOVEMENTS_MAX_ROWS) {
+      throw new Error(
+        `A importação aceita no máximo ${IMPORT_MOVEMENTS_MAX_ROWS} linhas por vez. Divida a planilha em partes.`,
+      );
+    }
 
     const titles = new Map(items.map((i) => [i.row, i.title]));
-    let replayed = false;
     onProgress?.(0, rows.length);
-    for (let from = 0; from < rows.length; from += IMPORT_CHUNK_ROWS) {
-      const chunk = rows.slice(from, from + IMPORT_CHUNK_ROWS);
-      const idempotencyKey = this.importKeyFor(chunk);
-      const response = await this.call((headers) =>
-        this.movementClient.importMovements({ idempotencyKey, rows: chunk }, headers),
-      );
-      const result = response.payload;
-      if (!result) throw new Error('A API não devolveu o resultado da importação.');
-      // Chegou resposta: a próxima importação desse mesmo conteúdo é uma nova, não um reenvio.
-      this.importKeys.delete(JSON.stringify(chunk));
-      replayed ||= result.replayed;
-      onProgress?.(Math.min(from + chunk.length, rows.length), rows.length);
-      for (const r of result.results) {
-        if (r.status === 'created' && r.movement) {
-          inserted.push(toMovement(r.movement));
-        } else {
-          failedRows.push({
+    const idempotencyKey = this.importKeyFor(rows);
+    const response = await this.call((headers) =>
+      this.movementClient.importMovements({ idempotencyKey, rows }, headers),
+    );
+    const result = response.payload;
+    if (!result) throw new Error('A API não devolveu o resultado da importação.');
+    // Chegou resposta: a próxima importação desse mesmo conteúdo é uma nova, não um reenvio.
+    this.importKeys.delete(JSON.stringify(rows));
+    onProgress?.(rows.length, rows.length);
+
+    const failed = result.results.filter((r) => r.status !== 'created' || !r.movement);
+    if (failed.length > 0) {
+      // As linhas boas voltam como ROLLED_BACK (foram desfeitas por causa das outras): não são o
+      // problema, então só as que causaram o cancelamento vão para a tela.
+      const causes = failed.filter((r) => r.error?.code !== 'ROLLED_BACK');
+      throw new ImportRejectedError(
+        (causes.length > 0 ? causes : failed)
+          .map((r) => ({
             row: r.row,
             title: titles.get(r.row) ?? '',
             error: this.importFailure(r.error),
-          });
-        }
-      }
+          }))
+          .sort((a, b) => a.row - b.row),
+      );
     }
-    failedRows.sort((a, b) => a.row - b.row);
+    const inserted = result.results.map((r) => toMovement(r.movement!));
     await this.refresh();
-    return { insertedCount: inserted.length, items: inserted, failedRows, replayed };
+    return {
+      insertedCount: inserted.length,
+      items: inserted,
+      failedRows: [],
+      replayed: result.replayed,
+    };
   }
 
   /**
@@ -614,8 +632,8 @@ export class MovimentacoesService {
    * tudo outra vez. Depois de uma resposta a chave é descartada, então importar de propósito o
    * mesmo arquivo de novo (ex.: depois de apagar os lançamentos) funciona.
    */
-  private importKeyFor(chunk: ImportMovementRow[]): string {
-    const fingerprint = JSON.stringify(chunk);
+  private importKeyFor(rows: ImportMovementRow[]): string {
+    const fingerprint = JSON.stringify(rows);
     let key = this.importKeys.get(fingerprint);
     if (!key) {
       key = `imp-${globalThis.crypto.randomUUID()}`;

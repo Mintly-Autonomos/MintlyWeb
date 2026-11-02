@@ -2,7 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { MovimentacoesComponent } from './movimentacoes.component';
-import { MovimentacoesService, buildImportPreview } from '../../services/movimentacoes.service';
+import {
+  ImportRejectedError,
+  MovimentacoesService,
+  buildImportPreview,
+} from '../../services/movimentacoes.service';
 import type { ImportGridRow } from '../../services/movimentacoes.service';
 import { ContasService } from '../../services/contas.service';
 import { CategoriasService } from '../../services/categorias.service';
@@ -17,6 +21,7 @@ interface Internals {
   confirmImportPreview(): void;
   setRowValue(index: number, text: string): void;
   closeImportPreview(): void;
+  importResult: () => Result | null;
   importResultTitle(res: Result): string;
   importResultSummary(res: Result): string;
   toggleRowIncluded(index: number, included: boolean): void;
@@ -638,6 +643,60 @@ describe('MovimentacoesComponent', () => {
       c.confirmImportPreview();
       await fixture.whenStable();
       expect(confirmImport.mock.calls[0][0][0].value).toBe(9.99);
+    });
+  });
+
+  describe('importação tudo ou nada: a API recusou', () => {
+    const root = () => fixture.nativeElement as HTMLElement;
+    const header = [
+      'Tipo',
+      'Título',
+      'Valor',
+      'Data',
+      'Categoria',
+      'Conta',
+      'Forma de pagamento',
+      'Status',
+    ];
+    const line = (n: number, title: string) => ({
+      row: n,
+      cells: ['Receita', title, 10, '2026-10-29', 'Venda Delivery', 'Keeta', 'Pix', 'Recebido'],
+    });
+    const load = async () => {
+      previewImport.mockResolvedValue(
+        buildImportPreview('x.xlsx', [
+          { row: 1, cells: header },
+          line(2, 'Pedido 1'),
+          line(3, 'Pedido 2'),
+        ]),
+      );
+      c.importFile.set(new File(['x'], 'base.xlsx'));
+      await c.submitImport();
+      fixture.detectChanges();
+    };
+
+    it('nada entra: a revisão continua aberta e a linha com problema fica em vermelho', async () => {
+      await load();
+      confirmImport.mockRejectedValueOnce(
+        new ImportRejectedError([{ row: 3, title: 'Pedido 2', error: 'Conta inativa.' }]),
+      );
+      c.confirmImportPreview();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(c.importRows()).toHaveLength(2);
+      expect(c.importRows()[0]).toMatchObject({ row: 2, valid: true, included: true });
+      expect(c.importRows()[1]).toMatchObject({
+        row: 3,
+        valid: false,
+        included: false,
+        error: 'Conta inativa.',
+      });
+      const msgs = Array.from(root().querySelectorAll('[data-testid="erro-linha"]')).map((e) =>
+        (e.textContent ?? '').trim(),
+      );
+      expect(msgs).toEqual(['Conta inativa.']);
+      expect(c.importResult()).toBeNull(); // sem aviso de sucesso
     });
   });
 
