@@ -461,21 +461,43 @@
     <app-modal
       [open]="regimeOpen()"
       (closed)="regimeOpen.set(false)"
-      title="Regime tributário"
-      subtitle="Decide como o imposto do DRE é calculado todo mês."
+      title="Como sua empresa paga imposto?"
+      subtitle="É o regime tributário. Com ele o Mintly calcula o imposto que sai da sua receita no DRE."
       size="md"
     >
-      <div class="space-y-2">
+      <div class="space-y-3">
+        <p class="text-[12.5px] text-muted-foreground">
+          Não sabe qual é o seu? O Cartão CNPJ mostra o porte da empresa (MEI ou Microempresa), e
+          seu contador confirma. Se você paga todo mês uma guia de valor fixo (o DAS-MEI), é MEI.
+        </p>
         <button
           type="button"
           [disabled]="savingRegime()"
           (click)="setRegime('mei')"
           class="w-full text-left p-4 rounded-xl border border-border hover:border-mint hover:bg-mint-soft/40 transition cursor-pointer disabled:opacity-60"
         >
-          <div class="font-semibold text-[14px]">MEI</div>
-          <p class="text-[12.5px] text-muted-foreground mt-0.5">
-            DAS fixo mensal, independente do faturamento.
-          </p>
+          <div class="font-semibold text-[14px]">MEI — Microempreendedor Individual</div>
+          <dl class="mt-2 space-y-1.5 text-[12.5px]">
+            <div>
+              <dt class="font-medium">Para quem é</dt>
+              <dd class="text-muted-foreground">
+                Quem fatura até R$ 81 mil por ano (em média R$ 6.750 por mês).
+              </dd>
+            </div>
+            <div>
+              <dt class="font-medium">Como o imposto é cobrado</dt>
+              <dd class="text-muted-foreground">
+                Um valor fixo por mês (a guia DAS-MEI), seja o mês forte ou fraco.
+              </dd>
+            </div>
+            <div>
+              <dt class="font-medium">O que o Mintly faz</dt>
+              <dd class="text-muted-foreground">
+                Mostra esse valor fixo no DRE e avisa quando o faturamento do ano chegar perto do
+                limite de R$ 81 mil.
+              </dd>
+            </div>
+          </dl>
         </button>
         <button
           type="button"
@@ -483,11 +505,33 @@
           (click)="setRegime('simplesNacionalAnexoI')"
           class="w-full text-left p-4 rounded-xl border border-border hover:border-mint hover:bg-mint-soft/40 transition cursor-pointer disabled:opacity-60"
         >
-          <div class="font-semibold text-[14px]">Simples Nacional — Anexo I</div>
-          <p class="text-[12.5px] text-muted-foreground mt-0.5">
-            Alíquota efetiva sobre a receita, conforme a faixa do RBT12.
-          </p>
+          <div class="font-semibold text-[14px]">Simples Nacional — Anexo I (comércio)</div>
+          <dl class="mt-2 space-y-1.5 text-[12.5px]">
+            <div>
+              <dt class="font-medium">Para quem é</dt>
+              <dd class="text-muted-foreground">
+                Microempresas e empresas pequenas que faturam até R$ 4,8 milhões por ano e vendem
+                alimentos e bebidas.
+              </dd>
+            </div>
+            <div>
+              <dt class="font-medium">Como o imposto é cobrado</dt>
+              <dd class="text-muted-foreground">
+                Um percentual sobre o que você vende. Ele começa em 4% e sobe por faixas conforme o
+                que você faturou nos últimos 12 meses.
+              </dd>
+            </div>
+            <div>
+              <dt class="font-medium">O que o Mintly faz</dt>
+              <dd class="text-muted-foreground">
+                Descobre sua faixa sozinho e desconta o imposto de cada venda no DRE.
+              </dd>
+            </div>
+          </dl>
         </button>
+        <p class="text-[12px] text-muted-foreground">
+          Ficou em dúvida? Confirme com seu contador antes de escolher.
+        </p>
       </div>
     </app-modal>
   }

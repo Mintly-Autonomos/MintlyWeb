@@ -25,10 +25,7 @@ import { ButtonComponent } from '../../shared/button.component';
 import { SectionHeaderComponent } from '../../shared/section-header.component';
 import { AreaChartComponent, AreaSeries } from '../../shared/area-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { formatBRL } from '../../shared/format';
-
-const abrev = (v: number) =>
-  Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v));
+import { formatBRL, formatCompact } from '../../shared/format';
 
 interface InsightUI {
   id: string;
@@ -91,7 +88,7 @@ export class PrevisoesComponent implements OnInit {
 
   protected loading = this.svc.loading;
   protected fmtBRL = formatBRL;
-  protected abrev = abrev;
+  protected abrev = formatCompact;
   protected readonly Math = Math;
   protected dados = this.svc.base;
   protected caixaHoje = computed(() => this.dados().caixaHoje);

@@ -8,6 +8,7 @@ import {
   computed,
   inject,
 } from '@angular/core';
+import { chartScale, roundTo, scaleTicks } from './chart-scale';
 
 export interface LineSeries {
   key: string;
@@ -155,29 +156,27 @@ export class LineChartComponent implements AfterViewInit, OnDestroy {
   protected size = signal({ w: 600, h: 300 });
   protected hoverIndex = signal<number | null>(null);
 
-  private maxValue = computed(() => {
-    let max = 0;
+  /** Eixo dos valores: aceita negativos e se ajusta aos dados quando a variação é pequena. */
+  private scale = computed(() => {
+    const values: number[] = [];
     for (const d of this.data) {
-      for (const s of this.series) {
-        max = Math.max(max, Number(field(d, s.key)) || 0);
-      }
+      for (const s of this.series) values.push(Number(field(d, s.key)) || 0);
     }
-    return niceMax(max);
+    return chartScale(values, 'auto');
   });
 
+  private yOf(value: number): number {
+    const { min, max } = this.scale();
+    const plot = Math.max(0, this.size().h - this.padTop - this.padBottom);
+    return this.size().h - this.padBottom - ((value - min) / (max - min || 1)) * plot;
+  }
+
   protected valueTicks = computed<AxisTick[]>(() => {
-    const max = this.maxValue();
-    const count = 4;
-    const s = this.size();
-    const plot = s.h - this.padTop - this.padBottom;
-    return Array.from({ length: count + 1 }, (_, i) => {
-      const value = (max / count) * i;
-      const frac = value / (max || 1);
-      return {
-        pos: s.h - this.padBottom - frac * plot,
-        label: this.valueFormatter(Math.round(value)),
-      };
-    });
+    const scale = this.scale();
+    return scaleTicks(scale).map((value) => ({
+      pos: this.yOf(value),
+      label: this.valueFormatter(roundTo(value, scale.step)),
+    }));
   });
 
   protected categoryTicks = computed<AxisTick[]>(() => {
@@ -194,14 +193,10 @@ export class LineChartComponent implements AfterViewInit, OnDestroy {
 
   protected linePaths = computed(() => {
     const ticks = this.categoryTicks();
-    const s = this.size();
-    const max = this.maxValue();
-    const plotH = s.h - this.padTop - this.padBottom;
     return this.series.map((sr) => {
       const points = this.data.map((d, i) => {
         const value = Number(field(d, sr.key)) || 0;
-        const y = max > 0 ? s.h - this.padBottom - (value / max) * plotH : s.h - this.padBottom;
-        return { x: ticks[i]?.pos ?? 0, y };
+        return { x: ticks[i]?.pos ?? 0, y: this.yOf(value) };
       });
       const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
       return { key: sr.key, color: sr.color, d, points };
@@ -248,13 +243,4 @@ export class LineChartComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
   }
-}
-
-function niceMax(value: number): number {
-  if (value <= 0) return 1;
-  const exp = Math.floor(Math.log10(value));
-  const base = Math.pow(10, exp);
-  const norm = value / base;
-  const niceNorm = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
-  return niceNorm * base;
 }

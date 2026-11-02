@@ -15,11 +15,10 @@ import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-ch
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { formatBRL, fmtMonthLong, fmtMonthShort } from '../../shared/format';
+import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
-const abrev = (v: number) => `${Math.round(v / 1000)}k`;
 
 interface DeltaInfo {
   novo: boolean;
@@ -94,7 +93,7 @@ export class ResultadoComponent implements OnInit {
   protected loading = this.svc.loading;
   protected fmtBRL = formatBRL;
   protected pctFmt = pctFmt;
-  protected abrev = abrev;
+  protected abrev = formatCompact;
   protected readonly Math = Math;
   protected regimeLabel = REGIME_LABEL;
   protected fmtMonthLong = fmtMonthLong;

@@ -14,10 +14,9 @@ import { BulletComponent } from '../../shared/bullet.component';
 import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-chart.component';
 import { AreaChartComponent, AreaSeries } from '../../shared/area-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { formatBRL, fmtMonthLong, fmtMonthShort } from '../../shared/format';
+import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
-const abrev = (v: number) => `${Math.round(v / 1000)}k`;
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
 const SCORE_META: Record<
@@ -87,7 +86,7 @@ export class VisaoGeralComponent implements OnInit {
   protected loading = this.svc.loading;
   protected fmtBRL = formatBRL;
   protected pctFmt = pctFmt;
-  protected abrev = abrev;
+  protected abrev = formatCompact;
   protected fmtMonthLong = fmtMonthLong;
   protected readonly circumference = 2 * Math.PI * 46;
   protected readonly pillarLabel = PILLAR_LABEL;

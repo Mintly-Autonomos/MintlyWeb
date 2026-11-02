@@ -17,11 +17,9 @@ import { BulletComponent } from '../../shared/bullet.component';
 import { ToggleGroupComponent, ToggleGroupOption } from '../../shared/toggle-group.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { formatBRL, fmtMonthLong, fmtMonthShort } from '../../shared/format';
+import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
-const abrev = (v: number) =>
-  Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v));
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
 type Compare = 'anterior' | 'media3';
@@ -78,7 +76,7 @@ export class CustosComponent implements OnInit {
   protected loading = this.svc.loading;
   protected fmtBRL = formatBRL;
   protected pctFmt = pctFmt;
-  protected abrev = abrev;
+  protected abrev = formatCompact;
   protected fmtMonthLong = fmtMonthLong;
   protected readonly Math = Math;
   protected readonly CategoryBehavior = CategoryBehavior;
