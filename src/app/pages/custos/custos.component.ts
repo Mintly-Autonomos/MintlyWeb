@@ -18,13 +18,7 @@ import { ToggleGroupComponent, ToggleGroupOption } from '../../shared/toggle-gro
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
-import { MonthOpt, defaultMonthOpt, monthStr } from './custos-month';
-
-const MONTH_OPTS: { key: MonthOpt; label: string }[] = [
-  { key: 'esteMes', label: 'Este mês' },
-  { key: 'mesPassado', label: 'Mês passado' },
-  { key: 'personalizado', label: 'Personalizado' },
-];
+import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 

@@ -1,4 +1,4 @@
-import { defaultMonthOpt, monthStr } from './custos-month';
+import { defaultMonthOpt, monthStr } from './month-select';
 
 describe('defaultMonthOpt (qual período a tela de Custos abre)', () => {
   it.each([1, 2, 12])('dia %i abre no mês passado', (day) => {

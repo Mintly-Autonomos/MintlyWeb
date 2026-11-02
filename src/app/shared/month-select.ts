@@ -1,5 +1,12 @@
 export type MonthOpt = 'esteMes' | 'mesPassado' | 'personalizado';
 
+/** As opções do seletor de mês (Visão geral, Custos e despesas e Resultado). */
+export const MONTH_OPTS: { key: MonthOpt; label: string }[] = [
+  { key: 'esteMes', label: 'Este mês' },
+  { key: 'mesPassado', label: 'Mês passado' },
+  { key: 'personalizado', label: 'Personalizado' },
+];
+
 /** Até este dia do mês a tela abre no mês passado: o mês corrente mal começou e o que interessa é o mês já fechado. */
 export const CLOSED_MONTH_UNTIL_DAY = 12;
 

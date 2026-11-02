@@ -16,6 +16,7 @@ import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
+import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
@@ -96,6 +97,11 @@ export class ResultadoComponent implements OnInit {
   protected readonly Math = Math;
   protected regimeLabel = REGIME_LABEL;
   protected fmtMonthLong = fmtMonthLong;
+
+  protected monthOpts = MONTH_OPTS;
+  // Do dia 1 ao 12 abre no mês passado (já fechado); depois, no mês atual.
+  protected monthSel = signal<MonthOpt>(defaultMonthOpt());
+  protected customMonth = signal(monthStr(-1));
 
   protected unidade = signal<'reais' | 'pct'>('reais');
   protected serie = signal<'lucro' | 'margem'>('lucro');
@@ -226,9 +232,31 @@ export class ResultadoComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    this.svc
-      .refresh()
+    this.load();
+  }
+
+  /** `undefined` = mês corrente (a API assume). */
+  private monthQuery(): string | undefined {
+    const sel = this.monthSel();
+    if (sel === 'esteMes') return undefined;
+    if (sel === 'mesPassado') return monthStr(-1);
+    return this.customMonth();
+  }
+
+  private load(): Promise<void> {
+    return this.svc
+      .refresh(this.monthQuery())
       .catch(() => this.toast.error('Não foi possível carregar o resultado do mês.'));
+  }
+
+  setMonth(m: MonthOpt): void {
+    this.monthSel.set(m);
+    void this.load();
+  }
+
+  setCustomMonth(v: string): void {
+    this.customMonth.set(v);
+    if (this.monthSel() === 'personalizado') void this.load();
   }
 
   formatDelta(fraction: number | null, inverso = false): DeltaInfo {
@@ -269,7 +297,7 @@ export class ResultadoComponent implements OnInit {
     try {
       await this.restauranteSvc.updateTaxRegime(regime);
       this.regimeOpen.set(false);
-      await this.svc.refresh();
+      await this.svc.refresh(this.monthQuery());
       this.toast.success('Regime tributário configurado.');
     } catch {
       this.toast.error('Não foi possível salvar o regime tributário.');

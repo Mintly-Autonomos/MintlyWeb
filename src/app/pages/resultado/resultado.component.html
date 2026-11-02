@@ -1,4 +1,40 @@
 <div class="space-y-6">
+  <!-- 0 — Mês -->
+  <div class="flex flex-wrap items-center gap-2">
+    <div
+      class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
+    >
+      @for (m of monthOpts; track m.key) {
+        <button
+          type="button"
+          (click)="setMonth(m.key)"
+          [attr.aria-pressed]="monthSel() === m.key"
+          [class]="
+            'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
+            (monthSel() === m.key
+              ? 'bg-mint-soft text-ocean'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+          "
+        >
+          {{ m.label }}
+        </button>
+      }
+    </div>
+    @if (monthSel() === 'personalizado') {
+      <div
+        class="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-border bg-card"
+      >
+        <input
+          type="month"
+          [value]="customMonth()"
+          (change)="setCustomMonth($any($event.target).value)"
+          aria-label="Mês de referência"
+          class="bg-transparent outline-none text-[12.5px]"
+        />
+      </div>
+    }
+  </div>
+
   @if (data(); as d) {
     <!-- 1 — Referência -->
     <div class="flex flex-wrap items-center gap-2">
