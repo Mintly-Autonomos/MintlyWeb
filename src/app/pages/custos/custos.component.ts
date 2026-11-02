@@ -18,8 +18,8 @@ import { ToggleGroupComponent, ToggleGroupOption } from '../../shared/toggle-gro
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtMonthLong, fmtMonthShort } from '../../shared/format';
+import { MonthOpt, defaultMonthOpt, monthStr } from './custos-month';
 
-type MonthOpt = 'esteMes' | 'mesPassado' | 'personalizado';
 const MONTH_OPTS: { key: MonthOpt; label: string }[] = [
   { key: 'esteMes', label: 'Este mês' },
   { key: 'mesPassado', label: 'Mês passado' },
@@ -36,12 +36,6 @@ type Canal = 'geral' | 'salao' | 'delivery';
 
 interface LinhaDespesa extends ExpenseItem {
   metric: number;
-}
-
-function currentMonthStr(offset = 0): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 const TREND_COLORS = [
@@ -74,8 +68,9 @@ export class CustosComponent implements OnInit {
   private toast = inject(ToastService);
 
   protected monthOpts = MONTH_OPTS;
-  protected monthSel = signal<MonthOpt>('esteMes');
-  protected customMonth = signal(currentMonthStr(-1));
+  // Do dia 1 ao 12 abre no mês passado (já fechado); depois, no mês atual.
+  protected monthSel = signal<MonthOpt>(defaultMonthOpt());
+  protected customMonth = signal(monthStr(-1));
 
   protected valueMode = signal<'brl' | 'pct'>('brl');
   protected compare = signal<Compare>('anterior');
@@ -171,7 +166,7 @@ export class CustosComponent implements OnInit {
   private monthQuery(): string | undefined {
     const sel = this.monthSel();
     if (sel === 'esteMes') return undefined;
-    if (sel === 'mesPassado') return currentMonthStr(-1);
+    if (sel === 'mesPassado') return monthStr(-1);
     return this.customMonth();
   }
 
