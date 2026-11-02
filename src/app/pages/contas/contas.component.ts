@@ -17,6 +17,16 @@ import { AuditTimelineComponent } from '../../shared/audit-timeline.component';
 import { ToastService } from '../../shared/toast.service';
 import { apiErrorMessage } from '../../shared/api-error-message';
 import { formatBRL, fmtDateTime } from '../../shared/format';
+import { describeSettlementRule, resolveSettlementRule, settlementDueDate } from 'mintly-lib';
+import {
+  SETTLEMENT_KIND_OPTS,
+  SettlementFormState,
+  WEEKDAY_BUTTONS,
+  emptySettlementForm,
+  settlementFormError,
+  settlementFormFromAccount,
+  settlementRuleFromForm,
+} from './settlement-form';
 
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -66,8 +76,18 @@ export class ContasComponent implements OnInit {
     active: boolean;
     isDefault: boolean;
     taxPct: string;
-    settlementDays: string;
-  }>({ name: '', type: 'Bank', active: true, isDefault: false, taxPct: '', settlementDays: '' });
+    settlement: SettlementFormState;
+  }>({
+    name: '',
+    type: 'Bank',
+    active: true,
+    isDefault: false,
+    taxPct: '',
+    settlement: emptySettlementForm(),
+  });
+
+  protected readonly settlementKinds = SETTLEMENT_KIND_OPTS;
+  protected readonly weekdays = WEEKDAY_BUTTONS;
 
   // Computed
   protected accounts = this.svc.accounts;
@@ -141,7 +161,7 @@ export class ContasComponent implements OnInit {
       active: true,
       isDefault: false,
       taxPct: '',
-      settlementDays: '',
+      settlement: emptySettlementForm(),
     });
     this.creating.set(true);
   }
@@ -153,7 +173,7 @@ export class ContasComponent implements OnInit {
       active: a.active,
       isDefault: a.isDefault,
       taxPct: a.taxPct != null ? String(a.taxPct) : '',
-      settlementDays: a.settlementDays != null ? String(a.settlementDays) : '',
+      settlement: settlementFormFromAccount(a),
     });
     this.editing.set(a);
   }
@@ -194,6 +214,7 @@ export class ContasComponent implements OnInit {
       if (this.activeCount() <= 1 || e.balance !== 0 || e.predictedBalance !== 0 || e.isDefault)
         return true;
     }
+    if (this.isPlatform && this.settlementError) return true;
     return false;
   }
 
@@ -224,8 +245,37 @@ export class ContasComponent implements OnInit {
   setFormTaxPct(v: string): void {
     this.form.update((f) => ({ ...f, taxPct: v }));
   }
-  setFormDays(v: string): void {
-    this.form.update((f) => ({ ...f, settlementDays: v }));
+  setSettlementKind(kind: SettlementFormState['kind']): void {
+    this.form.update((f) => ({ ...f, settlement: { ...f.settlement, kind } }));
+  }
+  setWeekday(weekday: number): void {
+    this.form.update((f) => ({ ...f, settlement: { ...f.settlement, weekday } }));
+  }
+  setSettlementField(field: 'days' | 'firstDay' | 'secondDay' | 'monthDay', v: string): void {
+    this.form.update((f) => ({ ...f, settlement: { ...f.settlement, [field]: v } }));
+  }
+
+  /** O que falta no bloco de repasse (vazio quando está pronto). */
+  get settlementError(): string {
+    return settlementFormError(this.form().settlement);
+  }
+
+  /** Exemplo para a pessoa conferir a regra: "Uma venda de hoje cai em 04/11/2026". */
+  get settlementPreview(): string {
+    const rule = settlementRuleFromForm(this.form().settlement);
+    if (!rule) return '';
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const due = settlementDueDate(rule, today);
+    return due
+      ? `Uma venda de hoje cai em ${due.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}.`
+      : 'O valor cai na hora, no mesmo dia da venda.';
+  }
+
+  /** A regra de repasse da conta em palavras ("Toda quarta-feira", "7 dias após a venda"). */
+  repasseLabel(a: Pick<Account, 'settlementRule' | 'settlementDays'>): string {
+    const rule = resolveSettlementRule(a);
+    return rule ? describeSettlementRule(rule) : '—';
   }
 
   private errMsg(err: unknown): string {
@@ -267,7 +317,9 @@ export class ContasComponent implements OnInit {
           name: f.name.trim(),
           type: f.type,
           taxPct: this.isPlatform ? Number(f.taxPct) || 0 : undefined,
-          settlementDays: this.isPlatform ? Number(f.settlementDays) || 0 : undefined,
+          settlementRule: this.isPlatform
+            ? (settlementRuleFromForm(f.settlement) ?? undefined)
+            : undefined,
         });
         this.toast.success('Conta criada com sucesso.');
         this.creating.set(false);
@@ -311,14 +363,16 @@ export class ContasComponent implements OnInit {
       active: boolean;
       isDefault: boolean;
       taxPct: string;
-      settlementDays: string;
+      settlement: SettlementFormState;
     },
   ): Promise<void> {
     const patch: UpdateAccountInput = {
       name: f.name.trim(),
       type: f.type,
       taxPct: this.isPlatform ? Number(f.taxPct) || 0 : undefined,
-      settlementDays: this.isPlatform ? Number(f.settlementDays) || 0 : undefined,
+      settlementRule: this.isPlatform
+        ? (settlementRuleFromForm(f.settlement) ?? undefined)
+        : undefined,
     };
     // Reativação (false -> true) não tem rota própria: viaja junto do update genérico.
     if (!e.active && f.active) patch.active = true;
