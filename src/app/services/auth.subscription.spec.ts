@@ -61,13 +61,10 @@ describe('AuthService — assinatura', () => {
       expect(sessionStorage.getItem('mintly-subscription-ends')).toBeNull();
     });
 
-    it('sair da conta apaga a assinatura guardada e a marca de onboarding', () => {
+    it('sair da conta apaga a assinatura guardada', () => {
       auth.setSubscriptionEndsAt(new Date(Date.now() + 5 * DAY).toISOString());
-      sessionStorage.setItem('mintly-pending-onboarding', '1');
       auth.clearSession();
       expect(auth.subscriptionState().status).toBe('none');
-      expect(sessionStorage.getItem('mintly-pending-onboarding')).toBeNull();
-      expect(localStorage.getItem('mintly-pending-onboarding')).toBeNull();
     });
   });
 
@@ -119,18 +116,6 @@ describe('AuthService — assinatura', () => {
       auth.setSubscriptionEndsAt(past);
       auth.onApiError(response(402, 'SUBSCRIPTION-0001'));
       expect(auth.subscriptionState().endsAt).toBe(past);
-    });
-  });
-
-  describe('onboarding pendente (recém-cadastrado)', () => {
-    it('depois de pagar vai ao onboarding uma única vez; depois, ao app', () => {
-      sessionStorage.setItem('mintly-pending-onboarding', '1');
-      expect(auth.consumeNextRouteAfterSubscription()).toBe('/auth/onboarding');
-      expect(auth.consumeNextRouteAfterSubscription()).toBe('/');
-    });
-
-    it('quem só renova vai direto ao app', () => {
-      expect(auth.consumeNextRouteAfterSubscription()).toBe('/');
     });
   });
 
@@ -219,7 +204,9 @@ describe('AuthService — assinatura', () => {
         termsAccepted: true,
       });
       expect(auth.hasActiveSubscription()).toBe(false);
-      expect(auth.consumeNextRouteAfterSubscription()).toBe('/auth/onboarding');
+      // O onboarding pendente NÃO é mais um marcador do navegador: vem do servidor (firstAccessAt vazio).
+      expect(localStorage.getItem('mintly-pending-onboarding')).toBeNull();
+      expect(sessionStorage.getItem('mintly-pending-onboarding')).toBeNull();
     });
   });
 
@@ -237,7 +224,7 @@ describe('AuthService — assinatura', () => {
       expect(auth.subscriptionState().expiresSoon).toBe(false);
     });
 
-    it('conta nova no mock nasce sem assinatura e com o onboarding para depois', async () => {
+    it('conta nova no mock nasce sem assinatura', async () => {
       await auth.signup({
         name: 'Novo',
         phone: '11999999999',
@@ -247,7 +234,7 @@ describe('AuthService — assinatura', () => {
         termsAccepted: true,
       });
       expect(auth.hasActiveSubscription()).toBe(false);
-      expect(auth.consumeNextRouteAfterSubscription()).toBe('/auth/onboarding');
+      expect(localStorage.getItem('mintly-pending-onboarding')).toBeNull(); // o onboarding pendente vem do servidor
     });
   });
 });

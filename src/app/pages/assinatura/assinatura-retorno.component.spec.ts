@@ -37,13 +37,11 @@ describe('AssinaturaRetornoComponent', () => {
   let refresh: ReturnType<typeof vi.fn>;
   let isPaid: ReturnType<typeof vi.fn>;
   let clearBaseline: ReturnType<typeof vi.fn>;
-  let consume: ReturnType<typeof vi.fn>;
 
   function create(query: Record<string, string> = {}) {
     refresh = vi.fn().mockResolvedValue({ status: 'none', endsAt: null });
     isPaid = vi.fn().mockReturnValue(false);
     clearBaseline = vi.fn();
-    consume = vi.fn().mockReturnValue('/auth/onboarding');
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -52,7 +50,6 @@ describe('AssinaturaRetornoComponent', () => {
           provide: AuthService,
           useValue: {
             subscriptionState: () => ({ endsAt: '2026-12-30T12:00:00.000Z' }),
-            consumeNextRouteAfterSubscription: consume,
           },
         },
         { provide: SubscriptionService, useValue: { refresh, isPaid, clearBaseline } },
@@ -105,7 +102,7 @@ describe('AssinaturaRetornoComponent', () => {
     expect(refresh).toHaveBeenCalledTimes(3); // parou de consultar
   });
 
-  it('"Continuar" segue para onde a assinatura manda (onboarding ou app) e limpa a base do checkout', async () => {
+  it('"Continuar" segue para o app (a guarda leva o recém-cadastrado ao onboarding) e limpa a base do checkout', async () => {
     const f = create();
     isPaid.mockReturnValue(true);
     f.detectChanges();
@@ -116,7 +113,7 @@ describe('AssinaturaRetornoComponent', () => {
     button(f, 'Continuar').click();
 
     expect(clearBaseline).toHaveBeenCalled();
-    expect(navigate).toHaveBeenCalledWith('/auth/onboarding');
+    expect(navigate).toHaveBeenCalledWith('/');
   });
 
   it('o provedor informou recusa: mostra "não aprovado" e NEM consulta', async () => {

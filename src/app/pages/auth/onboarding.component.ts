@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
+import { RestauranteService } from '../../services/restaurante.service';
 import { ToastService } from '../../shared/toast.service';
 import { CategoriasService } from '../../services/categorias.service';
 import { ContasService } from '../../services/contas.service';
@@ -194,6 +195,7 @@ export class OnboardingComponent {
   private contas = inject(ContasService);
   private categorias = inject(CategoriasService);
   private toast = inject(ToastService);
+  private restaurante = inject(RestauranteService);
 
   protected started = signal(false);
   /** Quantos passos já terminaram (0 a 3). */
@@ -242,12 +244,26 @@ export class OnboardingComponent {
     this.progress.update((p) => p + 1);
   }
 
-  goLogin(): void {
-    this.router.navigate(['/auth/login']);
+  /** "Já configurei": conta como concluído (senão a guarda voltaria para cá) e segue. */
+  async goLogin(): Promise<void> {
+    if (!(await this.finish())) return;
+    void this.router.navigate(['/auth/login']);
   }
 
-  enter(): void {
+  async enter(): Promise<void> {
     if (!this.done()) return;
-    this.router.navigate(['/contas']);
+    if (!(await this.finish())) return;
+    void this.router.navigate(['/contas']);
+  }
+
+  /** Marca o onboarding como feito no servidor; sem conseguir, fica na tela para tentar de novo. */
+  private async finish(): Promise<boolean> {
+    try {
+      await this.restaurante.completeOnboarding();
+      return true;
+    } catch {
+      this.toast.error('Não foi possível concluir agora. Tente de novo.');
+      return false;
+    }
   }
 }

@@ -3,6 +3,7 @@ import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { OnboardingComponent, onboardingSteps } from './onboarding.component';
 import { ContasService } from '../../services/contas.service';
+import { RestauranteService } from '../../services/restaurante.service';
 import { CategoriasService } from '../../services/categorias.service';
 import { ToastService } from '../../shared/toast.service';
 
@@ -35,18 +36,21 @@ describe('OnboardingComponent', () => {
     refresh: vi.fn().mockResolvedValue(undefined),
   };
   const toast = { error: vi.fn() };
+  const restaurante = { completeOnboarding: vi.fn() };
 
   beforeEach(() => {
     vi.useFakeTimers();
     contas.refresh.mockClear().mockResolvedValue(undefined);
     categorias.refresh.mockClear().mockResolvedValue(undefined);
     toast.error.mockClear();
+    restaurante.completeOnboarding.mockReset().mockResolvedValue(undefined);
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         { provide: ContasService, useValue: contas },
         { provide: CategoriasService, useValue: categorias },
         { provide: ToastService, useValue: toast },
+        { provide: RestauranteService, useValue: restaurante },
       ],
     });
   });
@@ -63,13 +67,25 @@ describe('OnboardingComponent', () => {
     expect(contas.refresh).not.toHaveBeenCalled();
   });
 
-  it('"Já configurei" vai para o login', () => {
+  it('"Já configurei" conclui o onboarding no servidor e vai para o login', async () => {
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const fixture = TestBed.createComponent(OnboardingComponent);
     fixture.detectChanges();
-    fixture.componentInstance.goLogin();
+    await fixture.componentInstance.goLogin();
+    expect(restaurante.completeOnboarding).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenCalledWith(['/auth/login']);
+  });
+
+  it('se o servidor não confirmar, "Já configurei" avisa e fica na tela (senão a guarda voltaria para cá)', async () => {
+    restaurante.completeOnboarding.mockRejectedValueOnce(new Error('rede'));
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(OnboardingComponent);
+    fixture.detectChanges();
+    await fixture.componentInstance.goLogin();
+    expect(toast.error).toHaveBeenCalledWith('Não foi possível concluir agora. Tente de novo.');
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('"Começar" confere conta e categorias, passa pelos 3 passos e libera "Acessar minha conta"', async () => {
@@ -84,8 +100,9 @@ describe('OnboardingComponent', () => {
     expect(text(fixture)).toContain('Preparando…');
 
     // "Acessar minha conta" ainda não faz nada antes de terminar.
-    fixture.componentInstance.enter();
+    await fixture.componentInstance.enter();
     expect(navigate).not.toHaveBeenCalled();
+    expect(restaurante.completeOnboarding).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(900 * 3 + 50);
     await started;
@@ -100,7 +117,9 @@ describe('OnboardingComponent', () => {
     expect(text(fixture)).toContain('Venda Balcão');
     expect(text(fixture)).not.toContain('Antiga');
 
-    fixture.componentInstance.enter();
+    await fixture.componentInstance.enter();
+    // Só ao entrar o onboarding vira "concluído" (o servidor grava a data do primeiro acesso).
+    expect(restaurante.completeOnboarding).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenCalledWith(['/contas']);
   });
 

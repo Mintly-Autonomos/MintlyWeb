@@ -38,8 +38,6 @@ const KEYS = {
   subscription: 'mintly-subscription-ends',
   /** Tipo da assinatura (basic | pro). */
   subscriptionTier: 'mintly-subscription-tier',
-  /** Recém-cadastrado: depois de pagar, ainda falta o onboarding. */
-  pendingOnboarding: 'mintly-pending-onboarding',
   /** Quando o token de acesso atual foi emitido (ms): é ele que diz quando renovar em silêncio. */
   accessIssuedAt: 'mintly-access-issued-at',
 } as const;
@@ -144,13 +142,6 @@ export class AuthService {
     }
     if (!this.router.url.startsWith('/assinatura')) this.router.navigate(['/assinatura']);
     return true;
-  }
-
-  /** Depois de pagar: quem acabou de se cadastrar segue para o onboarding; os demais, para o app. */
-  consumeNextRouteAfterSubscription(): string {
-    const pending = this.read(KEYS.pendingOnboarding) === '1';
-    this.remove(KEYS.pendingOnboarding);
-    return pending ? '/auth/onboarding' : '/';
   }
 
   /** Storage ativo conforme a opção "manter conectado". */
@@ -302,7 +293,6 @@ export class AuthService {
         avatarDataUrl: input.avatar,
       });
       this.setSubscriptionEndsAt(null);
-      this.write(KEYS.pendingOnboarding, '1');
       return;
     }
 
@@ -327,7 +317,6 @@ export class AuthService {
     });
     // Conta nova nunca tem assinatura: a tela de assinatura vem antes de tudo.
     this.setSubscriptionEndsAt(result.subscription?.endsAt ?? null, result.subscription?.tier);
-    this.write(KEYS.pendingOnboarding, '1');
   }
 
   /** Dispara o e-mail de recuperação. Resposta é sempre genérica (não revela se o e-mail existe). */
@@ -536,7 +525,6 @@ export class AuthService {
     this.remove(KEYS.subscription);
     this._subscriptionTier.set(null);
     this.remove(KEYS.subscriptionTier);
-    this.remove(KEYS.pendingOnboarding);
   }
 
   private loadStoredUser(): AuthUser | null {
