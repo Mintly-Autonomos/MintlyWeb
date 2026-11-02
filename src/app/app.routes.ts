@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './guards/auth.guard';
 import { subscriptionGuard } from './guards/subscription.guard';
+import { onboardingGuard } from './guards/onboarding.guard';
 
 export const routes: Routes = [
   // Auth routes (wrapped in AuthShell)
@@ -105,7 +106,8 @@ export const routes: Routes = [
   // App routes (wrapped in AppLayout — protegidas por authGuard e pela assinatura válida)
   {
     path: '',
-    canActivate: [authGuard, subscriptionGuard],
+    // Recém-cadastrado (onboarding pendente no servidor) passa pelo onboarding antes de usar o app.
+    canActivate: [authGuard, subscriptionGuard, onboardingGuard],
     loadComponent: () => import('./layout/app-layout.component').then((m) => m.AppLayoutComponent),
     children: [
       { path: '', redirectTo: 'visao-geral', pathMatch: 'full' },

@@ -154,7 +154,8 @@ export class AssinaturaRetornoComponent implements OnInit {
 
   continuar(): void {
     this.subscription.clearBaseline();
-    void this.router.navigateByUrl(this.auth.consumeNextRouteAfterSubscription());
+    // Quem acabou de se cadastrar ainda tem o onboarding pendente no servidor: a guarda do app o leva até ele.
+    void this.router.navigateByUrl('/');
   }
 
   private stop(): void {

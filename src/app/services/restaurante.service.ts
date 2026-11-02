@@ -109,6 +109,9 @@ export class RestauranteService {
   readonly profile = signal<RestaurantProfile | null>(null);
   readonly loading = signal(false);
 
+  /** Resposta do servidor sobre o onboarding, guardada por restaurante (uma consulta por sessão). */
+  private onboardingState: { restaurantId: string; pending: boolean } | null = null;
+
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
   }
@@ -167,6 +170,35 @@ export class RestauranteService {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /**
+   * O restaurante ainda precisa do onboarding? Quem sabe é o servidor: o cadastro grava o "primeiro acesso"
+   * (`firstAccessAt`) VAZIO e ele só é preenchido ao concluir o onboarding; vale em qualquer aparelho.
+   * Restaurante antigo não tem o campo (nada pendente). Sem conseguir consultar, não trava ninguém.
+   */
+  async isOnboardingPending(): Promise<boolean> {
+    if (environment.useMocks) return false;
+    const restaurantId = this.auth.currentUser()?.restaurantId ?? '';
+    if (this.onboardingState?.restaurantId === restaurantId) return this.onboardingState.pending;
+    try {
+      const response = await this.call((headers) => this.restaurantClient.me({}, headers));
+      const pending = response.payload?.restaurant.firstAccessAt === null;
+      this.onboardingState = { restaurantId, pending };
+      return pending;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Conclui o onboarding: o servidor grava a data do primeiro acesso. Lança erro se não conseguir (a pessoa tenta de novo). */
+  async completeOnboarding(): Promise<void> {
+    if (environment.useMocks) return;
+    await this.call((headers) => this.restaurantClient.completeFirstAccess(headers));
+    this.onboardingState = {
+      restaurantId: this.auth.currentUser()?.restaurantId ?? '',
+      pending: false,
+    };
   }
 
   /** Define o regime tributário (decide o cálculo do imposto no DRE). */
