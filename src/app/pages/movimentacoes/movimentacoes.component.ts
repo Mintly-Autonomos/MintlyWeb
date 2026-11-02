@@ -29,6 +29,7 @@ import { CategoriasService } from '../../services/categorias.service';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtDateTime, fmtShortDate, localISODate } from '../../shared/format';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
+import { CardapioService } from '../../services/cardapio.service';
 import { moneyToInput } from '../../shared/money-input';
 import { describeSettlementRule, resolveSettlementRule, settlementDueDate } from 'mintly-lib';
 import type { SettlementRule } from 'mintly-lib';
@@ -83,6 +84,8 @@ interface MovForm {
   paymentMethod: PaymentMethod | '';
   status: MovStatus;
   notes: string;
+  /** Pratos vendidos (só entradas): prato do cardápio e quantidade; o nome é só para mostrar. */
+  items: { menuItemId: string; name: string; qty: number }[];
 }
 
 @Component({
@@ -106,6 +109,7 @@ export class MovimentacoesComponent implements OnInit {
   private contasSvc = inject(ContasService);
   private categoriasSvc = inject(CategoriasService);
   private toast = inject(ToastService);
+  private cardapioSvc = inject(CardapioService);
 
   // ── UI state ──────────────────────────────────────────────────────────
   protected creating = signal(false);
@@ -174,6 +178,7 @@ export class MovimentacoesComponent implements OnInit {
     paymentMethod: '',
     status: 'pending',
     notes: '',
+    items: [],
   });
 
   // ── Data ──────────────────────────────────────────────────────────────
@@ -273,6 +278,8 @@ export class MovimentacoesComponent implements OnInit {
   ngOnInit(): void {
     this.svc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
     this.categoriasSvc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
+    // Os pratos do cardápio alimentam a escolha de "Pratos vendidos" na entrada.
+    this.cardapioSvc.refresh().catch(() => undefined);
     // Contas não é injetada só pra leitura aqui — sem isso, abrir Movimentações
     // direto (sem passar por Contas antes) deixa o dropdown de conta vazio.
     this.contasSvc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
@@ -433,6 +440,45 @@ export class MovimentacoesComponent implements OnInit {
     return this.contasSvc.accounts().find((a) => a.id === id)?.name ?? '—';
   }
 
+  /** Pratos que podem entrar numa venda nova: os ativos do cardápio, em ordem alfabética. */
+  protected dishOptions = computed(() =>
+    this.cardapioSvc
+      .pratos()
+      .filter((p) => p.active)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+  );
+
+  /** Prato escolhido na lista: entra com quantidade 1, ou soma 1 se já estava. */
+  addDish(menuItemId: string): void {
+    const dish = this.cardapioSvc.pratos().find((p) => p.id === menuItemId);
+    if (!dish) return;
+    this.form.update((f) => {
+      const i = f.items.findIndex((x) => x.menuItemId === menuItemId);
+      const items =
+        i >= 0
+          ? f.items.map((x, n) => (n === i ? { ...x, qty: Math.min(99, x.qty + 1) } : x))
+          : [...f.items, { menuItemId, name: dish.name, qty: 1 }];
+      return { ...f, items };
+    });
+  }
+
+  setDishQty(menuItemId: string, qty: number): void {
+    const next = Math.max(1, Math.min(99, Math.round(qty) || 1));
+    this.form.update((f) => ({
+      ...f,
+      items: f.items.map((x) => (x.menuItemId === menuItemId ? { ...x, qty: next } : x)),
+    }));
+  }
+
+  removeDish(menuItemId: string): void {
+    this.form.update((f) => ({ ...f, items: f.items.filter((x) => x.menuItemId !== menuItemId) }));
+  }
+
+  /** Os pratos que vão para a API (só entradas têm pratos). */
+  private itemsPayload(f: MovForm): { menuItemId: string; qty: number }[] {
+    return f.type === 'income' ? f.items.map(({ menuItemId, qty }) => ({ menuItemId, qty })) : [];
+  }
+
   setFormField<K extends keyof MovForm>(k: K, v: MovForm[K]): void {
     this.form.update((f) => ({ ...f, [k]: v }));
   }
@@ -481,6 +527,7 @@ export class MovimentacoesComponent implements OnInit {
       paymentMethod: '',
       status: type === 'income' ? 'received' : 'paid',
       notes: '',
+      items: [],
     });
     this.importMode.set(false);
     this.importFile.set(null);
@@ -498,6 +545,7 @@ export class MovimentacoesComponent implements OnInit {
       paymentMethod: m.paymentMethod ?? '',
       status: m.status,
       notes: m.notes ?? '',
+      items: (m.items ?? []).map((i) => ({ menuItemId: i.menuItemId, name: i.name, qty: i.qty })),
     });
     this.editing.set(m);
   }
@@ -1067,6 +1115,7 @@ export class MovimentacoesComponent implements OnInit {
           accountId: f.accountId!,
           paymentMethod: f.paymentMethod as PaymentMethod,
           notes: f.notes || null,
+          items: this.itemsPayload(f),
         });
         this.toast.success('Movimentação atualizada.');
         this.editing.set(null);
@@ -1082,6 +1131,7 @@ export class MovimentacoesComponent implements OnInit {
             paymentMethod: f.paymentMethod as PaymentMethod,
             status: f.status,
             notes: f.notes || null,
+            items: this.itemsPayload(f),
           },
           force,
         );

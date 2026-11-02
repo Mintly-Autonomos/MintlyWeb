@@ -92,6 +92,7 @@ export class ReceitasService {
       category,
       canal: delivery ? 'delivery' : 'salao',
       payment: m.paymentMethod ?? 'Outros',
+      ...(m.items?.length ? { pratos: m.items } : {}),
     };
   }
 

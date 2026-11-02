@@ -81,6 +81,17 @@ export class ReceitasComponent implements OnInit {
       .slice(0, 8);
   });
 
+  /** Subtítulo do ranking; avisa quantas vendas ficaram de fora por não informarem os pratos. */
+  protected rankingDescription(semPratos: number): string {
+    const base = 'Ordenado do maior para o menor';
+    if (semPratos <= 0) return base;
+    const vendas =
+      semPratos === 1
+        ? '1 venda sem pratos informados fica'
+        : `${semPratos} vendas sem pratos informados ficam`;
+    return `${base} · ${vendas} de fora`;
+  }
+
   protected rankingSeries = computed<BarSeries[]>(() => [
     {
       key: this.rankMode() === 'receita' ? 'receita' : 'qtd',

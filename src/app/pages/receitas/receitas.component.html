@@ -223,7 +223,7 @@
       <!-- 6 — Ranking -->
       <app-chart-card
         title="Itens mais vendidos"
-        description="Ordenado do maior para o menor"
+        [description]="rankingDescription(d.semPratos)"
         [loading]="loading()"
         [height]="430"
       >
@@ -252,7 +252,7 @@
           categoryKey="nome"
           [series]="rankingSeries()"
           orientation="bars"
-          [categoryLabelWidth]="170"
+          [categoryLabelWidth]="178"
           [valueFormatter]="rankingValueFormatter()"
           [tooltipFormatter]="rankingTooltipFormatter()"
         />
