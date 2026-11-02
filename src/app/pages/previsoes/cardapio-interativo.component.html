@@ -303,6 +303,7 @@
         <label class="block">
           <span class="text-[12px] font-medium block mb-1">Preço (R$)</span>
           <input
+            appMoneyInput
             type="text"
             inputmode="decimal"
             [value]="f().preco"
@@ -314,6 +315,7 @@
         <label class="block">
           <span class="text-[12px] font-medium block mb-1">Custo (R$)</span>
           <input
+            appMoneyInput
             type="text"
             inputmode="decimal"
             [value]="f().custo"
@@ -420,6 +422,7 @@
                   >
                     <span class="sm:hidden block text-[11px] text-muted-foreground">Preço</span>
                     <input
+                      appMoneyInput
                       type="text"
                       inputmode="decimal"
                       [value]="f().preco"
@@ -434,6 +437,7 @@
                   >
                     <span class="sm:hidden block text-[11px] text-muted-foreground">Custo</span>
                     <input
+                      appMoneyInput
                       type="text"
                       inputmode="decimal"
                       [value]="f().custo"
@@ -475,6 +479,7 @@
                     <span class="sm:hidden block text-[11px] text-muted-foreground">Preço</span>
                     @if (precoEditandoId() === p.id) {
                       <input
+                        appMoneyInput
                         type="text"
                         inputmode="decimal"
                         [value]="precoEditado()"
