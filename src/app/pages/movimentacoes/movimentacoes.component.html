@@ -876,6 +876,60 @@
         >
       </div>
 
+      @if (importDishRowCount() > 0 || importUnmatched().length > 0) {
+        <div
+          class="shrink-0 rounded-xl border border-border bg-muted/40 p-3 space-y-2"
+          data-testid="pratos-importacao"
+        >
+          <p class="text-[12.5px] font-medium">
+            Pratos lidos das Observações:
+            <span class="font-semibold">{{ importDishRowCount() }}</span>
+            {{ importDishRowCount() === 1 ? 'linha reconhecida' : 'linhas reconhecidas' }}
+            @if (importUnmatched().length > 0) {
+              · <span class="text-warning font-semibold">{{ importUnmatched().length }}</span>
+              {{
+                importUnmatched().length === 1 ? 'item não reconhecido' : 'itens não reconhecidos'
+              }}
+            }
+          </p>
+          @for (u of importUnmatched(); track u.key) {
+            <div
+              class="flex flex-wrap items-center gap-2 rounded-lg bg-card border border-border px-3 py-2"
+              data-testid="item-nao-reconhecido"
+            >
+              <span class="min-w-0 flex-1 text-[13px]" [title]="u.text">
+                <span class="font-medium">{{ u.text }}</span>
+                <span class="text-muted-foreground">
+                  · em {{ u.rows }} {{ u.rows === 1 ? 'linha' : 'linhas' }}</span
+                >
+                @if (u.suggestion) {
+                  <span class="text-muted-foreground"> · parecido com {{ u.suggestion.name }}</span>
+                }
+              </span>
+              <select
+                (change)="resolveUnmatched(u.key, $any($event.target).value)"
+                [attr.aria-label]="'O que é ' + u.text"
+                class="h-9 rounded-lg border border-border bg-card px-2 text-[12.5px] cursor-pointer"
+              >
+                <option value="">Escolher prato…</option>
+                @for (d of dishOptions(); track d.id) {
+                  <option [value]="d.id">
+                    {{ d.name }}
+                  </option>
+                }
+                <option value="ignore">Ignorar este texto</option>
+              </select>
+            </div>
+          }
+          @if (importUnmatched().length > 0) {
+            <p class="text-[11.5px] text-muted-foreground">
+              Itens sem prato escolhido entram na venda sem esse prato (não contam no ranking). A
+              escolha vale só para esta importação: na próxima planilha o Mintly pergunta de novo.
+            </p>
+          }
+        </div>
+      }
+
       @if (
         blankCount('type') +
           blankCount('categoryName') +

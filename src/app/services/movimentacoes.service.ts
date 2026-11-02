@@ -261,6 +261,8 @@ export interface ImportMovementItem {
   paymentMethod: PaymentMethod | null;
   status: MovStatus | null;
   notes: string | null;
+  /** Pratos reconhecidos nas observações (a tela resolve contra o cardápio antes de enviar). */
+  items?: { menuItemId: string; qty: number }[];
   valid: boolean;
   error: string | null;
 }
@@ -595,6 +597,7 @@ export class MovimentacoesService {
         paymentMethod: PAYMENT_TO_LIB[item.paymentMethod],
         status: fromMovStatus(item.status),
         ...(item.notes ? { description: item.notes } : {}),
+        ...(item.items?.length ? { items: item.items } : {}),
         ...(repeated ? { confirmDuplicate: true } : {}),
       });
     }

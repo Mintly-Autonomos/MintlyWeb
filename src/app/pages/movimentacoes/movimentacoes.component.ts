@@ -30,6 +30,13 @@ import { ToastService } from '../../shared/toast.service';
 import { formatBRL, fmtDateTime, fmtShortDate, localISODate } from '../../shared/format';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { CardapioService } from '../../services/cardapio.service';
+import {
+  DISH_IGNORE,
+  DishAliases,
+  matchDishLines,
+  recognizedItems,
+  splitDishText,
+} from '../../shared/dish-match';
 import { moneyToInput } from '../../shared/money-input';
 import { describeSettlementRule, resolveSettlementRule, settlementDueDate } from 'mintly-lib';
 import type { SettlementRule } from 'mintly-lib';
@@ -448,6 +455,50 @@ export class MovimentacoesComponent implements OnInit {
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
   );
 
+  // ── Pratos da importação ────────────────────────────────────────────
+  /**
+   * Escolhas feitas NESTA revisão ("Batata grande" = prato Batata Rústica). Não são guardadas: o nome da
+   * planilha só vale se for igual ao do cardápio; senão a pessoa indica qual é, a cada importação.
+   */
+  protected dishAliases = signal<DishAliases>({});
+
+  /** Os pratos de cada linha, lidos das Observações (entradas): igualdade exata com o cardápio. */
+  private importDishLines = computed(() =>
+    this.importRows().map((r) =>
+      r.type === 'income'
+        ? matchDishLines(splitDishText(r.notes), this.dishOptions(), this.dishAliases())
+        : [],
+    ),
+  );
+
+  /** Textos das Observações que não são nenhum prato do cardápio, agrupados (o mesmo texto em várias linhas conta uma vez). */
+  protected importUnmatched = computed(() => {
+    const groups = new Map<
+      string,
+      { key: string; text: string; rows: number; suggestion: { id: string; name: string } | null }
+    >();
+    for (const lines of this.importDishLines()) {
+      for (const l of lines) {
+        if (l.menuItemId || l.ignored) continue;
+        const g = groups.get(l.key);
+        if (g) g.rows += 1;
+        else groups.set(l.key, { key: l.key, text: l.text, rows: 1, suggestion: l.suggestion });
+      }
+    }
+    return [...groups.values()].sort((a, b) => b.rows - a.rows);
+  });
+
+  /** Quantas linhas já têm algum prato reconhecido. */
+  protected importDishRowCount = computed(
+    () => this.importDishLines().filter((lines) => lines.some((l) => l.menuItemId)).length,
+  );
+
+  /** Escolheu na revisão: o texto vira esse prato (ou "ignorar") em todas as linhas desta importação. */
+  resolveUnmatched(key: string, value: string): void {
+    if (!value) return;
+    this.dishAliases.update((a) => ({ ...a, [key]: value === 'ignore' ? DISH_IGNORE : value }));
+  }
+
   /** Prato escolhido na lista: entra com quantidade 1, ou soma 1 se já estava. */
   addDish(menuItemId: string): void {
     const dish = this.cardapioSvc.pratos().find((p) => p.id === menuItemId);
@@ -853,6 +904,7 @@ export class MovimentacoesComponent implements OnInit {
     this.importPreviewOpen.set(false);
     this.importConfirmWarningOpen.set(false);
     this.importRows.set([]);
+    this.dishAliases.set({});
   }
 
   /** Reavalia uma linha editada — recalcula erro/validade e ajusta `included`. */
@@ -1029,6 +1081,12 @@ export class MovimentacoesComponent implements OnInit {
         paymentMethod: r.paymentMethod,
         status: r.status,
         notes: r.notes,
+        items:
+          r.type === 'income'
+            ? recognizedItems(
+                matchDishLines(splitDishText(r.notes), this.dishOptions(), this.dishAliases()),
+              )
+            : [],
         valid: r.valid,
         error: r.error,
       }));
