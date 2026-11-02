@@ -1,5 +1,20 @@
 /** Formatação compartilhada de moeda e datas (pt-BR). */
 
+/**
+ * Número curto para eixo de gráfico e células apertadas: abaixo de mil mostra o valor ("20", "850"),
+ * depois "1,5k" e "2,5mi". Mostra casas só quando precisa, para o eixo sempre dizer algo útil (um
+ * arredondamento para "k" transformava R$ 20, 40 e 60 em "0k", "0k" e "0k").
+ */
+export function formatCompact(v: number): string {
+  if (!Number.isFinite(v)) return '';
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  const fmt = (n: number, max: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: max });
+  if (abs < 1000) return `${sign}${fmt(abs, abs < 10 ? 2 : 1)}`;
+  if (abs < 1_000_000) return `${sign}${fmt(abs / 1000, abs < 100_000 ? 1 : 0)}k`;
+  return `${sign}${fmt(abs / 1_000_000, abs < 100_000_000 ? 1 : 0)}mi`;
+}
+
 /** Formata um número como moeda brasileira: 1234.5 → "R$ 1.234,50". */
 export function formatBRL(n: number): string {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
