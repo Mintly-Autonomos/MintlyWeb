@@ -1,4 +1,4 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, computed, signal, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
@@ -20,11 +20,7 @@ import { apiErrorInfo } from '../../shared/api-error';
     AlertComponent,
   ],
   template: `
-    <app-auth-card
-      title="Bem-vindo de volta"
-      subtitle="Acesse sua conta para continuar gerenciando as finanças do seu negócio."
-      [hasFooter]="true"
-    >
+    <app-auth-card title="Bem-vindo de volta" [subtitle]="subtitulo()" [hasFooter]="true">
       <form (ngSubmit)="onSubmit()" class="space-y-4">
         @if (resetOk) {
           <app-alert variant="success" title="Senha redefinida com sucesso">
@@ -45,16 +41,35 @@ import { apiErrorInfo } from '../../shared/api-error';
           </div>
         }
 
-        <app-form-field label="E-mail" icon="mail">
-          <input
-            type="email"
-            [(ngModel)]="email"
-            name="email"
-            placeholder="voce@restaurante.com"
-            autocomplete="email"
-            class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
-          />
-        </app-form-field>
+        @if (saved(); as conta) {
+          <div
+            data-testid="conta-salva"
+            class="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5"
+          >
+            @if (conta.avatarDataUrl) {
+              <img
+                [src]="conta.avatarDataUrl"
+                alt=""
+                class="h-12 w-12 rounded-full object-cover shrink-0"
+              />
+            }
+            <div class="min-w-0">
+              <div class="text-sm font-semibold truncate">{{ conta.nome }}</div>
+              <div class="text-[13px] text-muted-foreground truncate">{{ conta.email }}</div>
+            </div>
+          </div>
+        } @else {
+          <app-form-field label="E-mail" icon="mail">
+            <input
+              type="email"
+              [(ngModel)]="email"
+              name="email"
+              placeholder="voce@restaurante.com"
+              autocomplete="email"
+              class="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+            />
+          </app-form-field>
+        }
 
         <app-form-field label="Senha" icon="lock">
           <input
@@ -80,15 +95,26 @@ import { apiErrorInfo } from '../../shared/api-error';
         </app-form-field>
 
         <div class="flex items-center justify-between">
-          <label class="flex items-center gap-2 cursor-pointer select-none py-2 -my-2">
-            <input
-              type="checkbox"
-              [(ngModel)]="remember"
-              name="remember"
-              class="h-4 w-4 rounded border-border accent-mint"
-            />
-            <span class="text-[13px] text-foreground/80">Manter conectado</span>
-          </label>
+          @if (saved()) {
+            <button
+              type="button"
+              data-testid="usar-outra-conta"
+              (click)="usarOutraConta()"
+              class="text-[13px] text-foreground/80 hover:underline py-2 -my-2 cursor-pointer"
+            >
+              Usar outra conta
+            </button>
+          } @else {
+            <label class="flex items-center gap-2 cursor-pointer select-none py-2 -my-2">
+              <input
+                type="checkbox"
+                [(ngModel)]="remember"
+                name="remember"
+                class="h-4 w-4 rounded border-border accent-mint"
+              />
+              <span class="text-[13px] text-foreground/80">Manter conectado</span>
+            </label>
+          }
           <a
             routerLink="/auth/esqueci-senha"
             class="text-[13px] text-ocean font-medium hover:underline py-2 -my-2"
@@ -156,19 +182,40 @@ export class LoginComponent {
   protected email = '';
   protected password = '';
   protected remember = false;
+  /** Conta lembrada neste aparelho ("Manter conectado" marcado antes): o login pede só a senha. */
+  protected saved = this.auth.savedAccount;
+  protected subtitulo = computed(() =>
+    this.saved()
+      ? 'Digite sua senha para continuar.'
+      : 'Acesse sua conta para continuar gerenciando as finanças do seu negócio.',
+  );
   protected showPwd = signal(false);
   protected loading = signal(false);
   protected error = signal<string | null>(null);
 
+  /** Não é você? Esquece a conta lembrada neste aparelho e volta ao login com e-mail e senha. */
+  usarOutraConta(): void {
+    this.auth.forgetSavedAccount();
+    this.email = '';
+    this.password = '';
+    this.remember = false;
+    this.error.set(null);
+  }
+
   async onSubmit(): Promise<void> {
     this.error.set(null);
-    if (!this.email || !this.password) {
-      this.error.set('Preencha seu e-mail e senha para continuar.');
+    const conta = this.saved();
+    const email = conta ? conta.email : this.email;
+    if (!email || !this.password) {
+      this.error.set(
+        conta ? 'Digite sua senha para continuar.' : 'Preencha seu e-mail e senha para continuar.',
+      );
       return;
     }
     this.loading.set(true);
     try {
-      await this.auth.login(this.email, this.password, this.remember);
+      // Conta lembrada continua lembrada: "manter conectado" segue ligado.
+      await this.auth.login(email, this.password, conta ? true : this.remember);
       // Sessão que acabou sem a pessoa pedir: volta para a tela em que ela estava.
       this.router.navigateByUrl(this.auth.consumeReturnUrl() ?? '/');
     } catch (err) {
