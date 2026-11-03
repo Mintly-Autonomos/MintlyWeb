@@ -91,11 +91,32 @@ describe('buildReceitas', () => {
     expect(d.deltas.pedidos).toBe('—');
   });
 
+  it('igual ao período anterior é neutro: sem alta, sem queda', () => {
+    const d = buildReceitas(
+      [mov({ date: '2026-10-05', gross: 100 }), mov({ date: '2026-09-05', gross: 100 })],
+      win,
+      0,
+    );
+    expect(d.deltas.receitaBruta).toBe('0%');
+    expect(d.deltasFlat.receitaBruta).toBe(true);
+    expect(d.deltasUp.receitaBruta).toBe(false);
+  });
+
+  it('variação de verdade não é neutra', () => {
+    const d = buildReceitas(
+      [mov({ date: '2026-10-05', gross: 150 }), mov({ date: '2026-09-05', gross: 100 })],
+      win,
+      0,
+    );
+    expect(d.deltasFlat.receitaBruta).toBe(false);
+    expect(d.deltasUp.receitaBruta).toBe(true);
+  });
+
   it('sem lançamentos devolve zeros, sem NaN', () => {
     const d = buildReceitas([], win, 0);
     expect(d.receitaBruta).toBe(0);
     expect(d.ticketMedio).toBe(0);
-    expect(d.deltas.receitaBruta).toBe('+0,0%');
+    expect(d.deltas.receitaBruta).toBe('—');
     expect(d.canais.map((c) => c.receita)).toEqual([0, 0]);
     expect(d.tendencia).toHaveLength(6);
     expect(Number.isNaN(d.receitaLiquida)).toBe(false);

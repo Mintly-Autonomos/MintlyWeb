@@ -4,6 +4,13 @@ import { SessaoExpiradaComponent } from './sessao-expirada.component';
 
 const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
 
+// A lib lê a URL da API ao instanciar os clients (o componente injeta o AuthService). Sem isto o teste
+// só passava se outro arquivo tivesse definido a variável antes — dependia da ordem de execução.
+declare const process: { env: Record<string, string | undefined> };
+beforeAll(() => {
+  process.env['BACK_END_URL'] = 'http://api.test';
+});
+
 describe('SessaoExpiradaComponent', () => {
   beforeEach(() => localStorage.removeItem('mintly-return-url'));
 

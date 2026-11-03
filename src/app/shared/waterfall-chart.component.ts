@@ -9,6 +9,8 @@ import {
   computed,
   inject,
 } from '@angular/core';
+import { chartScale, scaleTicks } from './chart-scale';
+import { formatCompact } from './format';
 
 export interface WaterfallRow {
   label: string;
@@ -16,9 +18,32 @@ export interface WaterfallRow {
   kind: 'start' | 'down' | 'up' | 'end';
 }
 
+/** Faixa de valores que a barra ocupa (`lo`–`hi`) e o total acumulado depois dela (`level`). */
+export interface WaterfallSpan {
+  lo: number;
+  hi: number;
+  level: number;
+}
+
+/**
+ * Início e fim nascem do zero; as etapas flutuam entre o total de antes e o de depois. Com prejuízo o
+ * total acumulado cruza o zero, então as faixas podem ficar abaixo dele.
+ */
+export function waterfallSpans(rows: WaterfallRow[]): WaterfallSpan[] {
+  let running = 0;
+  return rows.map((r) => {
+    if (r.kind === 'start' || r.kind === 'end') {
+      if (r.kind === 'start') running = r.value;
+      return { lo: Math.min(0, r.value), hi: Math.max(0, r.value), level: r.value };
+    }
+    const from = running;
+    running += r.value;
+    return { lo: Math.min(from, running), hi: Math.max(from, running), level: running };
+  });
+}
+
 interface ComputedBar extends WaterfallRow {
-  base: number;
-  bar: number;
+  level: number;
   x: number;
   y: number;
   width: number;
@@ -59,6 +84,15 @@ interface ComputedBar extends WaterfallRow {
             {{ t.label }}
           </text>
         }
+
+        <line
+          [attr.x1]="padLeft"
+          [attr.x2]="size().w - padRight"
+          [attr.y1]="yOf(0)"
+          [attr.y2]="yOf(0)"
+          stroke="var(--muted-foreground)"
+          stroke-opacity="0.5"
+        />
 
         @for (seg of connectors(); track $index) {
           <line
@@ -145,78 +179,62 @@ export class WaterfallChartComponent implements AfterViewInit, OnDestroy, OnChan
   protected size = signal({ w: 600, h: 300 });
   protected hover = signal<ComputedBar | null>(null);
 
-  private computedRows = computed(() => {
-    let running = 0;
-    return this.rows.map((w) => {
-      if (w.kind === 'start') {
-        running = w.value;
-        return { ...w, base: 0, bar: w.value };
-      }
-      if (w.kind === 'end') {
-        return { ...w, base: 0, bar: w.value };
-      }
-      const next = running + w.value;
-      const row = { ...w, base: next, bar: -w.value };
-      running = next;
-      return row;
-    });
-  });
+  private spans = computed(() => waterfallSpans(this.rows));
 
-  private maxValue = computed(() => {
-    const rows = this.computedRows();
-    let max = 0;
-    for (const r of rows) {
-      max = Math.max(max, r.base + Math.abs(r.bar));
-    }
-    return niceMax(max);
-  });
+  /** Eixo vertical: sempre inclui o zero e acompanha o total acumulado, mesmo abaixo dele. */
+  private scale = computed(() =>
+    chartScale(
+      this.spans().flatMap((p) => [p.lo, p.hi]),
+      'always',
+    ),
+  );
 
-  protected valueTicks = computed(() => {
-    const max = this.maxValue();
-    const count = 4;
-    const s = this.size();
-    const plot = s.h - this.padTop - this.padBottom;
-    return Array.from({ length: count + 1 }, (_, i) => {
-      const value = (max / count) * i;
-      const frac = value / (max || 1);
-      return { pos: s.h - this.padBottom - frac * plot, label: `${Math.round(value / 1000)}k` };
-    });
-  });
+  protected yOf(value: number): number {
+    const { min, max } = this.scale();
+    const plotH = this.size().h - this.padTop - this.padBottom;
+    return this.size().h - this.padBottom - ((value - min) / (max - min || 1)) * plotH;
+  }
+
+  protected valueTicks = computed(() =>
+    scaleTicks(this.scale()).map((v) => ({ pos: this.yOf(v), label: formatCompact(v) })),
+  );
 
   protected bars = computed<ComputedBar[]>(() => {
-    const rows = this.computedRows();
+    const spans = this.spans();
     const s = this.size();
-    const n = rows.length || 1;
-    const max = this.maxValue();
+    const n = this.rows.length || 1;
     const plotW = s.w - this.padLeft - this.padRight;
-    const plotH = s.h - this.padTop - this.padBottom;
     const band = plotW / n;
     const barW = band * 0.6;
-    return rows.map((r, i) => {
-      const top = r.base + Math.max(r.bar, 0);
-      const bottom = r.base + Math.min(r.bar, 0);
-      const yTop = max > 0 ? s.h - this.padBottom - (top / max) * plotH : s.h - this.padBottom;
-      const yBottom =
-        max > 0 ? s.h - this.padBottom - (bottom / max) * plotH : s.h - this.padBottom;
-      const x = this.padLeft + band * i + (band - barW) / 2;
+    return this.rows.map((r, i) => {
+      const yTop = this.yOf(spans[i].hi);
+      const yBottom = this.yOf(spans[i].lo);
       return {
         ...r,
-        x,
+        level: spans[i].level,
+        x: this.padLeft + band * i + (band - barW) / 2,
         y: yTop,
         width: barW,
         height: Math.max(1, yBottom - yTop),
         color:
-          r.kind === 'end' ? 'var(--mint)' : r.kind === 'start' ? 'var(--ocean)' : 'var(--warning)',
+          r.kind === 'end'
+            ? r.value < 0
+              ? 'var(--error)'
+              : 'var(--mint)'
+            : r.kind === 'start'
+              ? 'var(--ocean)'
+              : 'var(--warning)',
         topY: yTop,
       };
     });
   });
 
+  /** Liga o total acumulado ao fim de cada barra com o início da seguinte. */
   protected connectors = computed(() => {
     const bars = this.bars();
     const segs: { x1: number; x2: number; y: number }[] = [];
     for (let i = 0; i < bars.length - 1; i++) {
-      segs.push({ x1: bars[i].x + bars[i].width, x2: bars[i + 1].x, y: bars[i].topY });
+      segs.push({ x1: bars[i].x + bars[i].width, x2: bars[i + 1].x, y: this.yOf(bars[i].level) });
     }
     return segs;
   });
@@ -242,13 +260,4 @@ export class WaterfallChartComponent implements AfterViewInit, OnDestroy, OnChan
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
   }
-}
-
-function niceMax(value: number): number {
-  if (value <= 0) return 1;
-  const exp = Math.floor(Math.log10(value));
-  const base = Math.pow(10, exp);
-  const norm = value / base;
-  const niceNorm = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
-  return niceNorm * base;
 }

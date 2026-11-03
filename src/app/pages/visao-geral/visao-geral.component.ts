@@ -14,6 +14,8 @@ import { BulletComponent } from '../../shared/bullet.component';
 import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-chart.component';
 import { AreaChartComponent, AreaSeries } from '../../shared/area-chart.component';
 import { ToastService } from '../../shared/toast.service';
+import { CMV_HINT, PRIME_COST_HINT } from '../../shared/metric-hints';
+import { statDelta } from '../../shared/stat-delta';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
@@ -29,6 +31,14 @@ const SCORE_META: Record<
   noData: { color: 'var(--muted-foreground)', label: 'Sem dados' },
 };
 
+/** Mesmas faixas do score geral (API: abaixo de 40 risco, abaixo de 70 atenção). */
+function pillarColor(score: number | null): string {
+  if (score === null) return SCORE_META.noData.color;
+  if (score < 40) return SCORE_META.risk.color;
+  if (score < 70) return SCORE_META.attention.color;
+  return SCORE_META.healthy.color;
+}
+
 const PILLAR_LABEL: Record<string, string> = {
   netMargin: 'Margem líquida',
   runway: 'Fôlego de caixa',
@@ -36,8 +46,10 @@ const PILLAR_LABEL: Record<string, string> = {
   revenueTrend: 'Tendência de vendas',
 };
 
-function pillarDetail(key: string, value: number | null): string {
-  if (value === null) return 'sem dado suficiente';
+/** `mesPassado`: o score é do mês já fechado, e o caixa daquela época não existe (fôlego fica sem nota). */
+function pillarDetail(key: string, value: number | null, mesPassado = false): string {
+  if (value === null)
+    return key === 'runway' && mesPassado ? 'só calculado para o mês atual' : 'sem dado suficiente';
   switch (key) {
     case 'netMargin':
       return `${pctFmt(value * 100)} de margem`;
@@ -91,6 +103,10 @@ export class VisaoGeralComponent implements OnInit {
   protected readonly circumference = 2 * Math.PI * 46;
   protected readonly pillarLabel = PILLAR_LABEL;
   protected readonly pillarDetail = pillarDetail;
+  protected readonly pillarColor = pillarColor;
+  protected readonly statDelta = statDelta;
+  protected readonly cmvHint = CMV_HINT;
+  protected readonly primeCostHint = PRIME_COST_HINT;
   protected readonly Math = Math;
 
   protected netProfitSpark = computed(

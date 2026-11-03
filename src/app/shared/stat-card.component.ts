@@ -4,6 +4,8 @@ import { IconComponent } from './icon.component';
 export interface StatDelta {
   value: string;
   up: boolean;
+  /** Sem alteração: aparece neutro, nem verde nem vermelho. */
+  flat?: boolean;
   note?: string;
 }
 
@@ -16,10 +18,11 @@ export interface StatDelta {
   template: `
     <div
       class="m3-card p-6 h-[200px] flex flex-col transition-all duration-200 hover:m3-elev hover:-translate-y-0.5"
+      style="container-type: inline-size"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-1 text-[12px] text-muted-foreground font-medium min-w-0">
-          <span class="truncate">{{ label }}</span>
+          <span class="leading-tight break-words">{{ label }}</span>
           <ng-content select="[slot=hint]" />
         </div>
         <app-icon
@@ -30,8 +33,10 @@ export interface StatDelta {
       </div>
 
       <div class="flex-1 flex items-center">
+        <!-- O valor acompanha a largura do card (cqw): -R$ 10.421,77 cabe em card estreito sem vazar. -->
         <div
-          class="text-[22px] xl:text-[24px] 2xl:text-[28px] leading-tight font-bold tracking-tight tabular-nums whitespace-nowrap"
+          class="leading-tight font-bold tracking-tight tabular-nums whitespace-nowrap"
+          style="font-size: clamp(14px, 10cqw, 28px)"
         >
           {{ value }}
         </div>
@@ -42,13 +47,12 @@ export interface StatDelta {
         @if (subtext) {
           <div class="text-[12px] text-muted-foreground">{{ subtext }}</div>
         }
-        @if (delta) {
+        @if (delta && temDelta) {
           <div [class]="deltaClass">
-            <app-icon
-              [name]="delta.up ? 'trending_up' : 'trending_down'"
-              [style]="{ fontSize: '16px' }"
-            />
-            <span>{{ delta.up ? '▲' : '▼' }}</span>
+            <app-icon [name]="deltaIcon" [style]="{ fontSize: '16px' }" />
+            @if (!delta.flat) {
+              <span>{{ delta.up ? '▲' : '▼' }}</span>
+            }
             {{ delta.value }}
             <span class="text-muted-foreground font-normal">{{
               delta.note ?? 'vs. mês anterior'
@@ -87,8 +91,20 @@ export class StatCardComponent {
   @Input() spark: number[] | null = null;
   @Input() subtext = '';
 
+  /** Sem número (sem dado para comparar) não há o que mostrar: nada de legenda solta. */
+  get temDelta(): boolean {
+    const v = this.delta?.value?.trim();
+    return !!v && v !== '—';
+  }
+
+  get deltaIcon(): string {
+    if (this.delta?.flat) return 'trending_flat';
+    return this.delta?.up ? 'trending_up' : 'trending_down';
+  }
+
   get deltaClass(): string {
-    const base = 'inline-flex items-center gap-1 text-[12px] font-semibold whitespace-nowrap';
+    const base = 'inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[12px] font-semibold';
+    if (this.delta?.flat) return `${base} text-muted-foreground`;
     if (this.status === 'warning') return `${base} text-warning`;
     return `${base} ${this.delta?.up ? 'text-success' : 'text-error'}`;
   }

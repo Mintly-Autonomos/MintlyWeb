@@ -15,6 +15,7 @@ import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-ch
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
+import { statDelta } from '../../shared/stat-delta';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
@@ -95,6 +96,7 @@ export class ResultadoComponent implements OnInit {
   protected pctFmt = pctFmt;
   protected abrev = formatCompact;
   protected readonly Math = Math;
+  protected readonly statDelta = statDelta;
   protected regimeLabel = REGIME_LABEL;
   protected fmtMonthLong = fmtMonthLong;
 
@@ -226,7 +228,6 @@ export class ResultadoComponent implements OnInit {
 
   protected margemLiquida = computed(() => (this.data()?.current.netMargin ?? 0) * 100);
   protected margemLiquidaAnterior = computed(() => (this.data()?.previous.netMargin ?? 0) * 100);
-  protected deltaLucro = computed(() => (this.data()?.deltas.netProfit ?? 0) * 100);
   protected margemContribuicaoPct = computed(
     () => (this.data()?.breakEven.contributionMarginPct ?? 0) * 100,
   );
@@ -286,11 +287,36 @@ export class ResultadoComponent implements OnInit {
     return rev > 0 ? (part / rev) * 100 : 0;
   }
 
+  /** Quanto do ponto de equilíbrio já foi vendido (0–100). */
   breakEvenPct(): number {
     const d = this.data();
     if (!d || !d.breakEven.breakEvenRevenue || !d.current.grossRevenue) return 0;
-    return Math.min(100, (d.breakEven.breakEvenRevenue / d.current.grossRevenue) * 100);
+    return Math.min(100, (d.current.grossRevenue / d.breakEven.breakEvenRevenue) * 100);
   }
+
+  /**
+   * Margem de contribuição sobre a receita bruta: custos fixos ÷ ponto de equilíbrio. É a que fecha
+   * a conta mostrada na tela (a da API é sobre a receita líquida). Sem ponto de equilíbrio → null.
+   */
+  protected breakEvenInfo = computed(() => {
+    const be = this.data()?.breakEven;
+    if (!be?.breakEvenRevenue) return null;
+    return { alvo: be.breakEvenRevenue, margem: (be.fixedCosts / be.breakEvenRevenue) * 100 };
+  });
+
+  /** Por que não há ponto de equilíbrio a mostrar (sem vendas, sem custos fixos ou sem margem). */
+  protected breakEvenSemPonto = computed(() => {
+    const d = this.data();
+    if (!d) return '';
+    if (d.current.grossRevenue <= 0)
+      return 'Ainda não há vendas neste mês para calcular o ponto de equilíbrio.';
+    if (d.breakEven.fixedCosts <= 0 && (d.breakEven.contributionMarginPct ?? 0) > 0)
+      return 'Não há custos fixos lançados neste mês, então qualquer venda já cobre as contas.';
+    return `Neste mês, os custos variáveis consomem toda a venda: não sobra margem para cobrir os custos fixos de ${formatBRL(d.breakEven.fixedCosts)}, então não há ponto de equilíbrio.`;
+  });
+
+  protected readonly breakEvenHint =
+    'Quanto você precisa vender no mês só para pagar as contas, sem lucro nem prejuízo. Ponto de equilíbrio = custos fixos ÷ margem de contribuição, que é a parte de cada real vendido que sobra depois dos impostos e dos custos variáveis.';
 
   async setRegime(regime: TaxRegimeKey): Promise<void> {
     this.savingRegime.set(true);
