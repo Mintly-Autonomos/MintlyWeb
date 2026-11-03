@@ -7,7 +7,9 @@ name: MintlyWeb Deploy
 # erradas (ex.: subir production na Vercel por engano). Não existe staging na AWS.
 #
 # A BRANCH do código é a escolhida no topo do "Run workflow" (Use workflow from): é ela que o checkout baixa.
-# Os dois ambientes exigem aprovação (required reviewers do environment do GitHub).
+#
+# Segredos e aprovação: os DOIS jobs usam o environment "production" do GitHub (é nele que estão os segredos da
+# Vercel e da AWS e os revisores). O input "environment" só decide o destino; não é o environment do GitHub.
 
 on:
   workflow_dispatch:
@@ -58,7 +60,8 @@ jobs:
     needs: verify-inputs
     if: ${{ inputs.environment == 'staging' }}
     runs-on: ubuntu-latest
-    environment: staging
+    # Igual ao deploy da Vercel de antes: segredos e aprovação do environment "production" do GitHub.
+    environment: production
 
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
