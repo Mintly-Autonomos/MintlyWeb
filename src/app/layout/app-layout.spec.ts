@@ -33,8 +33,9 @@ describe('AppLayoutComponent — menu no celular', () => {
     const dlg = gaveta(el);
     expect(dlg).not.toBeNull();
     const nomes = Array.from(dlg!.querySelectorAll('nav a')).map((a) => a.textContent);
-    expect(nomes.length).toBe(9);
+    expect(nomes.length).toBe(10);
     expect(nomes.join(' ')).toContain('Movimentações');
+    expect(nomes.join(' ')).toContain('Cardápio');
   });
 
   it('trava a rolagem da página enquanto aberta e solta ao fechar', () => {

@@ -73,7 +73,8 @@ export function toPrato(raw: {
   return {
     id: (raw._id ?? raw.id) as string,
     name: raw.name,
-    category: raw.category ?? null,
+    // Texto vazio (apagou a categoria ao editar) vale "sem categoria", igual a ausente.
+    category: raw.category?.trim() || null,
     price: raw.price,
     cost: raw.cost ?? 0,
     soldPerMonth: raw.soldPerMonth ?? 0,
