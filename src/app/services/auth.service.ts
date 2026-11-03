@@ -92,6 +92,20 @@ export class AuthService {
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly currentUser = this._user.asReadonly();
 
+  /**
+   * Nome do restaurante no menu da conta. A resposta do login não o traz (só a do cadastro), então ele
+   * vem de /restaurants/me e é guardado na sessão, para sobreviver ao recarregar a página.
+   */
+  setCompanyName(name: string | null | undefined): void {
+    const user = this._user();
+    const empresa = name?.trim();
+    if (!user || !empresa || user.empresa === empresa) return;
+    const next = { ...user, empresa };
+    this._user.set(next);
+    // A foto fica numa chave própria (ver persistTokens): não entra no usuário salvo.
+    this.write(KEYS.user, JSON.stringify({ ...next, avatarDataUrl: undefined }));
+  }
+
   /** Renovação em andamento: quem pede enquanto ela roda espera por ela, em vez de gastar o token de novo. */
   private refreshInFlight: Promise<boolean> | null = null;
 

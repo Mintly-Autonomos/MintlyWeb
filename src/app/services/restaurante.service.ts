@@ -110,7 +110,7 @@ export class RestauranteService {
   readonly loading = signal(false);
 
   /** Resposta do servidor sobre o onboarding, guardada por restaurante (uma consulta por sessão). */
-  private onboardingState: { restaurantId: string; pending: boolean } | null = null;
+  private onboardingState: { restaurantId: string; pending: boolean; name?: string } | null = null;
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
@@ -167,6 +167,7 @@ export class RestauranteService {
       this.profile.set(
         toProfile(payload.restaurant.name, payload.restaurant.taxRegime, payload.tax),
       );
+      this.auth.setCompanyName(payload.restaurant.name);
     } finally {
       this.loading.set(false);
     }
@@ -180,11 +181,17 @@ export class RestauranteService {
   async isOnboardingPending(): Promise<boolean> {
     if (environment.useMocks) return false;
     const restaurantId = this.auth.currentUser()?.restaurantId ?? '';
-    if (this.onboardingState?.restaurantId === restaurantId) return this.onboardingState.pending;
+    if (this.onboardingState?.restaurantId === restaurantId) {
+      // Entrou de novo na mesma aba: o login não traz o nome do restaurante, mas a consulta já o guardou.
+      this.auth.setCompanyName(this.onboardingState.name);
+      return this.onboardingState.pending;
+    }
     try {
       const response = await this.call((headers) => this.restaurantClient.me({}, headers));
       const pending = response.payload?.restaurant.firstAccessAt === null;
-      this.onboardingState = { restaurantId, pending };
+      const name = response.payload?.restaurant.name;
+      this.onboardingState = { restaurantId, pending, name };
+      this.auth.setCompanyName(name);
       return pending;
     } catch {
       return false;
