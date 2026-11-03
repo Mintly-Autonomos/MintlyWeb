@@ -91,8 +91,16 @@ interface MovForm {
   paymentMethod: PaymentMethod | '';
   status: MovStatus;
   notes: string;
-  /** Pratos vendidos (só entradas): prato do cardápio e quantidade; o nome é só para mostrar. */
-  items: { menuItemId: string; name: string; qty: number }[];
+  /**
+   * Pratos vendidos (só entradas): prato do cardápio e quantidade. O nome e o preço são para mostrar e para
+   * somar o valor da venda; o servidor copia o preço do cardápio de novo ao gravar.
+   */
+  items: { menuItemId: string; name: string; qty: number; unitPrice: number }[];
+}
+
+/** Soma dos pratos em centavos inteiros (sem passar por float). */
+function dishesCents(items: MovForm['items']): number {
+  return items.reduce((sum, i) => sum + i.qty * Math.round(i.unitPrice * 100), 0);
 }
 
 @Component({
@@ -499,6 +507,42 @@ export class MovimentacoesComponent implements OnInit {
     this.dishAliases.update((a) => ({ ...a, [key]: value === 'ignore' ? DISH_IGNORE : value }));
   }
 
+  /**
+   * O valor da venda começa como a SOMA dos pratos e acompanha a soma enquanto a pessoa não mexe nele.
+   * Mexeu (ex.: um desconto)? O valor dela vale e deixa de ser recalculado: o formulário só mostra a soma
+   * e a diferença, e "Usar a soma dos pratos" volta a acompanhar. Sem pratos o campo é sempre livre.
+   * Uma venda antiga cujo valor já não bate com a soma abre assim (editado), para não mudar o dinheiro
+   * dela sem a pessoa ver.
+   */
+  protected valueEdited = signal(false);
+
+  protected dishTotal = computed(() => dishesCents(this.form().items) / 100);
+
+  /** Diferença (em reais) entre o valor do campo e a soma dos pratos; 0 quando batem ou não há pratos. */
+  protected dishValueDiff = computed(() => {
+    const f = this.form();
+    if (f.type !== 'income' || f.items.length === 0) return 0;
+    return (Math.round(parseNumberBR(f.value) * 100) - dishesCents(f.items)) / 100;
+  });
+
+  /** Com pratos, o valor acompanha a soma deles, a menos que a pessoa tenha editado o valor. */
+  private withDishValue(f: MovForm): MovForm {
+    if (f.type !== 'income' || f.items.length === 0 || this.valueEdited()) return f;
+    return { ...f, value: moneyToInput(dishesCents(f.items) / 100) };
+  }
+
+  /** A pessoa digitou no valor: passa a valer o que ela digitou (só importa com pratos na venda). */
+  onValueInput(value: string): void {
+    this.valueEdited.set(true);
+    this.setFormField('value', value);
+  }
+
+  /** Volta a acompanhar a soma dos pratos. */
+  useDishTotal(): void {
+    this.valueEdited.set(false);
+    this.form.update((f) => this.withDishValue(f));
+  }
+
   /** Prato escolhido na lista: entra com quantidade 1, ou soma 1 se já estava. */
   addDish(menuItemId: string): void {
     const dish = this.cardapioSvc.pratos().find((p) => p.id === menuItemId);
@@ -508,21 +552,27 @@ export class MovimentacoesComponent implements OnInit {
       const items =
         i >= 0
           ? f.items.map((x, n) => (n === i ? { ...x, qty: Math.min(99, x.qty + 1) } : x))
-          : [...f.items, { menuItemId, name: dish.name, qty: 1 }];
-      return { ...f, items };
+          : [...f.items, { menuItemId, name: dish.name, qty: 1, unitPrice: dish.price }];
+      return this.withDishValue({ ...f, items });
     });
   }
 
   setDishQty(menuItemId: string, qty: number): void {
     const next = Math.max(1, Math.min(99, Math.round(qty) || 1));
-    this.form.update((f) => ({
-      ...f,
-      items: f.items.map((x) => (x.menuItemId === menuItemId ? { ...x, qty: next } : x)),
-    }));
+    this.form.update((f) =>
+      this.withDishValue({
+        ...f,
+        items: f.items.map((x) => (x.menuItemId === menuItemId ? { ...x, qty: next } : x)),
+      }),
+    );
   }
 
   removeDish(menuItemId: string): void {
-    this.form.update((f) => ({ ...f, items: f.items.filter((x) => x.menuItemId !== menuItemId) }));
+    this.form.update((f) =>
+      this.withDishValue({ ...f, items: f.items.filter((x) => x.menuItemId !== menuItemId) }),
+    );
+    // Sem nenhum prato não há soma para acompanhar: a próxima venda com pratos recomeça da soma.
+    if (this.form().items.length === 0) this.valueEdited.set(false);
   }
 
   /** Os pratos que vão para a API (só entradas têm pratos). */
@@ -580,6 +630,7 @@ export class MovimentacoesComponent implements OnInit {
       notes: '',
       items: [],
     });
+    this.valueEdited.set(false);
     this.importMode.set(false);
     this.importFile.set(null);
     this.creating.set(true);
@@ -596,8 +647,16 @@ export class MovimentacoesComponent implements OnInit {
       paymentMethod: m.paymentMethod ?? '',
       status: m.status,
       notes: m.notes ?? '',
-      items: (m.items ?? []).map((i) => ({ menuItemId: i.menuItemId, name: i.name, qty: i.qty })),
+      items: (m.items ?? []).map((i) => ({
+        menuItemId: i.menuItemId,
+        name: i.name,
+        qty: i.qty,
+        unitPrice: i.unitPrice,
+      })),
     });
+    // O valor guardado manda: só segue os pratos se já era exatamente a soma deles.
+    const stored = Math.round(m.value * 100);
+    this.valueEdited.set((m.items ?? []).length > 0 && stored !== dishesCents(this.form().items));
     this.editing.set(m);
   }
 

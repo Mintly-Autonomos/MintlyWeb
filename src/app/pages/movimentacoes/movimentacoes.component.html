@@ -412,6 +412,11 @@
                 <span class="min-w-0 flex-1 truncate text-[13px] font-medium" [title]="it.name">{{
                   it.name
                 }}</span>
+                <span
+                  class="shrink-0 text-[12px] tabular-nums text-muted-foreground"
+                  data-testid="prato-subtotal"
+                  >{{ fmtBRL(it.qty * it.unitPrice) }}</span
+                >
                 <button
                   type="button"
                   (click)="setDishQty(it.menuItemId, it.qty - 1)"
@@ -458,7 +463,7 @@
               <input
                 appMoneyInput
                 [value]="form().value"
-                (input)="setFormField('value', $any($event.target).value)"
+                (input)="onValueInput($any($event.target).value)"
                 type="text"
                 inputmode="decimal"
                 placeholder="0,00"
@@ -467,6 +472,26 @@
             </div>
             @if (amountError) {
               <p class="text-error text-[12px] mt-1">{{ amountError }}</p>
+            } @else if (form().type === 'income' && form().items.length > 0) {
+              <p class="text-muted-foreground text-[12px] mt-1" data-testid="valor-soma-pratos">
+                @if (dishValueDiff() === 0) {
+                  Soma dos pratos. Você pode alterar (ex.: desconto).
+                } @else {
+                  Soma dos pratos: {{ fmtBRL(dishTotal()) }} ({{
+                    dishValueDiff() < 0
+                      ? fmtBRL(-dishValueDiff()) + ' a menos'
+                      : fmtBRL(dishValueDiff()) + ' a mais'
+                  }}).
+                  <button
+                    type="button"
+                    (click)="useDishTotal()"
+                    class="font-semibold text-ocean underline underline-offset-2 cursor-pointer"
+                    data-testid="usar-soma-pratos"
+                  >
+                    Usar a soma dos pratos
+                  </button>
+                }
+              </p>
             } @else {
               <p class="text-muted-foreground text-[12px] mt-1">
                 Digite os centavos depois da vírgula (ex.: 1.234,50).

@@ -16,8 +16,14 @@ interface Internals {
   form: () => {
     date: string;
     type: string;
-    items: { menuItemId: string; name: string; qty: number }[];
+    value: string;
+    items: { menuItemId: string; name: string; qty: number; unitPrice: number }[];
   };
+  dishTotal: () => number;
+  dishValueDiff: () => number;
+  onValueInput(value: string): void;
+  useDishTotal(): void;
+  openEdit(m: unknown): void;
   addDish(id: string): void;
   setDishQty(id: string, qty: number): void;
   removeDish(id: string): void;
@@ -115,9 +121,9 @@ describe('MovimentacoesComponent', () => {
           provide: CardapioService,
           useValue: {
             pratos: signal([
-              { id: 'm1', name: 'Arroz', active: true },
-              { id: 'm2', name: 'Batata Rústica', active: true },
-              { id: 'm3', name: 'Prato antigo', active: false },
+              { id: 'm1', name: 'Arroz', price: 12.5, active: true },
+              { id: 'm2', name: 'Batata Rústica', price: 8.9, active: true },
+              { id: 'm3', name: 'Prato antigo', price: 20, active: false },
             ]),
             refresh: vi.fn().mockResolvedValue(undefined),
           },
@@ -884,7 +890,9 @@ describe('MovimentacoesComponent', () => {
       c.openCreate('income');
       c.addDish('m1');
       c.addDish('m1');
-      expect(c.form().items).toEqual([{ menuItemId: 'm1', name: 'Arroz', qty: 2 }]);
+      expect(c.form().items).toEqual([
+        { menuItemId: 'm1', name: 'Arroz', qty: 2, unitPrice: 12.5 },
+      ]);
       c.setDishQty('m1', 0);
       expect(c.form().items[0].qty).toBe(1);
       c.setDishQty('m1', 500);
@@ -905,6 +913,143 @@ describe('MovimentacoesComponent', () => {
       c.addDish('m1');
       c.openCreate('income');
       expect(c.form().items).toEqual([]);
+    });
+  });
+
+  describe('valor da venda = soma dos pratos (e a pessoa pode alterar)', () => {
+    it('cada prato escolhido soma no valor, com centavos exatos', () => {
+      c.openCreate('income');
+      expect(c.form().value).toBe('');
+      c.addDish('m1');
+      expect(c.form().value).toBe('12,50');
+      c.addDish('m1');
+      c.addDish('m2');
+      expect(c.form().value).toBe('33,90'); // 2 x 12,50 + 8,90
+      expect(c.dishTotal()).toBe(33.9);
+    });
+
+    it('mudar a quantidade ou tirar um prato atualiza o valor', () => {
+      c.openCreate('income');
+      c.addDish('m1');
+      c.addDish('m2');
+      c.setDishQty('m2', 3);
+      expect(c.form().value).toBe('39,20'); // 12,50 + 3 x 8,90
+      c.removeDish('m1');
+      expect(c.form().value).toBe('26,70');
+    });
+
+    it('sem pratos o valor é livre: nada é preenchido nem apagado', () => {
+      c.openCreate('income');
+      c.onValueInput('45,00');
+      expect(c.form().value).toBe('45,00');
+      expect(c.dishValueDiff()).toBe(0);
+    });
+
+    it('a pessoa pode alterar o valor (ex.: desconto): vale o que ela digitou e mostra a diferença', () => {
+      c.openCreate('income');
+      c.addDish('m1');
+      c.addDish('m2'); // 21,40
+      c.onValueInput('20,00');
+      expect(c.form().value).toBe('20,00');
+      expect(c.dishTotal()).toBe(21.4);
+      expect(c.dishValueDiff()).toBe(-1.4);
+    });
+
+    it('depois de editar, mexer nos pratos NÃO sobrescreve o valor da pessoa', () => {
+      c.openCreate('income');
+      c.addDish('m1');
+      c.onValueInput('10,00');
+      c.addDish('m2');
+      expect(c.form().value).toBe('10,00');
+      expect(c.dishTotal()).toBe(21.4);
+    });
+
+    it('"Usar a soma dos pratos" volta a acompanhar os pratos', () => {
+      c.openCreate('income');
+      c.addDish('m1');
+      c.onValueInput('10,00');
+      c.useDishTotal();
+      expect(c.form().value).toBe('12,50');
+      expect(c.dishValueDiff()).toBe(0);
+      c.addDish('m2');
+      expect(c.form().value).toBe('21,40');
+    });
+
+    it('tirar todos os pratos libera o valor: a próxima venda com pratos recomeça da soma', () => {
+      c.openCreate('income');
+      c.addDish('m1');
+      c.onValueInput('10,00');
+      c.removeDish('m1');
+      c.addDish('m2');
+      expect(c.form().value).toBe('8,90');
+    });
+
+    it('na tela: cada prato mostra o subtotal e o valor explica a soma, a diferença e o botão de voltar', () => {
+      const el = () => fixture.nativeElement as HTMLElement;
+      const text = (selector: string) =>
+        el().querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+      c.openCreate('income');
+      c.addDish('m1');
+      c.addDish('m1');
+      c.addDish('m2');
+      fixture.detectChanges();
+
+      const subtotais = Array.from(el().querySelectorAll('[data-testid="prato-subtotal"]')).map(
+        (s) => s.textContent?.replace(/\s+/g, ' ').trim(),
+      );
+      expect(subtotais).toEqual(['R$ 25,00', 'R$ 8,90']);
+      expect(text('[data-testid="valor-soma-pratos"]')).toContain(
+        'Soma dos pratos. Você pode alterar',
+      );
+      expect(el().querySelector('[data-testid="usar-soma-pratos"]')).toBeNull();
+
+      c.onValueInput('30,00');
+      fixture.detectChanges();
+      expect(text('[data-testid="valor-soma-pratos"]')).toContain(
+        'Soma dos pratos: R$ 33,90 (R$ 3,90 a menos)',
+      );
+      (el().querySelector('[data-testid="usar-soma-pratos"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(c.form().value).toBe('33,90');
+      expect(el().querySelector('[data-testid="usar-soma-pratos"]')).toBeNull();
+    });
+
+    it('venda antiga: abrir para editar não troca o valor guardado pela soma dos pratos', () => {
+      const old = {
+        id: 'v1',
+        title: 'Venda antiga',
+        type: 'income',
+        status: 'received',
+        date: '2026-10-20',
+        value: 100,
+        categoryId: 'c2',
+        accountId: 'a1',
+        items: [{ menuItemId: 'm1', name: 'Arroz', qty: 2, unitPrice: 12.5 }],
+      };
+      c.openEdit(old);
+      expect(c.form().value).toBe('100,00');
+      expect(c.dishValueDiff()).toBe(75);
+      c.addDish('m2');
+      expect(c.form().value).toBe('100,00');
+      c.useDishTotal();
+      expect(c.form().value).toBe('33,90');
+    });
+
+    it('venda antiga cujo valor já é a soma dos pratos continua acompanhando', () => {
+      const old = {
+        id: 'v2',
+        title: 'Venda certa',
+        type: 'income',
+        status: 'received',
+        date: '2026-10-20',
+        value: 25,
+        categoryId: 'c2',
+        accountId: 'a1',
+        items: [{ menuItemId: 'm1', name: 'Arroz', qty: 2, unitPrice: 12.5 }],
+      };
+      c.openEdit(old);
+      c.setDishQty('m1', 3);
+      expect(c.form().value).toBe('37,50');
     });
   });
 
