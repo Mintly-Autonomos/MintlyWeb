@@ -64,12 +64,17 @@
           />
         </div>
         <div
-          class="mt-2 text-[40px] xl:text-[52px] leading-none font-bold tracking-tight tabular-nums text-success"
+          [class]="
+            'mt-2 text-[40px] xl:text-[52px] leading-none font-bold tracking-tight tabular-nums ' +
+            (d.current.netProfit < 0 ? 'text-error' : 'text-success')
+          "
         >
           {{ fmtBRL(d.current.netProfit) }}
         </div>
         <div class="mt-4 flex flex-wrap items-center gap-2">
-          <app-chip tone="success" icon="percent">Margem de {{ pctFmt(margemLiquida()) }}</app-chip>
+          <app-chip [tone]="d.current.netProfit < 0 ? 'error' : 'success'" icon="percent"
+            >Margem de {{ pctFmt(margemLiquida()) }}</app-chip
+          >
           <app-chip
             [tone]="deltaLucro() >= 0 ? 'mint' : 'warning'"
             [icon]="deltaLucro() >= 0 ? 'trending_up' : 'trending_down'"
@@ -78,9 +83,14 @@
             {{ fmtMonthLong(d.previousMonth) }}
           </app-chip>
           <span class="text-[12.5px] text-muted-foreground">
-            De cada R$ 100 vendidos, R$
-            {{ margemLiquida().toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }} ficaram com
-            você.
+            @if (d.current.netProfit < 0) {
+              De cada R$ 100 vendidos, você ficou devendo R$
+              {{ Math.abs(margemLiquida()).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }}.
+            } @else {
+              De cada R$ 100 vendidos, R$
+              {{ margemLiquida().toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }} ficaram
+              com você.
+            }
           </span>
         </div>
       </div>
@@ -88,28 +98,52 @@
       <div class="m3-card p-5 flex flex-col justify-center">
         <div class="text-[12.5px] text-muted-foreground font-medium flex items-center gap-1.5">
           Ponto de equilíbrio
-          <app-hint
-            text="Quanto você precisa vender no mês só para pagar as contas, sem lucro nem prejuízo."
-          />
+          <app-hint [text]="breakEvenHint" />
         </div>
         <div class="mt-2 text-[26px] font-bold tracking-tight tabular-nums">
           {{ d.breakEven.breakEvenRevenue ? fmtBRL(d.breakEven.breakEvenRevenue) : '—' }}
         </div>
-        <p class="text-[12.5px] text-muted-foreground mt-2 leading-relaxed">
-          @if (d.breakEven.reachedOnDay) {
-            Você atingiu esse valor no dia {{ d.breakEven.reachedOnDay }} do mês. Cada real vendido
-            depois disso tem {{ pctFmt(margemContribuicaoPct()) }} de margem.
-          } @else {
-            Ainda não atingido neste mês. Cada real vendido depois do ponto de equilíbrio tem
-            {{ pctFmt(margemContribuicaoPct()) }} de margem.
-          }
-        </p>
-        <div class="mt-3 h-2 rounded-full bg-muted overflow-hidden">
-          <div class="h-full rounded-full bg-mint" [style.width.%]="breakEvenPct()"></div>
-        </div>
-        <div class="mt-1.5 text-[11.5px] text-muted-foreground">
-          Custos fixos de {{ fmtBRL(d.breakEven.fixedCosts) }} no mês
-        </div>
+        @if (breakEvenInfo(); as be) {
+          <p class="text-[12.5px] text-muted-foreground mt-2 leading-relaxed">
+            @if (d.breakEven.reachedOnDay) {
+              Você atingiu esse valor no dia {{ d.breakEven.reachedOnDay }} do mês. Cada real
+              vendido depois disso tem {{ pctFmt(be.margem) }} de margem.
+            } @else {
+              Ainda não atingido neste mês. Cada real vendido até lá tem {{ pctFmt(be.margem) }} de
+              margem para cobrir os custos fixos.
+            }
+          </p>
+          <div
+            class="mt-3 h-2 rounded-full bg-muted overflow-hidden"
+            role="progressbar"
+            aria-label="Quanto do ponto de equilíbrio já foi vendido"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            [attr.aria-valuenow]="Math.round(breakEvenPct())"
+          >
+            <div
+              [class]="
+                'h-full rounded-full transition-all duration-300 ' +
+                (breakEvenPct() >= 100 ? 'bg-mint' : 'bg-warning')
+              "
+              [style.width.%]="breakEvenPct()"
+            ></div>
+          </div>
+          <div class="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 text-[11.5px]">
+            <span class="text-muted-foreground"
+              >Vendido: {{ fmtBRL(d.current.grossRevenue) }} de {{ fmtBRL(be.alvo) }}</span
+            >
+            <span class="font-semibold tabular-nums">{{ pctFmt(breakEvenPct()) }}</span>
+          </div>
+          <div class="mt-2 text-[11.5px] text-muted-foreground leading-relaxed">
+            Conta: custos fixos {{ fmtBRL(d.breakEven.fixedCosts) }} ÷ margem de contribuição
+            {{ pctFmt(be.margem) }} = {{ fmtBRL(be.alvo) }}
+          </div>
+        } @else {
+          <p class="text-[12.5px] text-muted-foreground mt-2 leading-relaxed">
+            {{ breakEvenSemPonto() }}
+          </p>
+        }
       </div>
     </div>
 
@@ -145,7 +179,7 @@
         label="Margem líquida"
         [value]="pctFmt(margemLiquida())"
         icon="savings"
-        status="positive"
+        [status]="margemLiquida() < 0 ? 'negative' : 'positive'"
         [spark]="lucroSpark()"
         [subtext]="
           'Era ' + pctFmt(margemLiquidaAnterior()) + ' em ' + fmtMonthLong(d.previousMonth)
@@ -295,7 +329,7 @@
               [class]="
                 'w-[140px] text-right tabular-nums ' +
                 (l.tipo === 'resultado'
-                  ? 'text-[17px] font-bold text-success'
+                  ? 'text-[17px] font-bold ' + (l.valor < 0 ? 'text-error' : 'text-success')
                   : l.tipo === 'subtotal'
                     ? 'text-[14.5px] font-bold'
                     : l.tipo === 'deducao'

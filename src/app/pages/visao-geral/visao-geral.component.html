@@ -108,7 +108,7 @@
       </div>
 
       <!-- 3 — KPIs -->
-      <div class="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div class="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-6">
         <app-stat-card
           label="Lucro do mês"
           [value]="fmtBRL(d.cards.netProfit.amount)"
@@ -164,10 +164,7 @@
           icon="restaurant"
           status="warning"
         >
-          <app-hint
-            slot="hint"
-            text="Custo da Mercadoria Vendida: quanto dos seus insumos foi consumido para gerar as vendas. Ideal entre 28% e 35% da receita."
-          />
+          <app-hint slot="hint" [text]="cmvHint" />
           <app-bullet
             slot="footer"
             [value]="(d.cards.cmv.pct ?? 0) * 100"
@@ -196,10 +193,7 @@
           icon="stacked_bar_chart"
           status="warning"
         >
-          <app-hint
-            slot="hint"
-            text="CMV + custo de pessoal. É o maior custo controlável de um restaurante."
-          />
+          <app-hint slot="hint" [text]="primeCostHint" />
           <app-bullet
             slot="footer"
             [value]="(d.cards.primeCost.pct ?? 0) * 100"
@@ -226,7 +220,7 @@
     <!-- 4 — Insights -->
     <section>
       <app-section-header title="O que fazer primeiro" />
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         @for (i of d.insights; track i.kind) {
           <app-insight-card
             [severity]="insightSeverity(i)"
@@ -282,19 +276,23 @@
           <div>
             <div class="flex items-center justify-between text-[13px]">
               <span class="font-semibold">{{ pillarLabel[p.key] }}</span>
-              <span class="tabular-nums font-bold">{{ p.score ?? '—' }}</span>
+              <span class="tabular-nums font-bold" [style.color]="pillarColor(p.score)">{{
+                p.score ?? '—'
+              }}</span>
             </div>
             <div class="mt-2 h-2 rounded-full bg-muted overflow-hidden">
               <div
                 class="h-full rounded-full"
                 [style.width.%]="p.score ?? 0"
-                [style.background]="scoreMeta().color"
+                [style.background]="pillarColor(p.score)"
               ></div>
             </div>
             <div
               class="mt-1.5 flex items-center justify-between text-[11.5px] text-muted-foreground"
             >
-              <span>{{ pillarDetail(p.key, p.value) }}</span>
+              <span>{{
+                pillarDetail(p.key, p.value, d.health.basisMonth === d.referenceMonth)
+              }}</span>
               <span>peso {{ Math.round(p.weight * 100) }}%</span>
             </div>
           </div>

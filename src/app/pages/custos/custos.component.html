@@ -62,10 +62,7 @@
         status="warning"
         [subtext]="fmtBRL(d.cmv.amount)"
       >
-        <app-hint
-          slot="hint"
-          text="Custo dos ingredientes sobre a receita. Ideal entre 28% e 35%."
-        />
+        <app-hint slot="hint" [text]="cmvHint" />
         <app-bullet
           slot="footer"
           [value]="(d.cmv.pctOfRevenue ?? 0) * 100"
@@ -87,10 +84,7 @@
         status="warning"
         [subtext]="fmtBRL(d.primeCost.cmv + d.primeCost.labor) + ' de CMV + pró-labore'"
       >
-        <app-hint
-          slot="hint"
-          text="Soma do custo dos ingredientes com a mão de obra (aqui, o pró-labore da família). É o maior custo controlável de um restaurante."
-        />
+        <app-hint slot="hint" [text]="primeCostHint" />
         <app-bullet
           slot="footer"
           [value]="(d.primeCost.pctOfRevenue ?? 0) * 100"
