@@ -1,3 +1,4 @@
+import { Location } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/icon.component';
@@ -39,6 +40,7 @@ export class CardapioComponent implements OnInit, OnDestroy {
   private svc = inject(CardapioService);
   private toast = inject(ToastService);
   private route = inject(ActivatedRoute);
+  private location = inject(Location);
 
   protected readonly fmtBRL = formatBRL;
   protected readonly inputClass = INPUT;
@@ -69,11 +71,14 @@ export class CardapioComponent implements OnInit, OnDestroy {
   protected editandoId = signal<string | null>(null);
   protected precoEditandoId = signal<string | null>(null);
   protected destaque = signal<string | null>(null);
+  /** Preço vindo do simulador (Previsões): abre o editor de preço já preenchido para a pessoa só confirmar. */
+  protected sugerido = signal<{ id: string; price: number } | null>(null);
   protected f = signal({ ...FORM_VAZIO });
   protected precoEditado = signal('');
 
   /** Prato a destacar (vem do sino: "Rever preço"). */
   private pendingFocus: string | null = null;
+  private pendingPrice: number | null = null;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
   constructor() {
@@ -89,16 +94,31 @@ export class CardapioComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.pendingFocus = this.route.snapshot.queryParamMap.get('item');
+    const params = this.route.snapshot.queryParamMap;
+    this.pendingFocus = params.get('item');
+    const preco = params.get('preco');
+    const valor = preco === null || preco.trim() === '' ? NaN : Number(preco);
+    this.pendingPrice = Number.isFinite(valor) && valor >= 0 ? valor : null;
     this.tryFocus();
     this.svc.refresh().catch(() => this.toast.error('Não foi possível carregar o cardápio.'));
   }
 
   private tryFocus(): void {
     const id = this.pendingFocus;
-    if (!id || !this.svc.pratos().some((x) => x.id === id)) return;
+    const prato = id ? this.svc.pratos().find((x) => x.id === id) : undefined;
+    if (!id || !prato) return;
     this.pendingFocus = null;
     this.destaque.set(id);
+    // Veio do simulador com um preço: abre "Mudar preço" já com o valor, é só confirmar em Salvar.
+    const preco = this.pendingPrice;
+    this.pendingPrice = null;
+    if (preco !== null && prato.active && Math.abs(preco - prato.price) >= 0.005) {
+      this.iniciarPreco(prato);
+      this.precoEditado.set(moneyToInput(preco));
+      this.sugerido.set({ id, price: preco });
+    }
+    // O pedido já foi atendido: tira os parâmetros do endereço (recarregar não reabre o editor).
+    this.location.replaceState('/cardapio');
     this.timers.push(
       setTimeout(
         () =>
@@ -120,12 +140,11 @@ export class CardapioComponent implements OnInit, OnDestroy {
     return tempoLabel(diasSemRevisao(p, new Date()));
   }
 
-  /** Preço menos custo e quanto isso é do preço; "—" enquanto o custo não foi informado. */
+  /** Quanto do preço sobra depois do custo, em %; "—" enquanto o custo não foi informado. */
   protected margemLabel(p: Prato): string {
     if (!(p.cost > 0) || !(p.price > 0)) return '—';
-    const margem = p.price - p.cost;
-    const pct = (margem / p.price) * 100;
-    return `${formatBRL(margem)} (${pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%)`;
+    const pct = ((p.price - p.cost) / p.price) * 100;
+    return `${pct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%`;
   }
 
   protected inputValue(e: Event): string {
@@ -239,6 +258,7 @@ export class CardapioComponent implements OnInit, OnDestroy {
     try {
       await this.svc.changePrice(p.id, preco);
       this.precoEditandoId.set(null);
+      this.sugerido.set(null);
       this.toast.success(
         preco === p.price ? `Preço de ${p.name} mantido.` : `Preço de ${p.name} atualizado.`,
       );

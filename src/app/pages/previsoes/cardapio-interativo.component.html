@@ -174,7 +174,7 @@
               @if (item()!.alterado) {
                 <a
                   routerLink="/cardapio"
-                  [queryParams]="{ item: item()!.id }"
+                  [queryParams]="{ item: item()!.id, preco: item()!.preco }"
                   class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 transition"
                 >
                   <app-icon name="restaurant_menu" [style]="{ fontSize: '18px' }" />
