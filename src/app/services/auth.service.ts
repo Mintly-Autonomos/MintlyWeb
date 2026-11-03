@@ -17,6 +17,17 @@ export interface AuthUser {
   avatarDataUrl?: string;
 }
 
+/**
+ * Conta lembrada neste aparelho (só quando a pessoa marcou "Manter conectado"): a tela de login mostra
+ * quem é e pede só a senha. Nunca guarda senha nem token.
+ */
+export interface SavedAccount {
+  email: string;
+  nome: string;
+  /** Foto de perfil vinda do servidor; sem foto não há ícone. */
+  avatarDataUrl?: string;
+}
+
 interface MockRegisteredUser {
   name: string;
   email: string;
@@ -51,6 +62,8 @@ const RETURN_URL_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const RENEW_AFTER_MS = 10 * 60 * 1000;
 const TOKEN_KEYS: string[] = [KEYS.access, KEYS.refresh];
 const AVATAR_KEY = 'mintly-avatar';
+const SAVED_ACCOUNT_KEY = 'mintly-saved-account';
+const SAVED_AVATAR_KEY = 'mintly-saved-avatar';
 
 /**
  * Seed do modo mock (`environment.useMocks: true`, só local) — restaurante de demonstração
@@ -81,7 +94,14 @@ export class AuthService {
   private personClient = inject(MintlyClientService).client.personClient;
 
   // "Manter conectado" => localStorage (persiste); senão => sessionStorage (só a aba).
-  private remember = localStorage.getItem(REMEMBER_KEY) === '1';
+  // Vale ONDE ESTÁ a sessão desta aba, não o último valor gravado: outra aba entrando com "manter conectado"
+  // mudava essa opção e a renovação de uma sessão sem "manter" passava a gravar no localStorage, trocando a
+  // sessão guardada por outra pessoa.
+  private remember = this.sessionIsRemembered();
+
+  private _saved = signal<SavedAccount | null>(this.loadSavedAccount());
+  /** Conta lembrada neste aparelho (para o login pedir só a senha). */
+  readonly savedAccount = this._saved.asReadonly();
 
   private _accessToken = signal<string | null>(this.read(KEYS.access));
   private _refreshToken = signal<string | null>(this.read(KEYS.refresh));
@@ -164,6 +184,61 @@ export class AuthService {
     return true;
   }
 
+  private sessionIsRemembered(): boolean {
+    const inLocal = localStorage.getItem(KEYS.access) !== null;
+    const inSession = sessionStorage.getItem(KEYS.access) !== null;
+    if (inSession) return false;
+    if (inLocal) return true;
+    return localStorage.getItem(REMEMBER_KEY) === '1';
+  }
+
+  private loadSavedAccount(): SavedAccount | null {
+    try {
+      const raw = localStorage.getItem(SAVED_ACCOUNT_KEY);
+      if (!raw) return null;
+      const acc = JSON.parse(raw) as Partial<SavedAccount>;
+      if (typeof acc.email !== 'string' || !acc.email || typeof acc.nome !== 'string') return null;
+      const avatarDataUrl = localStorage.getItem(SAVED_AVATAR_KEY) ?? undefined;
+      return { email: acc.email, nome: acc.nome, ...(avatarDataUrl ? { avatarDataUrl } : {}) };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Guarda a conta neste aparelho (nome, e-mail e foto; nunca a senha). */
+  private saveAccount(user: AuthUser): void {
+    const acc: SavedAccount = {
+      email: user.email,
+      nome: user.nome,
+      ...(user.avatarDataUrl ? { avatarDataUrl: user.avatarDataUrl } : {}),
+    };
+    this._saved.set(acc);
+    try {
+      localStorage.setItem(SAVED_ACCOUNT_KEY, JSON.stringify({ email: acc.email, nome: acc.nome }));
+      if (acc.avatarDataUrl) localStorage.setItem(SAVED_AVATAR_KEY, acc.avatarDataUrl);
+      else localStorage.removeItem(SAVED_AVATAR_KEY);
+    } catch {
+      /* sem cota: a foto vale só nesta aba; nome e e-mail seguem guardados quando couberem */
+    }
+  }
+
+  /** Esquece a conta lembrada neste aparelho (o login volta a pedir e-mail e senha). */
+  forgetSavedAccount(): void {
+    this._saved.set(null);
+    localStorage.removeItem(SAVED_ACCOUNT_KEY);
+    localStorage.removeItem(SAVED_AVATAR_KEY);
+  }
+
+  /** Depois de entrar: com "manter conectado" lembra a conta; sem ele, esquece a mesma conta se estava lembrada. */
+  private syncSavedAccount(remember: boolean, user: AuthUser): void {
+    if (remember) {
+      this.saveAccount(user);
+      return;
+    }
+    const saved = this._saved();
+    if (saved && saved.email.toLowerCase() === user.email.toLowerCase()) this.forgetSavedAccount();
+  }
+
   /** Storage ativo conforme a opção "manter conectado". */
   private get store(): Storage {
     return this.remember ? localStorage : sessionStorage;
@@ -235,6 +310,11 @@ export class AuthService {
 
   private applyAvatar(avatarDataUrl: string | undefined): void {
     this._user.update((u) => (u ? { ...u, avatarDataUrl } : u));
+    const user = this._user();
+    const saved = this._saved();
+    if (user && saved && saved.email.toLowerCase() === user.email.toLowerCase()) {
+      this.saveAccount(user);
+    }
     try {
       if (avatarDataUrl) this.write(AVATAR_KEY, avatarDataUrl);
       else this.remove(AVATAR_KEY);
@@ -253,13 +333,15 @@ export class AuthService {
         (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password,
       );
       if (!match) throw new Error('E-mail ou senha inválidos.');
-      this.persistTokens(fakeToken('mock-access'), fakeToken('mock-refresh'), {
+      const entered: AuthUser = {
         nome: match.name,
         email: match.email,
         empresa: match.restaurantName,
         restaurantId: match.restaurantId,
         avatarDataUrl: match.avatar,
-      });
+      };
+      this.persistTokens(fakeToken('mock-access'), fakeToken('mock-refresh'), entered);
+      this.syncSavedAccount(remember, entered);
       this.setSubscriptionEndsAt(match.subscriptionEndsAt ?? null, match.subscriptionTier);
       return;
     }
@@ -267,12 +349,14 @@ export class AuthService {
     const response = await this.authClient.login({ email, password }, this.headers);
     const result = response.payload;
     if (!result) throw new Error('Resposta de login sem payload.');
-    this.persistTokens(result.accessToken, result.refreshToken, {
+    const entered: AuthUser = {
       nome: result.user.person.name,
       email: result.user.email,
       restaurantId: result.user.restaurantId,
       avatarDataUrl: result.user.person.avatar,
-    });
+    };
+    this.persistTokens(result.accessToken, result.refreshToken, entered);
+    this.syncSavedAccount(remember, entered);
     this.setSubscriptionEndsAt(result.subscription?.endsAt ?? null, result.subscription?.tier);
   }
 
@@ -305,13 +389,15 @@ export class AuthService {
         avatar: input.avatar,
         subscriptionEndsAt: null,
       });
-      this.persistTokens(fakeToken('mock-access'), fakeToken('mock-refresh'), {
+      const created: AuthUser = {
         nome: input.name,
         email: input.email,
         empresa: input.restaurantName,
         restaurantId,
         avatarDataUrl: input.avatar,
-      });
+      };
+      this.persistTokens(fakeToken('mock-access'), fakeToken('mock-refresh'), created);
+      this.syncSavedAccount(true, created);
       this.setSubscriptionEndsAt(null);
       return;
     }
@@ -328,13 +414,15 @@ export class AuthService {
     );
     const result = response.payload;
     if (!result) throw new Error('Resposta de cadastro sem payload.');
-    this.persistTokens(result.accessToken, result.refreshToken, {
+    const created: AuthUser = {
       nome: result.user.person.name,
       email: result.user.email,
       empresa: result.restaurant.name,
       restaurantId: result.user.restaurantId,
       avatarDataUrl: result.user.person.avatar,
-    });
+    };
+    this.persistTokens(result.accessToken, result.refreshToken, created);
+    this.syncSavedAccount(true, created);
     // Conta nova nunca tem assinatura: a tela de assinatura vem antes de tudo.
     this.setSubscriptionEndsAt(result.subscription?.endsAt ?? null, result.subscription?.tier);
   }
@@ -522,6 +610,9 @@ export class AuthService {
   }
 
   private persistTokens(accessToken: string, refreshToken: string | null, user: AuthUser): void {
+    // Antes de gravar a sessão nova, tira a anterior dos DOIS storages: sobrar token de outra pessoa no outro
+    // storage fazia o app entrar direto com a conta errada ao reabrir ou em outra aba.
+    this.clearSession();
     this._accessToken.set(accessToken);
     this._refreshToken.set(refreshToken);
     this._user.set(user);
