@@ -1,19 +1,21 @@
 name: MintlyWeb Deploy
 
+# Deploy manual. O AMBIENTE decide a nuvem (igual ao MintlyApi):
+#   environment = staging    -> Vercel (o projeto atual, slot "production" da Vercel: o endereço estável)
+#   environment = production -> AWS (S3 + CloudFront)
+# Não há input de nuvem: staging é sempre Vercel e production é sempre AWS, o que evita combinações
+# erradas (ex.: subir production na Vercel por engano). Não existe staging na AWS.
+#
+# A BRANCH do código é a escolhida no topo do "Run workflow" (Use workflow from): é ela que o checkout baixa.
+# Os dois ambientes exigem aprovação (required reviewers do environment do GitHub).
+
 on:
   workflow_dispatch:
     inputs:
-      target:
-        description: Where to deploy
-        required: true
-        type: choice
-        options:
-          - vercel
-          - aws
       environment:
-        description: Which environment to deploy
+        description: Which environment to deploy (staging -> Vercel, production -> AWS)
         required: true
-        default: production
+        default: staging
         type: choice
         options:
           - staging
@@ -25,7 +27,7 @@ on:
         type: boolean
 
 concurrency:
-  group: mintlyweb-deploy-${{ inputs.target }}-${{ inputs.environment }}
+  group: mintlyweb-deploy-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
@@ -43,21 +45,26 @@ jobs:
 
       - name: Print deployment summary
         run: |
-          echo "Target: ${{ inputs.target }}"
           echo "Environment: ${{ inputs.environment }}"
+          echo "Branch: ${{ github.ref_name }}"
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            echo "Destination: AWS (S3 + CloudFront)"
+          else
+            echo "Destination: Vercel"
+          fi
 
   deploy-vercel:
-    name: Deploy to Vercel
+    name: Deploy to Vercel (staging)
     needs: verify-inputs
-    if: ${{ inputs.target == 'vercel' }}
+    if: ${{ inputs.environment == 'staging' }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: staging
 
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       # URL real da API (não-sensível — vars, não secrets). Sem isso, o build usa
-      # o valor commitado no environment.*.ts (apiUrl) como fallback.
+      # o valor commitado no environment.production.ts (apiUrl) como fallback.
       API_URL: ${{ vars.API_URL }}
 
     steps:
@@ -85,12 +92,9 @@ jobs:
       - name: Unit tests
         run: npm run test:ci
 
-      - name: Configure API URL for this environment
+      - name: Configure API URL
         run: |
           FILE="src/environments/environment.production.ts"
-          if [ "${{ inputs.environment }}" != "production" ]; then
-            FILE="src/environments/environment.development.ts"
-          fi
           if [ -n "$API_URL" ]; then
             sed -i "s|apiUrl: '[^']*'|apiUrl: '$API_URL'|" "$FILE"
             echo "apiUrl definida via vars.API_URL: $API_URL"
@@ -98,47 +102,28 @@ jobs:
             echo "vars.API_URL não setada — mantendo o valor commitado em $FILE"
           fi
 
+      # O que a Vercel serve é o build de produção (otimizado), no slot "production" do projeto.
       - name: Application build
-        run: |
-          if [ "${{ inputs.environment }}" = "production" ]; then
-            npm run build:ci
-          else
-            npm run build:staging
-          fi
+        run: npm run build:ci
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
       - name: Pull Vercel environment
-        run: |
-          if [ "${{ inputs.environment }}" = "production" ]; then
-            vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-          else
-            vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-          fi
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Vercel artifacts
-        run: |
-          if [ "${{ inputs.environment }}" = "production" ]; then
-            vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-          else
-            vercel build --token=${{ secrets.VERCEL_TOKEN }}
-          fi
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to Vercel
-        run: |
-          if [ "${{ inputs.environment }}" = "production" ]; then
-            vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-          else
-            vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
-          fi
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-aws:
-    name: Deploy to AWS
+    name: Deploy to AWS (production)
     needs: verify-inputs
-    if: ${{ inputs.target == 'aws' }}
+    if: ${{ inputs.environment == 'production' }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: production
 
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -146,7 +131,7 @@ jobs:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
       DIST_PATH: dist/mintly-front-end/browser
       # URL real da API (não-sensível — vars, não secrets). Sem isso, o build usa
-      # o valor commitado no environment.*.ts (apiUrl) como fallback.
+      # o valor commitado no environment.production.ts (apiUrl) como fallback.
       API_URL: ${{ vars.API_URL }}
 
     steps:
@@ -174,12 +159,9 @@ jobs:
       - name: Unit tests
         run: npm run test:ci
 
-      - name: Configure API URL for this environment
+      - name: Configure API URL
         run: |
           FILE="src/environments/environment.production.ts"
-          if [ "${{ inputs.environment }}" != "production" ]; then
-            FILE="src/environments/environment.development.ts"
-          fi
           if [ -n "$API_URL" ]; then
             sed -i "s|apiUrl: '[^']*'|apiUrl: '$API_URL'|" "$FILE"
             echo "apiUrl definida via vars.API_URL: $API_URL"
@@ -188,12 +170,7 @@ jobs:
           fi
 
       - name: Application build
-        run: |
-          if [ "${{ inputs.environment }}" = "production" ]; then
-            npm run build:ci
-          else
-            npm run build:staging
-          fi
+        run: npm run build:ci
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
