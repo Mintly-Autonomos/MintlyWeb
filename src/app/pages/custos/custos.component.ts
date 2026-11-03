@@ -13,6 +13,7 @@ import { ToggleGroupComponent, ToggleGroupOption } from '../../shared/toggle-gro
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { CMV_HINT, PRIME_COST_HINT } from '../../shared/metric-hints';
+import { statDelta } from '../../shared/stat-delta';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
@@ -74,6 +75,7 @@ export class CustosComponent implements OnInit {
   protected fmtMonthLong = fmtMonthLong;
   protected readonly Math = Math;
   protected readonly CategoryBehavior = CategoryBehavior;
+  protected readonly statDelta = statDelta;
   protected readonly cmvHint = CMV_HINT;
   protected readonly primeCostHint = PRIME_COST_HINT;
 

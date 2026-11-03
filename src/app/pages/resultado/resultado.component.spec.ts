@@ -97,15 +97,12 @@ describe('ResultadoComponent', () => {
     expect(bigNumber(root)?.className).toContain('text-success');
   });
 
-  /** Linha de variação (▲/▼ + %) do card de indicador com esse rótulo. */
+  /** Linha de variação (seta + %) do card de indicador com esse rótulo. */
   const deltaDo = (root: HTMLElement, rotulo: string) => {
     const card = Array.from(root.querySelectorAll('app-stat-card')).find((c) =>
       c.textContent?.includes(rotulo),
     )!;
-    // O mais interno que contém a seta: a linha da variação, não o card.
-    return Array.from(card.querySelectorAll<HTMLElement>('div'))
-      .filter((d) => /[▲▼]/.test(d.textContent ?? ''))
-      .pop()!;
+    return card.querySelector<HTMLElement>('div.inline-flex.font-semibold')!;
   };
 
   it('receita que caiu mostra ▼ em vermelho, não ▲ verde', () => {
@@ -122,6 +119,32 @@ describe('ResultadoComponent', () => {
     const delta = deltaDo(root, 'Receita bruta');
     expect(delta.textContent).toContain('▲');
     expect(delta.className).toContain('text-success');
+  });
+
+  it('sem alteração a variação fica neutra: nem verde, nem vermelha, sem seta', () => {
+    const { root } = render(report({}, 1500, { grossRevenue: 0 }));
+    const delta = deltaDo(root, 'Receita bruta');
+    expect(delta.textContent).toContain('0%');
+    expect(delta.textContent).not.toMatch(/[▲▼]/);
+    expect(delta.className).toContain('text-muted-foreground');
+    expect(delta.className).not.toMatch(/text-(success|error|warning)/);
+  });
+
+  it('sem dado para comparar (variação nula) a linha da variação nem aparece', () => {
+    const { root } = render(report({}, 1500, { grossRevenue: null }));
+    const card = Array.from(root.querySelectorAll('app-stat-card')).find((c) =>
+      c.textContent?.includes('Receita bruta'),
+    )!;
+    expect(card.textContent).not.toMatch(/[▲▼]/);
+    expect(card.textContent).not.toContain('vs. mês anterior');
+  });
+
+  it('o chip de lucro sem variação é neutro e sem dado some', () => {
+    const neutro = render(report({}, 1500, { netProfit: 0 }));
+    expect(neutro.text()).toContain('Sem variação vs.');
+    TestBed.resetTestingModule();
+    const semDado = render(report({}, 1500, { netProfit: null }));
+    expect(semDado.text()).not.toMatch(/vs\. Setembro/);
   });
 
   it('margem bruta e despesas também seguem o sinal da variação', () => {

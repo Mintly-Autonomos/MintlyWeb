@@ -75,13 +75,15 @@
           <app-chip [tone]="d.current.netProfit < 0 ? 'error' : 'success'" icon="percent"
             >Margem de {{ pctFmt(margemLiquida()) }}</app-chip
           >
-          <app-chip
-            [tone]="deltaLucro() >= 0 ? 'mint' : 'warning'"
-            [icon]="deltaLucro() >= 0 ? 'trending_up' : 'trending_down'"
-          >
-            {{ deltaLucro() >= 0 ? '+' : '−' }}{{ pctFmt(Math.abs(deltaLucro())) }} vs.
-            {{ fmtMonthLong(d.previousMonth) }}
-          </app-chip>
+          @if (statDelta(d.deltas.netProfit); as ld) {
+            <app-chip
+              [tone]="ld.flat ? 'neutral' : ld.up ? 'mint' : 'warning'"
+              [icon]="ld.flat ? 'trending_flat' : ld.up ? 'trending_up' : 'trending_down'"
+            >
+              {{ ld.flat ? 'Sem variação' : (ld.up ? '+' : '−') + ld.value }} vs.
+              {{ fmtMonthLong(d.previousMonth) }}
+            </app-chip>
+          }
           <span class="text-[12.5px] text-muted-foreground">
             @if (d.current.netProfit < 0) {
               De cada R$ 100 vendidos, você ficou devendo R$
@@ -154,10 +156,7 @@
         [value]="fmtBRL(d.current.grossRevenue)"
         icon="payments"
         status="positive"
-        [delta]="{
-          value: pctFmt(Math.abs((d.deltas.grossRevenue ?? 0) * 100)),
-          up: (d.deltas.grossRevenue ?? 0) >= 0,
-        }"
+        [delta]="statDelta(d.deltas.grossRevenue)"
         subtext="Salão + delivery"
       />
       <app-stat-card
@@ -166,10 +165,7 @@
         icon="restaurant_menu"
         status="positive"
         [subtext]="pctFmt(pctDaReceita(d.current.grossMargin)) + ' da receita'"
-        [delta]="{
-          value: pctFmt(Math.abs((d.deltas.grossMargin ?? 0) * 100)),
-          up: (d.deltas.grossMargin ?? 0) >= 0,
-        }"
+        [delta]="statDelta(d.deltas.grossMargin)"
       >
         <app-hint slot="hint" text="Receita líquida menos o custo dos ingredientes (CMV)." />
       </app-stat-card>
@@ -179,10 +175,7 @@
         icon="receipt_long"
         status="warning"
         [subtext]="pctFmt(pctDaReceita(d.current.operatingExpenses)) + ' da receita'"
-        [delta]="{
-          value: pctFmt(Math.abs((d.deltas.operatingExpenses ?? 0) * 100)),
-          up: (d.deltas.operatingExpenses ?? 0) >= 0,
-        }"
+        [delta]="statDelta(d.deltas.operatingExpenses)"
       />
       <app-stat-card
         label="Margem líquida"
@@ -191,7 +184,9 @@
         [status]="margemLiquida() < 0 ? 'negative' : 'positive'"
         [spark]="lucroSpark()"
         [subtext]="
-          'Era ' + pctFmt(margemLiquidaAnterior()) + ' em ' + fmtMonthLong(d.previousMonth)
+          d.previous.grossRevenue > 0
+            ? 'Era ' + pctFmt(margemLiquidaAnterior()) + ' em ' + fmtMonthLong(d.previousMonth)
+            : ''
         "
       />
     </div>

@@ -112,11 +112,7 @@
         <app-stat-card
           label="Lucro do mês"
           [value]="fmtBRL(d.cards.netProfit.amount)"
-          [delta]="{
-            value: pctFmt(Math.abs((d.cards.netProfit.delta ?? 0) * 100)),
-            up: (d.cards.netProfit.delta ?? 0) >= 0,
-            note: 'vs. mês anterior',
-          }"
+          [delta]="statDelta(d.cards.netProfit.delta)"
           icon="savings"
           status="neutral"
           [spark]="netProfitSpark()"
@@ -153,14 +149,7 @@
         <app-stat-card
           label="CMV"
           [value]="pctFmt((d.cards.cmv.pct ?? 0) * 100)"
-          [delta]="{
-            value:
-              Math.abs(d.cards.cmv.deltaPoints ?? 0).toLocaleString('pt-BR', {
-                maximumFractionDigits: 1,
-              }) + ' p.p.',
-            up: (d.cards.cmv.deltaPoints ?? 0) >= 0,
-            note: 'vs. mês anterior',
-          }"
+          [delta]="statDelta(d.cards.cmv.deltaPoints, { points: true })"
           icon="restaurant"
           status="warning"
         >
@@ -182,14 +171,7 @@
         <app-stat-card
           label="Prime Cost"
           [value]="pctFmt((d.cards.primeCost.pct ?? 0) * 100)"
-          [delta]="{
-            value:
-              Math.abs(d.cards.primeCost.deltaPoints ?? 0).toLocaleString('pt-BR', {
-                maximumFractionDigits: 1,
-              }) + ' p.p.',
-            up: (d.cards.primeCost.deltaPoints ?? 0) >= 0,
-            note: 'vs. mês anterior',
-          }"
+          [delta]="statDelta(d.cards.primeCost.deltaPoints, { points: true })"
           icon="stacked_bar_chart"
           status="warning"
         >
@@ -205,11 +187,7 @@
         <app-stat-card
           label="Receita do mês"
           [value]="fmtBRL(d.cards.revenue.amount)"
-          [delta]="{
-            value: pctFmt(Math.abs((d.cards.revenue.delta ?? 0) * 100)),
-            up: (d.cards.revenue.delta ?? 0) >= 0,
-            note: 'vs. mês anterior',
-          }"
+          [delta]="statDelta(d.cards.revenue.delta)"
           icon="trending_up"
           status="neutral"
           [spark]="revenueSpark()"

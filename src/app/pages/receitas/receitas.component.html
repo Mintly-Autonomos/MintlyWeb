@@ -72,6 +72,7 @@
           [delta]="{
             value: d.deltas.receitaBruta,
             up: d.deltasUp.receitaBruta,
+            flat: d.deltasFlat.receitaBruta,
             note: d.comparacaoLabel,
           }"
           icon="payments"
@@ -84,6 +85,7 @@
           [delta]="{
             value: d.deltas.receitaLiquida,
             up: d.deltasUp.receitaLiquida,
+            flat: d.deltasFlat.receitaLiquida,
             note: d.comparacaoLabel,
           }"
           icon="account_balance"
@@ -98,6 +100,7 @@
           [delta]="{
             value: d.deltas.ticketMedio,
             up: d.deltasUp.ticketMedio,
+            flat: d.deltasFlat.ticketMedio,
             note: d.comparacaoLabel,
           }"
           icon="receipt_long"
@@ -107,7 +110,12 @@
         <app-stat-card
           [label]="d.pedidosLabel"
           [value]="d.pedidos.toLocaleString('pt-BR')"
-          [delta]="{ value: d.deltas.pedidos, up: d.deltasUp.pedidos, note: d.comparacaoLabel }"
+          [delta]="{
+            value: d.deltas.pedidos,
+            up: d.deltasUp.pedidos,
+            flat: d.deltasFlat.pedidos,
+            note: d.comparacaoLabel,
+          }"
           icon="restaurant"
           status="neutral"
           [spark]="d.sparks.pedidos"

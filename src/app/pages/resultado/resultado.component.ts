@@ -15,6 +15,7 @@ import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-ch
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
+import { statDelta } from '../../shared/stat-delta';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
@@ -95,6 +96,7 @@ export class ResultadoComponent implements OnInit {
   protected pctFmt = pctFmt;
   protected abrev = formatCompact;
   protected readonly Math = Math;
+  protected readonly statDelta = statDelta;
   protected regimeLabel = REGIME_LABEL;
   protected fmtMonthLong = fmtMonthLong;
 
@@ -226,7 +228,6 @@ export class ResultadoComponent implements OnInit {
 
   protected margemLiquida = computed(() => (this.data()?.current.netMargin ?? 0) * 100);
   protected margemLiquidaAnterior = computed(() => (this.data()?.previous.netMargin ?? 0) * 100);
-  protected deltaLucro = computed(() => (this.data()?.deltas.netProfit ?? 0) * 100);
   protected margemContribuicaoPct = computed(
     () => (this.data()?.breakEven.contributionMarginPct ?? 0) * 100,
   );

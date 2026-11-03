@@ -46,13 +46,9 @@
       <app-stat-card
         label="Custos e despesas"
         [value]="fmtBRL(d.total.current)"
-        [delta]="{
-          value: pctFmt(Math.abs((d.total.deltaPrevious ?? 0) * 100)),
-          up: (d.total.deltaPrevious ?? 0) >= 0,
-          note: 'vs. mês anterior',
-        }"
+        [delta]="statDelta(d.total.deltaPrevious)"
         icon="trending_down"
-        [status]="(d.total.deltaPrevious ?? 0) >= 0 ? 'warning' : 'positive'"
+        [status]="(d.total.deltaPrevious ?? 0) > 0 ? 'warning' : 'positive'"
         [spark]="historySpark()"
       />
       <app-stat-card
@@ -96,11 +92,7 @@
       <app-stat-card
         label="Taxa de plataforma"
         [value]="fmtBRL(d.platformFee.amount)"
-        [delta]="{
-          value: pctFmt(Math.abs((d.platformFee.deltaPrevious ?? 0) * 100)),
-          up: (d.platformFee.deltaPrevious ?? 0) >= 0,
-          note: 'vs. mês anterior',
-        }"
+        [delta]="statDelta(d.platformFee.deltaPrevious)"
         icon="delivery_dining"
         status="warning"
       >

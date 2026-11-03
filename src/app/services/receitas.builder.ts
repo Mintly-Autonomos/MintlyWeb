@@ -48,6 +48,13 @@ export interface ReceitasDataset {
     ticketMedio: boolean;
     pedidos: boolean;
   };
+  /** Sem alteração em relação ao período anterior: o card mostra neutro. */
+  deltasFlat: {
+    receitaBruta: boolean;
+    receitaLiquida: boolean;
+    ticketMedio: boolean;
+    pedidos: boolean;
+  };
   sparks: {
     receitaBruta: number[];
     receitaLiquida: number[];
@@ -233,11 +240,19 @@ function totals(movs: ReceitaMov[], start: string, end: string): Totals {
   };
 }
 
-/** Variação sobre o período anterior; sem base de comparação (anterior = 0) mostra "—". */
-function delta(atual: number, anterior: number): { text: string; up: boolean } {
-  if (anterior === 0 && atual !== 0) return { text: '—', up: true };
-  const p = anterior === 0 ? 0 : ((atual - anterior) / anterior) * 100;
-  return { text: `${p >= 0 ? '+' : '−'}${Math.abs(p).toFixed(1).replace('.', ',')}%`, up: p >= 0 };
+/**
+ * Variação sobre o período anterior. Sem base de comparação (anterior = 0) devolve "—" e o card não
+ * mostra a linha; sem alteração devolve `flat` (neutro).
+ */
+function delta(atual: number, anterior: number): { text: string; up: boolean; flat: boolean } {
+  if (anterior === 0) return { text: '—', up: false, flat: false };
+  const p = ((atual - anterior) / anterior) * 100;
+  if (Math.abs(p) < 0.05) return { text: '0%', up: false, flat: true };
+  return {
+    text: `${p >= 0 ? '+' : '−'}${Math.abs(p).toFixed(1).replace('.', ',')}%`,
+    up: p >= 0,
+    flat: false,
+  };
 }
 
 /** Divide [start, end] em até 6 trechos de dias consecutivos (para os mini-gráficos dos cards). */
@@ -403,6 +418,12 @@ export function buildReceitas(
       pedidos: dP.text,
     },
     deltasUp: { receitaBruta: dB.up, receitaLiquida: dL.up, ticketMedio: dT.up, pedidos: dP.up },
+    deltasFlat: {
+      receitaBruta: dB.flat,
+      receitaLiquida: dL.flat,
+      ticketMedio: dT.flat,
+      pedidos: dP.flat,
+    },
     sparks: {
       receitaBruta: pontos(sparks.map((s) => s.gross)),
       receitaLiquida: pontos(sparks.map((s) => s.liq)),
