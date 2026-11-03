@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
-import { CategoryBehavior } from 'mintly-lib';
+import { CategoryBehavior, DreGroup } from 'mintly-lib';
 import { CustosService, ExpenseItem, ExpenseSubitem } from '../../services/custos.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -14,6 +14,7 @@ import { LineChartComponent, LineSeries } from '../../shared/line-chart.componen
 import { ToastService } from '../../shared/toast.service';
 import { CMV_HINT, PRIME_COST_HINT } from '../../shared/metric-hints';
 import { statDelta } from '../../shared/stat-delta';
+import { CmvAvisoComponent, DespesaForaDoCmv } from '../../shared/cmv-aviso.component';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
@@ -48,6 +49,7 @@ const TREND_COLORS = [
     BulletComponent,
     ToggleGroupComponent,
     LineChartComponent,
+    CmvAvisoComponent,
   ],
   templateUrl: './custos.component.html',
 })
@@ -78,6 +80,21 @@ export class CustosComponent implements OnInit {
   protected readonly statDelta = statDelta;
   protected readonly cmvHint = CMV_HINT;
   protected readonly primeCostHint = PRIME_COST_HINT;
+
+  /** CMV zerado mas com despesa variável em "despesa operacional": provavelmente é insumo na categoria errada. */
+  protected foraDoCmv = computed<DespesaForaDoCmv[]>(() => {
+    const d = this.data();
+    if (!d || d.cmv.amount > 0) return [];
+    return d.items
+      .filter(
+        (i) =>
+          i.kind === 'category' &&
+          i.dreGroup === DreGroup.Opex &&
+          i.behavior === CategoryBehavior.Variable &&
+          i.amount > 0,
+      )
+      .map((i) => ({ name: i.name, amount: i.amount }));
+  });
 
   protected historySpark = computed(() => this.data()?.history.map((h) => h.total) ?? []);
 

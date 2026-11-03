@@ -16,6 +16,7 @@ import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { statDelta } from '../../shared/stat-delta';
+import { CmvAvisoComponent, DespesaForaDoCmv } from '../../shared/cmv-aviso.component';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
@@ -82,6 +83,7 @@ const REGIME_LABEL: Record<TaxRegimeKey, string> = {
     WaterfallChartComponent,
     BarChartComponent,
     LineChartComponent,
+    CmvAvisoComponent,
   ],
   templateUrl: './resultado.component.html',
 })
@@ -189,6 +191,15 @@ export class ResultadoComponent implements OnInit {
       { label: 'Desp. operacionais', value: -d.current.operatingExpenses, kind: 'down' },
       { label: 'Resultado', value: d.current.netProfit, kind: 'end' },
     ];
+  });
+
+  /** CMV zerado mas com despesa variável em despesa operacional: provavelmente é insumo na categoria errada. */
+  protected foraDoCmv = computed<DespesaForaDoCmv[]>(() => {
+    const d = this.data();
+    if (!d || d.current.cmv > 0) return [];
+    return d.operatingExpenseItems
+      .filter((i) => i.kind === 'opex' && i.behavior === CategoryBehavior.Variable && i.amount > 0)
+      .map((i) => ({ name: i.name, amount: i.amount }));
   });
 
   protected despesasOrdenadas = computed<DespesaView[]>(() => {

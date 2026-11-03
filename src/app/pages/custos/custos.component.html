@@ -108,6 +108,10 @@
       </app-stat-card>
     </div>
 
+    @if (foraDoCmv().length > 0) {
+      <app-cmv-aviso [itens]="foraDoCmv()" />
+    }
+
     <!-- 3 — Fique de olho -->
     <section>
       <app-section-header

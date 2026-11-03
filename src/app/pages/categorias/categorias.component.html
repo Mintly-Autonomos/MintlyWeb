@@ -83,6 +83,14 @@
       [options]="natureOpts"
       (valueChange)="natureFilter.set($any($event))"
     />
+    @if (tab() === 'expense') {
+      <app-filter-select
+        label="Onde entra"
+        [value]="dreFilter()"
+        [options]="dreFilterOpts"
+        (valueChange)="dreFilter.set($any($event))"
+      />
+    }
     <app-filter-select
       label="Status"
       [value]="statusFilter()"
@@ -127,6 +135,9 @@
               <th class="text-left px-4 py-3 font-medium">Nome</th>
               <th class="text-left px-4 py-3 font-medium hidden sm:table-cell">Comportamento</th>
               <th class="text-left px-4 py-3 font-medium hidden md:table-cell">Natureza</th>
+              @if (tab() === 'expense') {
+                <th class="text-left px-4 py-3 font-medium hidden sm:table-cell">Onde entra</th>
+              }
               <th class="text-left px-4 py-3 font-medium">Status</th>
               <th class="px-4 py-3"></th>
             </tr>
@@ -181,6 +192,16 @@
                     [label]="natureLabel(c.nature)"
                   />
                 </td>
+                @if (tab() === 'expense') {
+                  <td class="px-4 py-3 hidden sm:table-cell">
+                    <app-chip
+                      [tone]="
+                        c.dreGroup === 'cmv' ? 'ocean' : c.dreGroup === 'labor' ? 'mint' : 'neutral'
+                      "
+                      [label]="dreLabel(c)"
+                    />
+                  </td>
+                }
                 <td class="px-4 py-3">
                   <app-toggle [checked]="c.active" (changed)="handleToggle(c, $event)" />
                 </td>
@@ -270,6 +291,45 @@
           </p>
         }
       </label>
+
+      <!-- Onde entra no resultado (só despesa) -->
+      @if (form().type === 'expense') {
+        <div data-testid="dre-group">
+          <div class="text-[13px] font-medium mb-2">Onde essa despesa entra no resultado?</div>
+          <div class="space-y-2" role="radiogroup" aria-label="Onde entra no resultado">
+            @for (o of dreOptions(); track o.value) {
+              <button
+                type="button"
+                role="radio"
+                [attr.aria-checked]="form().dreGroup === o.value"
+                [attr.data-group]="o.value"
+                (click)="setDreGroup(o.value)"
+                [class]="
+                  'w-full text-left rounded-xl border px-3.5 py-2.5 cursor-pointer transition ' +
+                  (form().dreGroup === o.value
+                    ? 'border-mint bg-mint-soft'
+                    : 'border-border hover:bg-muted')
+                "
+              >
+                <span class="block text-sm font-medium">{{ o.label }}</span>
+                <span class="block text-[12px] text-muted-foreground mt-0.5">{{
+                  o.description
+                }}</span>
+              </button>
+            }
+          </div>
+          @if (dreHint() === 'auto') {
+            <p class="text-[12px] text-ocean mt-2" data-testid="dre-hint-auto">
+              O nome parece de ingrediente ou insumo, então já marcamos CMV. Pode trocar.
+            </p>
+          } @else if (dreHint() === 'parece') {
+            <p class="text-[12px] text-warning mt-2" data-testid="dre-hint-parece">
+              O nome parece de ingrediente ou insumo. Se for, escolha “Ingredientes e insumos
+              (CMV)”; senão o CMV fica de fora do seu resultado.
+            </p>
+          }
+        </div>
+      }
 
       <!-- Behavior -->
       <div>
@@ -451,6 +511,12 @@
           <span class="text-muted-foreground block mb-0.5">Natureza</span>
           <span class="font-medium">{{ natureLabel(details()!.nature) }}</span>
         </div>
+        @if (details()!.type === 'expense') {
+          <div class="p-3 rounded-xl bg-muted/60">
+            <span class="text-muted-foreground block mb-0.5">Onde entra no resultado</span>
+            <span class="font-medium">{{ dreLabel(details()!) }}</span>
+          </div>
+        }
         <div class="p-3 rounded-xl bg-muted/60">
           <span class="text-muted-foreground block mb-0.5">Criada em</span>
           <span class="font-medium">{{ fmtDate(details()!.createdAt) }}</span>
