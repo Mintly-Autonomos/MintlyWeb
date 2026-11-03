@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { CardapioComponent } from './cardapio.component';
+import { CardapioComponent, DESTAQUE_MS } from './cardapio.component';
 import { CardapioService, Prato } from '../../services/cardapio.service';
 import { ToastService } from '../../shared/toast.service';
 
@@ -172,6 +172,45 @@ describe('CardapioComponent', () => {
     const { root, text } = render([]);
     expect(text()).toContain('Seu cardápio está vazio');
     expect(root.querySelector('table')).toBeNull();
+  });
+
+  describe('destaque do prato vindo do sino ou do simulador', () => {
+    // O jsdom não implementa a rolagem; o app rola até o prato destacado.
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn();
+    });
+
+    afterEach(() => vi.useRealTimers());
+
+    const linha = (root: HTMLElement, id: string) =>
+      root.querySelector<HTMLElement>('#cardapio-item-' + id)!;
+
+    it('marca o prato do link e tira a marca depois de alguns segundos', () => {
+      vi.useFakeTimers();
+      const { fixture, root } = render([prato({ id: 'a' }), prato({ id: 'b', name: 'Suco' })], {
+        item: 'a',
+      });
+      fixture.detectChanges();
+      expect(linha(root, 'a').className).toContain('bg-warning/10');
+      expect(linha(root, 'b').className).not.toContain('bg-warning/10');
+
+      vi.advanceTimersByTime(DESTAQUE_MS + 10);
+      fixture.detectChanges();
+      expect(linha(root, 'a').className).not.toContain('bg-warning/10');
+      expect(linha(root, 'a').className).toContain('outline-transparent');
+    });
+
+    it('sem prato no link, nenhum fica marcado', () => {
+      const { root } = render([prato({ id: 'a' })]);
+      expect(linha(root, 'a').className).not.toContain('bg-warning/10');
+    });
+
+    it('ao sair da tela cancela os timers pendentes', () => {
+      vi.useFakeTimers();
+      const { fixture } = render([prato({ id: 'a' })], { item: 'a' });
+      fixture.destroy();
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 
   it('traz um link para a análise em Previsões, que só sugere', () => {

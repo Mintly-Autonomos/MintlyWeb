@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -22,6 +22,9 @@ const INPUT =
 
 const FORM_VAZIO = { nome: '', categoria: '', preco: '', custo: '' };
 
+/** Por quanto tempo o prato vindo do sino/simulador fica marcado antes de o destaque sumir. */
+export const DESTAQUE_MS = 4000;
+
 /**
  * Cardápio: onde o dono vê e edita os pratos (cadastrar, mudar preço, custo e categoria, inativar).
  * A análise e a simulação de preço ficam em Previsões, que só sugere; aqui é onde se muda.
@@ -32,7 +35,7 @@ const FORM_VAZIO = { nome: '', categoria: '', preco: '', custo: '' };
   imports: [IconComponent, ChipComponent, EmptyStateComponent, MoneyInputDirective, RouterLink],
   templateUrl: './cardapio.component.html',
 })
-export class CardapioComponent implements OnInit {
+export class CardapioComponent implements OnInit, OnDestroy {
   private svc = inject(CardapioService);
   private toast = inject(ToastService);
   private route = inject(ActivatedRoute);
@@ -71,6 +74,7 @@ export class CardapioComponent implements OnInit {
 
   /** Prato a destacar (vem do sino: "Rever preço"). */
   private pendingFocus: string | null = null;
+  private timers: ReturnType<typeof setTimeout>[] = [];
 
   constructor() {
     // Quando os pratos chegam, destaca o pedido pelo sino.
@@ -78,6 +82,10 @@ export class CardapioComponent implements OnInit {
       this.svc.pratos();
       this.tryFocus();
     });
+  }
+
+  ngOnDestroy(): void {
+    this.timers.forEach(clearTimeout);
   }
 
   ngOnInit(): void {
@@ -91,12 +99,16 @@ export class CardapioComponent implements OnInit {
     if (!id || !this.svc.pratos().some((x) => x.id === id)) return;
     this.pendingFocus = null;
     this.destaque.set(id);
-    setTimeout(
-      () =>
-        document
-          .getElementById('cardapio-item-' + id)
-          ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
-      250,
+    this.timers.push(
+      setTimeout(
+        () =>
+          document
+            .getElementById('cardapio-item-' + id)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+        250,
+      ),
+      // O destaque chama a atenção para o prato e some; não fica marcado para sempre.
+      setTimeout(() => this.destaque.set(null), DESTAQUE_MS),
     );
   }
 
