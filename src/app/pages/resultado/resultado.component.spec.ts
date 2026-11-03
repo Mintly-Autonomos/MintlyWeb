@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { ResultadoComponent } from './resultado.component';
 import { ResultadoService, ResultReport } from '../../services/resultado.service';
 import { RestauranteService } from '../../services/restaurante.service';
@@ -10,12 +11,13 @@ function report(
   over: Partial<ResultReport['breakEven']> = {},
   netProfit = -13360.16,
   deltas: Partial<ResultReport['deltas']> = {},
+  extra: { cmv?: number; items?: unknown[] } = {},
 ) {
   const current = {
     grossRevenue: 8130,
     taxes: 325.2,
     netRevenue: 7804.8,
-    cmv: 0,
+    cmv: extra.cmv ?? 0,
     grossMargin: 7804.8,
     operatingExpenses: 21164.96,
     netProfit,
@@ -46,7 +48,7 @@ function report(
       ...over,
     },
     insights: [],
-    operatingExpenseItems: [],
+    operatingExpenseItems: extra.items ?? [],
     history: [],
   } as unknown as ResultReport;
 }
@@ -64,6 +66,7 @@ describe('ResultadoComponent', () => {
   function render(data: ResultReport) {
     TestBed.configureTestingModule({
       providers: [
+        provideRouter([]),
         {
           provide: ResultadoService,
           useValue: {
@@ -151,6 +154,47 @@ describe('ResultadoComponent', () => {
     const { root } = render(report({}, -13360.16, { grossMargin: -0.1, operatingExpenses: -0.3 }));
     expect(deltaDo(root, 'Margem bruta').textContent).toContain('▼');
     expect(deltaDo(root, 'Despesas operacionais').textContent).toContain('▼');
+  });
+
+  describe('aviso de CMV zerado', () => {
+    const fornecedor = { name: 'Fornecedor', kind: 'opex', behavior: 'variable', amount: 2349 };
+    const aluguel = { name: 'Aluguel', kind: 'opex', behavior: 'fixed', amount: 3033.55 };
+
+    it('CMV zerado com despesa variável em despesa operacional: avisa e aponta o Fornecedor', () => {
+      const { text } = render(report({}, -13360.16, {}, { items: [fornecedor, aluguel] }));
+      expect(text()).toContain('Seu CMV está zerado');
+      expect(text()).toContain('Fornecedor');
+      expect(text()).toContain('R$ 2.349,00');
+      expect(text()).not.toContain('Aluguel (R$');
+      expect(text()).toContain('Ir para Categorias');
+    });
+
+    it('só despesa fixa fora do CMV não avisa (aluguel não é insumo)', () => {
+      const { text } = render(report({}, -13360.16, {}, { items: [aluguel] }));
+      expect(text()).not.toContain('Seu CMV está zerado');
+    });
+
+    it('quando já há CMV não avisa', () => {
+      const { text } = render(report({}, 1500, {}, { cmv: 2600, items: [fornecedor] }));
+      expect(text()).not.toContain('Seu CMV está zerado');
+    });
+
+    it('mão de obra e taxa de plataforma não entram no aviso', () => {
+      const { text } = render(
+        report(
+          {},
+          -13360.16,
+          {},
+          {
+            items: [
+              { name: 'Pró-labore', kind: 'labor', behavior: 'variable', amount: 1000 },
+              { name: 'Taxa Keeta', kind: 'platformFee', behavior: 'variable', amount: 500 },
+            ],
+          },
+        ),
+      );
+      expect(text()).not.toContain('Seu CMV está zerado');
+    });
   });
 
   it('ponto de equilíbrio: a barra mostra quanto já foi vendido, não 100%', () => {

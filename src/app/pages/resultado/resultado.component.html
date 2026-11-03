@@ -191,6 +191,10 @@
       />
     </div>
 
+    @if (foraDoCmv().length > 0) {
+      <app-cmv-aviso [itens]="foraDoCmv()" />
+    }
+
     <!-- 4 — Insights -->
     <div>
       <app-section-header

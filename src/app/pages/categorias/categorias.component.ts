@@ -6,6 +6,7 @@ import {
   CatType,
   Behavior,
   Nature,
+  DreGroupKey,
 } from '../../services/categorias.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -17,12 +18,15 @@ import { AuditTimelineComponent } from '../../shared/audit-timeline.component';
 import { ToastService } from '../../shared/toast.service';
 import { apiErrorMessage } from '../../shared/api-error-message';
 import { fmtDateTime } from '../../shared/format';
+import { dreGroupOptionsFor, dreGroupShort, sugereCmv } from '../../shared/dre-group';
 
 interface CatForm {
   name: string;
   type: CatType;
   behavior: Behavior;
   nature: Nature;
+  /** Onde a despesa entra no resultado (CMV, mão de obra, despesa operacional). Só em despesa. */
+  dreGroup: DreGroupKey;
   active: boolean;
 }
 
@@ -55,12 +59,16 @@ export class CategoriasComponent implements OnInit {
   protected behaviorFilter = signal<'all' | Behavior>('all');
   protected natureFilter = signal<'all' | Nature>('all');
   protected statusFilter = signal<'all' | 'active' | 'inactive'>('all');
+  protected dreFilter = signal<'all' | DreGroupKey>('all');
+  /** A pessoa escolheu o grupo na mão: a sugestão pelo nome para de mexer nele. */
+  protected dreTouched = signal(false);
 
   protected form = signal<CatForm>({
     name: '',
     type: 'income',
     behavior: 'variable',
     nature: 'operational',
+    dreGroup: 'opex',
     active: true,
   });
 
@@ -72,8 +80,22 @@ export class CategoriasComponent implements OnInit {
     () =>
       (this.behaviorFilter() !== 'all' ? 1 : 0) +
       (this.natureFilter() !== 'all' ? 1 : 0) +
-      (this.statusFilter() !== 'all' ? 1 : 0),
+      (this.statusFilter() !== 'all' ? 1 : 0) +
+      (this.tab() === 'expense' && this.dreFilter() !== 'all' ? 1 : 0),
   );
+
+  protected dreOptions = computed(() => dreGroupOptionsFor(this.form().dreGroup));
+
+  /**
+   * Aviso sob o seletor: 'auto' = o grupo veio da sugestão pelo nome (criando); 'parece' = o nome
+   * parece ingrediente mas o grupo ainda é despesa operacional (criando ou editando).
+   */
+  protected dreHint = computed<'auto' | 'parece' | null>(() => {
+    const f = this.form();
+    if (f.type !== 'expense' || !sugereCmv(f.name)) return null;
+    if (f.dreGroup === 'cmv') return this.dreTouched() || this.editing() ? null : 'auto';
+    return f.dreGroup === 'opex' ? 'parece' : null;
+  });
 
   protected filtered = computed(() => {
     const q = this.query().trim().toLowerCase();
@@ -85,6 +107,12 @@ export class CategoriasComponent implements OnInit {
         if (this.natureFilter() !== 'all' && c.nature !== this.natureFilter()) return false;
         if (this.statusFilter() === 'active' && !c.active) return false;
         if (this.statusFilter() === 'inactive' && c.active) return false;
+        if (
+          this.tab() === 'expense' &&
+          this.dreFilter() !== 'all' &&
+          (c.dreGroup ?? 'opex') !== this.dreFilter()
+        )
+          return false;
         return true;
       })
       .sort((a, b) => {
@@ -108,6 +136,7 @@ export class CategoriasComponent implements OnInit {
     this.behaviorFilter.set('all');
     this.natureFilter.set('all');
     this.statusFilter.set('all');
+    this.dreFilter.set('all');
   }
 
   get nameError(): string {
@@ -136,8 +165,10 @@ export class CategoriasComponent implements OnInit {
       type: this.tab(),
       behavior: 'variable',
       nature: 'operational',
+      dreGroup: 'opex',
       active: true,
     });
+    this.dreTouched.set(false);
     this.creating.set(true);
   }
 
@@ -151,8 +182,11 @@ export class CategoriasComponent implements OnInit {
       type: c.type,
       behavior: c.behavior,
       nature: c.nature,
+      dreGroup: c.dreGroup ?? 'opex',
       active: c.active,
     });
+    // Categoria que já existe: nada muda sozinho, só aparece o aviso quando o nome parece insumo.
+    this.dreTouched.set(true);
     this.editing.set(c);
   }
 
@@ -163,6 +197,22 @@ export class CategoriasComponent implements OnInit {
 
   setField<K extends keyof CatForm>(k: K, v: CatForm[K]): void {
     this.form.update((f) => ({ ...f, [k]: v }));
+    // Cadastro novo de despesa: o nome sugere o grupo (ingrediente -> CMV) até a pessoa escolher.
+    if ((k === 'name' || k === 'type') && !this.editing() && !this.dreTouched()) {
+      this.form.update((f) => ({
+        ...f,
+        dreGroup: f.type === 'expense' && sugereCmv(f.name) ? 'cmv' : 'opex',
+      }));
+    }
+  }
+
+  setDreGroup(g: DreGroupKey): void {
+    this.dreTouched.set(true);
+    this.setField('dreGroup', g);
+  }
+
+  dreLabel(c: Category): string {
+    return dreGroupShort(c.dreGroup);
   }
 
   private errMsg(err: unknown): string {
@@ -180,6 +230,7 @@ export class CategoriasComponent implements OnInit {
           type: f.type,
           behavior: f.behavior,
           nature: f.nature,
+          ...(f.type === 'expense' ? { dreGroup: f.dreGroup } : {}),
         });
         // Ativação/desativação usa as rotas dedicadas (auditadas no servidor).
         if (e.active && !f.active) await this.svc.inactivate(e.id);
@@ -196,6 +247,7 @@ export class CategoriasComponent implements OnInit {
           type: f.type,
           behavior: f.behavior,
           nature: f.nature,
+          ...(f.type === 'expense' ? { dreGroup: f.dreGroup } : {}),
         });
         this.toast.success('Categoria criada com sucesso.');
         this.creating.set(false);
@@ -239,6 +291,12 @@ export class CategoriasComponent implements OnInit {
     { value: 'all', label: 'Todas' },
     { value: 'operational', label: 'Operacional' },
     { value: 'non-operational', label: 'Não operacional' },
+  ];
+  protected dreFilterOpts = [
+    { value: 'all', label: 'Todos' },
+    { value: 'cmv', label: 'CMV' },
+    { value: 'labor', label: 'Mão de obra' },
+    { value: 'opex', label: 'Despesa operacional' },
   ];
   protected statusOpts = [
     { value: 'all', label: 'Todos' },
