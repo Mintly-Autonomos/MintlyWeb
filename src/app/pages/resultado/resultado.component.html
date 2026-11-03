@@ -154,7 +154,10 @@
         [value]="fmtBRL(d.current.grossRevenue)"
         icon="payments"
         status="positive"
-        [delta]="{ value: pctFmt((d.deltas.grossRevenue ?? 0) * 100), up: true }"
+        [delta]="{
+          value: pctFmt(Math.abs((d.deltas.grossRevenue ?? 0) * 100)),
+          up: (d.deltas.grossRevenue ?? 0) >= 0,
+        }"
         subtext="Salão + delivery"
       />
       <app-stat-card
@@ -163,7 +166,10 @@
         icon="restaurant_menu"
         status="positive"
         [subtext]="pctFmt(pctDaReceita(d.current.grossMargin)) + ' da receita'"
-        [delta]="{ value: pctFmt((d.deltas.grossMargin ?? 0) * 100), up: true }"
+        [delta]="{
+          value: pctFmt(Math.abs((d.deltas.grossMargin ?? 0) * 100)),
+          up: (d.deltas.grossMargin ?? 0) >= 0,
+        }"
       >
         <app-hint slot="hint" text="Receita líquida menos o custo dos ingredientes (CMV)." />
       </app-stat-card>
@@ -173,7 +179,10 @@
         icon="receipt_long"
         status="warning"
         [subtext]="pctFmt(pctDaReceita(d.current.operatingExpenses)) + ' da receita'"
-        [delta]="{ value: pctFmt((d.deltas.operatingExpenses ?? 0) * 100), up: true }"
+        [delta]="{
+          value: pctFmt(Math.abs((d.deltas.operatingExpenses ?? 0) * 100)),
+          up: (d.deltas.operatingExpenses ?? 0) >= 0,
+        }"
       />
       <app-stat-card
         label="Margem líquida"

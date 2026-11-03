@@ -6,7 +6,11 @@ import { RestauranteService } from '../../services/restaurante.service';
 import { ToastService } from '../../shared/toast.service';
 
 /** Outubro da Alice: R$ 8.130 vendidos, R$ 15.951,77 de custos fixos, prejuízo no fim. */
-function report(over: Partial<ResultReport['breakEven']> = {}, netProfit = -13360.16) {
+function report(
+  over: Partial<ResultReport['breakEven']> = {},
+  netProfit = -13360.16,
+  deltas: Partial<ResultReport['deltas']> = {},
+) {
   const current = {
     grossRevenue: 8130,
     taxes: 325.2,
@@ -31,6 +35,7 @@ function report(over: Partial<ResultReport['breakEven']> = {}, netProfit = -1336
       grossMargin: 0.5,
       operatingExpenses: 0.2,
       netProfit: -3.2,
+      ...deltas,
     },
     breakEven: {
       fixedCosts: 15951.77,
@@ -90,6 +95,39 @@ describe('ResultadoComponent', () => {
   it('lucro: o número grande continua verde', () => {
     const { root } = render(report({}, 1500));
     expect(bigNumber(root)?.className).toContain('text-success');
+  });
+
+  /** Linha de variação (▲/▼ + %) do card de indicador com esse rótulo. */
+  const deltaDo = (root: HTMLElement, rotulo: string) => {
+    const card = Array.from(root.querySelectorAll('app-stat-card')).find((c) =>
+      c.textContent?.includes(rotulo),
+    )!;
+    // O mais interno que contém a seta: a linha da variação, não o card.
+    return Array.from(card.querySelectorAll<HTMLElement>('div'))
+      .filter((d) => /[▲▼]/.test(d.textContent ?? ''))
+      .pop()!;
+  };
+
+  it('receita que caiu mostra ▼ em vermelho, não ▲ verde', () => {
+    const { root } = render(report({}, -13360.16, { grossRevenue: -0.2 }));
+    const delta = deltaDo(root, 'Receita bruta');
+    expect(delta.textContent).toContain('▼');
+    expect(delta.textContent).toContain('20%');
+    expect(delta.textContent).not.toContain('-');
+    expect(delta.className).toContain('text-error');
+  });
+
+  it('receita que subiu mostra ▲ em verde', () => {
+    const { root } = render(report({}, 1500, { grossRevenue: 0.5 }));
+    const delta = deltaDo(root, 'Receita bruta');
+    expect(delta.textContent).toContain('▲');
+    expect(delta.className).toContain('text-success');
+  });
+
+  it('margem bruta e despesas também seguem o sinal da variação', () => {
+    const { root } = render(report({}, -13360.16, { grossMargin: -0.1, operatingExpenses: -0.3 }));
+    expect(deltaDo(root, 'Margem bruta').textContent).toContain('▼');
+    expect(deltaDo(root, 'Despesas operacionais').textContent).toContain('▼');
   });
 
   it('ponto de equilíbrio: a barra mostra quanto já foi vendido, não 100%', () => {
