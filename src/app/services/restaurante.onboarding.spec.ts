@@ -14,18 +14,24 @@ describe('RestauranteService — onboarding (primeiro acesso no servidor)', () =
   let me: ReturnType<typeof vi.fn>;
   let completeFirstAccess: ReturnType<typeof vi.fn>;
   let restaurantId: string;
+  let setCompanyName: ReturnType<typeof vi.fn>;
 
   const answer = (restaurant: Record<string, unknown>) =>
     me.mockResolvedValue({ payload: { restaurant, tax: {} } });
 
   beforeEach(() => {
     restaurantId = 'rest-1';
+    setCompanyName = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         {
           provide: AuthService,
-          useValue: { currentUser: () => ({ restaurantId }), getAccessToken: () => 't' },
+          useValue: {
+            currentUser: () => ({ restaurantId }),
+            getAccessToken: () => 't',
+            setCompanyName,
+          },
         },
       ],
     });
@@ -68,6 +74,21 @@ describe('RestauranteService — onboarding (primeiro acesso no servidor)', () =
     answer({ name: 'B', firstAccessAt: '2026-11-02T10:00:00.000Z' });
     expect(await svc.isOnboardingPending()).toBe(false);
     expect(me).toHaveBeenCalledTimes(2);
+  });
+
+  it('guarda o nome do restaurante no menu da conta (o login não o devolve)', async () => {
+    answer({ name: 'Cantina do Davi', firstAccessAt: '2026-11-02T10:00:00.000Z' });
+    await svc.isOnboardingPending();
+    expect(setCompanyName).toHaveBeenCalledWith('Cantina do Davi');
+  });
+
+  it('sair e entrar de novo na mesma aba: reaplica o nome sem consultar outra vez', async () => {
+    answer({ name: 'Cantina do Davi', firstAccessAt: '2026-11-02T10:00:00.000Z' });
+    await svc.isOnboardingPending();
+    setCompanyName.mockClear();
+    await svc.isOnboardingPending();
+    expect(me).toHaveBeenCalledTimes(1);
+    expect(setCompanyName).toHaveBeenCalledWith('Cantina do Davi');
   });
 
   it('não consegue consultar: não trava ninguém (nada pendente)', async () => {
