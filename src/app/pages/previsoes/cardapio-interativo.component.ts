@@ -1,16 +1,13 @@
 import { Component, Input, computed, effect, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { HintComponent } from '../../shared/hint.component';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { ChartCardComponent } from '../../shared/chart-card.component';
 import { ScatterChartComponent, ScatterPoint } from '../../shared/scatter-chart.component';
-import { ToastService } from '../../shared/toast.service';
-import { MoneyInputDirective } from '../../shared/money-input.directive';
-import { moneyToInput } from '../../shared/money-input';
 import { formatBRL } from '../../shared/format';
 import { CardapioService, Prato } from '../../services/cardapio.service';
-import { parseNumberBR } from '../../services/movimentacoes.service';
 import {
   ORDEM_QUADRANTES,
   QUADRANTES,
@@ -19,7 +16,6 @@ import {
   diasSemRevisao,
   faixaPreco,
   impactoMes,
-  incompleto,
   precisaRevisar,
   quadranteDe,
   recalcular,
@@ -33,14 +29,11 @@ const FORMA: Record<Quadrante, ScatterPoint['forma']> = {
   repensar: 'triangle',
 };
 
-const INPUT =
-  'h-10 rounded-xl border border-border bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint';
-
 /**
  * "Meu cardápio": análise de cardápio (menu engineering) com simulador de preço por prato, igual ao
  * protótipo — quatro grupos pelas médias de vendidos e de margem, painel para simular o preço (o
- * prato muda de grupo na hora) e gráfico sob demanda. Os dados são os pratos reais; custo e vendidos
- * no mês são informados pelo dono na tabela "Gerenciar cardápio", logo abaixo.
+ * prato muda de grupo na hora) e gráfico sob demanda. Aqui só se sugere e simula: cadastrar e mudar
+ * pratos (preço, custo, categoria, inativar) é na tela Cardápio.
  */
 @Component({
   selector: 'app-cardapio-interativo',
@@ -52,13 +45,12 @@ const INPUT =
     EmptyStateComponent,
     ChartCardComponent,
     ScatterChartComponent,
-    MoneyInputDirective,
+    RouterLink,
   ],
   templateUrl: './cardapio-interativo.component.html',
 })
 export class CardapioInterativoComponent {
   private svc = inject(CardapioService);
-  private toast = inject(ToastService);
 
   /** Prato a abrir já selecionado (vindo do sino: "Rever preço"). */
   @Input() set initialItem(id: string | null) {
@@ -69,7 +61,6 @@ export class CardapioInterativoComponent {
   protected readonly ORDEM = ORDEM_QUADRANTES;
   protected readonly QUADRANTES = QUADRANTES;
   protected readonly fmtBRL = formatBRL;
-  protected readonly inputClass = INPUT;
   protected readonly Math = Math;
 
   protected loading = this.svc.loading;
@@ -78,7 +69,6 @@ export class CardapioInterativoComponent {
       (a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'pt-BR'),
     ),
   );
-  protected categorias = this.svc.categorias;
 
   // ── análise e simulador ──
   protected precos = signal<Record<string, number>>({});
@@ -144,15 +134,6 @@ export class CardapioInterativoComponent {
     () => Math.max(...this.pontos().map((p) => p.y), this.fantasma()?.y ?? 0) + 8,
   );
 
-  // ── gerenciar cardápio ──
-  protected incompletos = computed(() => this.pratos().filter(incompleto).length);
-  protected adding = signal(false);
-  protected busyId = signal<string | null>(null);
-  protected editandoId = signal<string | null>(null);
-  protected precoEditandoId = signal<string | null>(null);
-  protected f = signal({ nome: '', categoria: '', preco: '', custo: '' });
-  protected precoEditado = signal('');
-
   private pendingFocus: string | null = null;
 
   constructor() {
@@ -170,11 +151,12 @@ export class CardapioInterativoComponent {
     if (!p) return;
     this.pendingFocus = null;
     this.destaque.set(id);
-    if (this.analise().itens.some((i) => i.id === id)) this.selecionado.set(id);
+    if (!this.analise().itens.some((i) => i.id === id)) return;
+    this.selecionado.set(id);
     setTimeout(
       () =>
         document
-          .getElementById(this.selecionado() === id ? 'cardapio-simulador' : 'cardapio-item-' + id)
+          .getElementById('cardapio-simulador')
           ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
       250,
     );
@@ -196,34 +178,6 @@ export class CardapioInterativoComponent {
     });
   }
 
-  /** Grava o preço simulado (muda o valor e conta como revisão do preço). */
-  async aplicarPreco(id: string): Promise<void> {
-    const preco = this.precos()[id];
-    if (preco === undefined) return;
-    this.busyId.set(id);
-    try {
-      await this.svc.changePrice(id, preco);
-      this.voltarPreco(id);
-      this.toast.success('Preço atualizado.');
-    } catch (err) {
-      this.toast.error(this.svc.errorMessage(err));
-    } finally {
-      this.busyId.set(null);
-    }
-  }
-
-  async manterPreco(p: Prato): Promise<void> {
-    this.busyId.set(p.id);
-    try {
-      await this.svc.keepPrice(p.id);
-      this.toast.success(`Certo! Só voltamos a avisar sobre ${p.name} daqui a uns 5 meses e meio.`);
-    } catch (err) {
-      this.toast.error(this.svc.errorMessage(err));
-    } finally {
-      this.busyId.set(null);
-    }
-  }
-
   protected revisar(p: Prato): boolean {
     return precisaRevisar(p, new Date());
   }
@@ -234,142 +188,5 @@ export class CardapioInterativoComponent {
 
   protected rangeValue(e: Event): number {
     return (e.target as HTMLInputElement).valueAsNumber;
-  }
-
-  protected inputValue(e: Event): string {
-    return (e.target as HTMLInputElement).value;
-  }
-
-  protected setF(campo: 'nome' | 'categoria' | 'preco' | 'custo', valor: string): void {
-    this.f.update((v) => ({ ...v, [campo]: valor }));
-  }
-
-  private num(v: string): number {
-    return parseNumberBR(v);
-  }
-
-  toggleAdd(): void {
-    this.adding.update((v) => !v);
-    this.f.set({ nome: '', categoria: '', preco: '', custo: '' });
-  }
-
-  async adicionar(): Promise<void> {
-    const v = this.f();
-    const preco = this.num(v.preco);
-    const custo = v.custo.trim() === '' ? 0 : this.num(v.custo);
-    if (!v.nome.trim() || v.preco.trim() === '' || !(preco >= 0)) {
-      this.toast.error('Informe o nome e o preço do prato.');
-      return;
-    }
-    if (!(custo >= 0)) {
-      this.toast.error('O custo não pode ser negativo.');
-      return;
-    }
-    this.busyId.set('novo');
-    try {
-      await this.svc.create({
-        name: v.nome.trim(),
-        price: preco,
-        category: v.categoria.trim() || undefined,
-        cost: custo,
-      });
-      this.adding.set(false);
-      this.toast.success('Prato adicionado ao cardápio.');
-    } catch (err) {
-      this.toast.error(this.svc.errorMessage(err));
-    } finally {
-      this.busyId.set(null);
-    }
-  }
-
-  iniciarEdicao(p: Prato): void {
-    this.precoEditandoId.set(null);
-    this.editandoId.set(p.id);
-    this.f.set({
-      nome: p.name,
-      categoria: p.category ?? '',
-      preco: moneyToInput(p.price),
-      custo: p.cost ? moneyToInput(p.cost) : '',
-    });
-  }
-
-  cancelarEdicao(): void {
-    this.editandoId.set(null);
-  }
-
-  async salvarEdicao(p: Prato): Promise<void> {
-    const v = this.f();
-    const custo = v.custo.trim() === '' ? 0 : this.num(v.custo);
-    const preco = this.num(v.preco);
-    if (!v.nome.trim()) {
-      this.toast.error('O prato precisa de um nome.');
-      return;
-    }
-    if (v.preco.trim() === '' || !(preco >= 0)) {
-      this.toast.error('Informe um preço válido.');
-      return;
-    }
-    if (!(custo >= 0)) {
-      this.toast.error('O custo não pode ser negativo.');
-      return;
-    }
-    this.busyId.set(p.id);
-    try {
-      await this.svc.update(p.id, {
-        name: v.nome.trim(),
-        category: v.categoria.trim(),
-        cost: custo,
-      });
-      // Preço só vai pelo endpoint próprio quando mudou: é ele que conta como revisão de preço.
-      if (preco !== p.price) {
-        await this.svc.changePrice(p.id, preco);
-        this.voltarPreco(p.id);
-      }
-      this.editandoId.set(null);
-      this.toast.success('Dados do prato atualizados.');
-    } catch (err) {
-      this.toast.error(this.svc.errorMessage(err));
-    } finally {
-      this.busyId.set(null);
-    }
-  }
-
-  iniciarPreco(p: Prato): void {
-    this.editandoId.set(null);
-    this.precoEditandoId.set(p.id);
-    this.precoEditado.set(moneyToInput(p.price));
-  }
-
-  async salvarPreco(p: Prato): Promise<void> {
-    const preco = this.num(this.precoEditado());
-    if (this.precoEditado().trim() === '' || !(preco >= 0)) {
-      this.toast.error('Informe um preço válido.');
-      return;
-    }
-    this.busyId.set(p.id);
-    try {
-      await this.svc.changePrice(p.id, preco);
-      this.precoEditandoId.set(null);
-      this.voltarPreco(p.id);
-      this.toast.success(
-        preco === p.price ? `Preço de ${p.name} mantido.` : `Preço de ${p.name} atualizado.`,
-      );
-    } catch (err) {
-      this.toast.error(this.svc.errorMessage(err));
-    } finally {
-      this.busyId.set(null);
-    }
-  }
-
-  async alternarAtivo(p: Prato): Promise<void> {
-    this.busyId.set(p.id);
-    try {
-      await this.svc.setActive(p.id, !p.active);
-      if (this.selecionado() === p.id && p.active) this.selecionado.set(null);
-    } catch (err) {
-      this.toast.error(this.svc.errorMessage(err));
-    } finally {
-      this.busyId.set(null);
-    }
   }
 }

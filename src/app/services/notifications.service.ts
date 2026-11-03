@@ -89,8 +89,8 @@ export class NotificationsService {
       description: `O preço está parado em ${formatBRL(a.price)} desde então. Vale revisar se ainda cobre o custo atual dos ingredientes.`,
       itemName: a.name,
       actionLabel: 'Rever preço',
-      actionRoute: '/previsoes',
-      actionQueryParams: { tab: 'cardapio', item: a.id },
+      actionRoute: '/cardapio',
+      actionQueryParams: { item: a.id },
       dismissLabel: 'Não quero mudar',
     };
   }

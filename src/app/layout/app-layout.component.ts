@@ -19,6 +19,7 @@ const NAV = [
   { to: '/resultado', label: 'Resultado', icon: 'savings' },
   { to: '/previsoes', label: 'Previsões', icon: 'auto_graph' },
   { to: '/movimentacoes', label: 'Movimentações', icon: 'swap_horiz' },
+  { to: '/cardapio', label: 'Cardápio', icon: 'restaurant_menu' },
   { to: '/contas', label: 'Contas Financeiras', icon: 'account_balance' },
   { to: '/categorias', label: 'Categorias', icon: 'category' },
 ] as const;
@@ -491,6 +492,7 @@ export class AppLayoutComponent implements OnInit {
       sub: 'Veja, registre e organize entradas e saídas.',
     },
     '/categorias': { title: 'Categorias', sub: 'Organize suas receitas e despesas por categoria.' },
+    '/cardapio': { title: 'Cardápio', sub: 'Seus pratos, com preço e custo.' },
   };
 
   private router = inject(Router);

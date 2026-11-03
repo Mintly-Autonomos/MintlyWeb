@@ -133,6 +133,12 @@ export const routes: Routes = [
           import('./pages/categorias/categorias.component').then((m) => m.CategoriasComponent),
       },
       {
+        path: 'cardapio',
+        title: 'Cardápio',
+        loadComponent: () =>
+          import('./pages/cardapio/cardapio.component').then((m) => m.CardapioComponent),
+      },
+      {
         path: 'receitas',
         title: 'Receitas',
         loadComponent: () =>

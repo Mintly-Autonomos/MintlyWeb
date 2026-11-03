@@ -1,0 +1,388 @@
+<div class="space-y-6 max-w-[1400px]">
+  <div class="m3-card rounded-2xl p-5" id="cardapio-gerenciar">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <div>
+        <h3 class="text-[15px] font-bold tracking-tight">Seus pratos</h3>
+        <p class="text-[12.5px] text-muted-foreground mt-1 max-w-[640px]">
+          Cadastre e edite o preço, o custo e a categoria de cada prato. A cada cerca de 6 meses
+          vale revisar o preço: o sino avisa quando um prato passa de 5 meses e meio sem revisão.
+        </p>
+      </div>
+      <button
+        type="button"
+        (click)="toggleAdd()"
+        class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-sm font-semibold bg-mint-soft text-ocean hover:brightness-95 transition cursor-pointer"
+      >
+        <app-icon name="add" [style]="{ fontSize: '18px' }" />
+        Novo prato
+      </button>
+    </div>
+
+    @if (incompletos() > 0 && pratos().length > 0) {
+      <p class="text-[12.5px] text-warning mb-3">
+        {{ incompletos() }}
+        {{ incompletos() === 1 ? 'prato ainda está' : 'pratos ainda estão' }} sem custo ou sem
+        vendas registradas nos últimos 30 dias (escolha os pratos ao registrar a entrada), e por
+        isso {{ incompletos() === 1 ? 'fica' : 'ficam' }} fora da análise.
+      </p>
+    }
+
+    @if (adding()) {
+      <form
+        (submit)="$event.preventDefault(); adicionar()"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.4fr_110px_110px_130px_1fr_auto] gap-2 mb-4 items-end"
+      >
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">Nome do prato</span>
+          <input
+            type="text"
+            maxlength="80"
+            [value]="f().nome"
+            (input)="setF('nome', inputValue($event))"
+            placeholder="Ex.: Frango Original"
+            [class]="inputClass + ' w-full'"
+          />
+        </label>
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">Preço (R$)</span>
+          <input
+            appMoneyInput
+            type="text"
+            inputmode="decimal"
+            [value]="f().preco"
+            (input)="setF('preco', inputValue($event))"
+            placeholder="0,00"
+            [class]="inputClass + ' w-full'"
+          />
+        </label>
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">Custo (R$)</span>
+          <input
+            appMoneyInput
+            type="text"
+            inputmode="decimal"
+            [value]="f().custo"
+            (input)="setF('custo', inputValue($event))"
+            placeholder="0,00"
+            [class]="inputClass + ' w-full'"
+          />
+        </label>
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">Categoria (opcional)</span>
+          <input
+            type="text"
+            list="cardapio-categorias"
+            maxlength="40"
+            [value]="f().categoria"
+            (input)="setF('categoria', inputValue($event))"
+            placeholder="Ex.: Frango"
+            [class]="inputClass + ' w-full'"
+          />
+          <datalist id="cardapio-categorias">
+            @for (c of categorias(); track c) {
+              <option [value]="c"></option>
+            }
+          </datalist>
+        </label>
+        <button
+          type="submit"
+          [disabled]="busyId() === 'novo'"
+          class="inline-flex items-center justify-center h-10 px-5 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 transition cursor-pointer disabled:opacity-60"
+        >
+          Adicionar
+        </button>
+      </form>
+    }
+
+    @if (pratos().length > 0) {
+      <div class="flex flex-wrap items-center gap-3 mb-3">
+        <label class="relative block w-full sm:w-[280px]">
+          <span class="sr-only">Buscar prato</span>
+          <app-icon
+            name="search"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            [style]="{ fontSize: '18px' }"
+          />
+          <input
+            type="search"
+            [value]="busca()"
+            (input)="busca.set(inputValue($event))"
+            placeholder="Buscar por nome ou categoria"
+            [class]="inputClass + ' w-full !pl-9'"
+          />
+        </label>
+        <span class="text-[12.5px] text-muted-foreground">
+          {{ visiveis().length }} de {{ pratos().length }}
+          {{ pratos().length === 1 ? 'prato' : 'pratos' }}
+          @if (inativos() > 0) {
+            · {{ inativos() }} {{ inativos() === 1 ? 'inativo' : 'inativos' }}
+          }
+        </span>
+      </div>
+    }
+
+    @if (pratos().length === 0 && !loading()) {
+      <app-empty-state
+        icon="restaurant_menu"
+        title="Seu cardápio está vazio"
+        description="Cadastre seus pratos com preço, custo e quanto vendem por mês. O Mintly mostra quais proteger, promover ou repensar e avisa quando um preço ficar parado por muito tempo."
+      />
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="w-full text-[13px]">
+          <thead>
+            <tr
+              class="text-left text-[11.5px] text-muted-foreground border-b border-border max-sm:hidden"
+            >
+              <th class="py-2 pr-3 font-semibold">Item</th>
+              <th class="py-2 pr-3 font-semibold">Categoria</th>
+              <th class="py-2 pr-3 font-semibold text-right">Preço</th>
+              <th class="py-2 pr-3 font-semibold text-right">Custo</th>
+              <th
+                class="py-2 pr-3 font-semibold text-right"
+                title="Preço menos custo, e quanto isso representa do preço"
+              >
+                Margem
+              </th>
+              <th
+                class="py-2 pr-3 font-semibold text-right"
+                title="Unidades vendidas nos últimos 30 dias, somadas das vendas que informaram os pratos"
+              >
+                Vendidos (30 dias)
+              </th>
+              <th class="py-2 pr-3 font-semibold">Preço revisado</th>
+              <th class="py-2 font-semibold text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border">
+            @for (p of visiveis(); track p.id) {
+              <tr
+                class="max-sm:flex max-sm:flex-wrap max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-1.5 max-sm:py-3"
+                [id]="'cardapio-item-' + p.id"
+                [class]="
+                  (p.id === destaque()
+                    ? 'bg-warning/10 outline outline-2 outline-warning/50 -outline-offset-2 '
+                    : '') + (p.active ? '' : 'opacity-60')
+                "
+              >
+                @if (editandoId() === p.id) {
+                  <td class="py-2 pr-3 max-sm:w-full max-sm:p-0">
+                    <input
+                      type="text"
+                      maxlength="80"
+                      [value]="f().nome"
+                      (input)="setF('nome', inputValue($event))"
+                      [attr.aria-label]="'Nome do prato'"
+                      [class]="inputClass + ' w-full min-w-[150px] !h-8'"
+                    />
+                  </td>
+                  <td class="py-2 pr-3 max-sm:w-full max-sm:p-0">
+                    <input
+                      type="text"
+                      list="cardapio-categorias"
+                      maxlength="40"
+                      [value]="f().categoria"
+                      (input)="setF('categoria', inputValue($event))"
+                      [attr.aria-label]="'Categoria'"
+                      [class]="inputClass + ' w-full min-w-[110px] !h-8'"
+                    />
+                  </td>
+                  <td
+                    class="py-2 pr-3 text-right max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
+                  >
+                    <span class="sm:hidden block text-[11px] text-muted-foreground">Preço</span>
+                    <input
+                      appMoneyInput
+                      type="text"
+                      inputmode="decimal"
+                      [value]="f().preco"
+                      (input)="setF('preco', inputValue($event))"
+                      [attr.aria-label]="'Preço de ' + p.name"
+                      placeholder="0,00"
+                      [class]="inputClass + ' w-24 max-sm:w-full !h-8 text-right'"
+                    />
+                  </td>
+                  <td
+                    class="py-2 pr-3 text-right max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
+                  >
+                    <span class="sm:hidden block text-[11px] text-muted-foreground">Custo</span>
+                    <input
+                      appMoneyInput
+                      type="text"
+                      inputmode="decimal"
+                      [value]="f().custo"
+                      (input)="setF('custo', inputValue($event))"
+                      [attr.aria-label]="'Custo de ' + p.name"
+                      placeholder="0,00"
+                      [class]="inputClass + ' w-20 max-sm:w-full !h-8 text-right'"
+                    />
+                  </td>
+                  <td
+                    class="py-2 pr-3 text-right tabular-nums max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
+                  >
+                    <span class="sm:hidden block text-[11px] text-muted-foreground">Margem</span>
+                    {{ margemLabel(p) }}
+                  </td>
+                  <td
+                    class="py-2 pr-3 text-right max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
+                  >
+                    <span class="sm:hidden block text-[11px] text-muted-foreground"
+                      >Vendidos (30 dias)</span
+                    >
+                    {{ p.soldPerMonth > 0 ? p.soldPerMonth : '—' }}
+                  </td>
+                } @else {
+                  <td class="py-2 pr-3 font-medium max-sm:w-full max-sm:p-0">
+                    {{ p.name }}
+                    @if (!p.active) {
+                      <span class="ml-1 text-[11px] text-muted-foreground">(inativo)</span>
+                    }
+                  </td>
+                  <td class="py-2 pr-3 text-muted-foreground max-sm:w-full max-sm:p-0">
+                    {{ p.category ?? '—' }}
+                  </td>
+                  <td
+                    class="py-2 pr-3 text-right tabular-nums max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
+                  >
+                    <span class="sm:hidden block text-[11px] text-muted-foreground">Preço</span>
+                    @if (precoEditandoId() === p.id) {
+                      <input
+                        appMoneyInput
+                        type="text"
+                        inputmode="decimal"
+                        [value]="precoEditado()"
+                        (input)="precoEditado.set(inputValue($event))"
+                        (keydown.enter)="salvarPreco(p)"
+                        (keydown.escape)="precoEditandoId.set(null)"
+                        [attr.aria-label]="'Novo preço de ' + p.name"
+                        [class]="inputClass + ' w-24 max-sm:w-full !h-8 text-right'"
+                      />
+                    } @else {
+                      {{ fmtBRL(p.price) }}
+                    }
+                  </td>
+                  <td
+                    class="py-2 pr-3 text-right tabular-nums max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
+                  >
+                    <span class="sm:hidden block text-[11px] text-muted-foreground">Custo</span>
+                    {{ p.cost > 0 ? fmtBRL(p.cost) : '—' }}
+                  </td>
+                  <td
+                    class="py-2 pr-3 text-right tabular-nums max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
+                  >
+                    <span class="sm:hidden block text-[11px] text-muted-foreground">Margem</span>
+                    {{ margemLabel(p) }}
+                  </td>
+                  <td
+                    class="py-2 pr-3 text-right tabular-nums max-sm:w-[calc(33.333%-0.5rem)] max-sm:p-0 max-sm:text-left"
+                  >
+                    <span class="sm:hidden block text-[11px] text-muted-foreground"
+                      >Vendidos (30 dias)</span
+                    >
+                    {{ p.soldPerMonth > 0 ? p.soldPerMonth : '—' }}
+                  </td>
+                }
+                <td class="py-2 pr-3 max-sm:w-full max-sm:p-0">
+                  <span class="sm:hidden text-muted-foreground">Preço revisado: </span>
+                  <span class="text-muted-foreground">{{ revisadoLabel(p) }}</span>
+                  @if (revisar(p)) {
+                    <app-chip tone="warning" icon="sell">Revisar preço</app-chip>
+                  }
+                </td>
+                <td
+                  class="py-2 text-right whitespace-nowrap max-sm:w-full max-sm:p-0 max-sm:pt-1 max-sm:text-left max-sm:whitespace-normal"
+                >
+                  @if (editandoId() === p.id) {
+                    <button
+                      type="button"
+                      (click)="salvarEdicao(p)"
+                      [disabled]="busyId() === p.id"
+                      class="h-8 px-3 rounded-lg bg-mint-soft text-ocean text-[12px] font-semibold hover:brightness-95 cursor-pointer"
+                    >
+                      Salvar
+                    </button>
+                    <button
+                      type="button"
+                      (click)="cancelarEdicao()"
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  } @else if (precoEditandoId() === p.id) {
+                    <button
+                      type="button"
+                      (click)="salvarPreco(p)"
+                      [disabled]="busyId() === p.id"
+                      class="h-8 px-3 rounded-lg bg-mint-soft text-ocean text-[12px] font-semibold hover:brightness-95 cursor-pointer"
+                    >
+                      Salvar
+                    </button>
+                    <button
+                      type="button"
+                      (click)="precoEditandoId.set(null)"
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  } @else {
+                    @if (p.active) {
+                      <button
+                        type="button"
+                        (click)="iniciarPreco(p)"
+                        [disabled]="busyId() === p.id"
+                        class="h-8 px-3 rounded-lg bg-mint-soft text-ocean text-[12px] font-semibold hover:brightness-95 cursor-pointer"
+                      >
+                        Mudar preço
+                      </button>
+                      @if (revisar(p)) {
+                        <button
+                          type="button"
+                          (click)="manterPreco(p)"
+                          [disabled]="busyId() === p.id"
+                          class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                        >
+                          Não quero mudar
+                        </button>
+                      }
+                    }
+                    <button
+                      type="button"
+                      (click)="iniciarEdicao(p)"
+                      [disabled]="busyId() === p.id"
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      (click)="alternarAtivo(p)"
+                      [disabled]="busyId() === p.id"
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                    >
+                      {{ p.active ? 'Inativar' : 'Reativar' }}
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (visiveis().length === 0) {
+        <p class="text-[13px] text-muted-foreground py-6 text-center">
+          Nenhum prato encontrado para "{{ busca() }}".
+        </p>
+      }
+    }
+  </div>
+
+  <p class="text-[12.5px] text-muted-foreground flex flex-wrap items-center gap-x-1">
+    Quer saber quais pratos proteger, promover ou repensar?
+    <a
+      routerLink="/previsoes"
+      [queryParams]="{ tab: 'cardapio' }"
+      class="font-semibold text-ocean hover:underline"
+      >Ver a análise do cardápio em Previsões</a
+    >
+  </p>
+</div>
