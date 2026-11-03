@@ -65,6 +65,21 @@ describe('textos de tempo', () => {
 });
 
 describe('toPrato', () => {
+  it('categoria em branco vira "sem categoria" (null), como se não existisse', () => {
+    const base = {
+      _id: 'm1',
+      name: 'Arroz',
+      price: 12.5,
+      status: 'active',
+      priceUpdatedAt: '2026-05-01T00:00:00.000Z',
+      priceReviewedAt: '2026-05-01T00:00:00.000Z',
+    };
+    expect(toPrato({ ...base, category: '' }).category).toBeNull();
+    expect(toPrato({ ...base, category: '   ' }).category).toBeNull();
+    expect(toPrato({ ...base, category: ' Frango ' }).category).toBe('Frango');
+    expect(toPrato(base).category).toBeNull();
+  });
+
   it('mapeia a entidade da lib (id, status e datas)', () => {
     const p = toPrato({
       _id: 'm1',
