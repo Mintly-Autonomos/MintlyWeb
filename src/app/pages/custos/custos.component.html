@@ -160,11 +160,11 @@
           <h3 class="text-[15px] font-bold tracking-tight inline-flex items-center gap-1.5">
             Para onde está indo seu dinheiro
             <app-hint
-              text="As maiores categorias primeiro. Clique em uma categoria para ver os itens e o que mudou em relação ao passado."
+              text="As maiores categorias primeiro. As que têm itens detalhados abrem com um clique e mostram o que mudou em relação ao passado."
             />
           </h3>
           <p class="text-[12.5px] text-muted-foreground mt-0.5">
-            Clique numa categoria para abrir os itens ·
+            Categorias com seta abrem os itens ·
             {{ compare() === 'anterior' ? 'vs. mês anterior' : 'vs. média 3 meses' }}
           </p>
         </div>
@@ -191,12 +191,6 @@
           [options]="lenteOpts"
           (valueChange)="lente.set($any($event))"
         />
-        <app-toggle-group
-          ariaLabel="Canal"
-          [value]="canal()"
-          [options]="canalOpts"
-          (valueChange)="setCanal($any($event))"
-        />
       </div>
 
       @if (lente() === 'variaveis' && !loading()) {
@@ -206,31 +200,30 @@
           ({{ pctFmt((d.byBehavior.variable / (d.total.current || 1)) * 100) }} do total).
         </p>
       }
-      @if (canal() !== 'geral' && !loading()) {
-        <p class="mt-3 text-[12.5px] text-muted-foreground leading-relaxed">
-          Mostrando a parcela de custo atribuível ao
-          {{ canal() === 'salao' ? 'salão' : 'delivery' }}.
-          @if (d.sharedExcluded) {
-            {{ fmtBRL(d.sharedExcluded) }} de despesas "da casa" ficaram de fora deste filtro.
-          }
-        </p>
-      }
 
       <div class="mt-4 space-y-2">
         @for (linha of linhas(); track linha.key) {
+          <!-- Só abre quem tem itens para mostrar; sem subcategoria a linha é só leitura. -->
+          @let temItens = linha.subitems.length > 0;
           <div
             [class]="
               'rounded-xl border transition-colors ' +
-              (openCat() === linha.key
+              (openCat() === linha.key && temItens
                 ? 'border-mint bg-mint-soft/30'
-                : 'border-border hover:bg-muted/60')
+                : temItens
+                  ? 'border-border hover:bg-muted/60'
+                  : 'border-border')
             "
           >
             <button
               type="button"
               (click)="toggleCat(linha.key)"
-              [attr.aria-expanded]="openCat() === linha.key"
-              class="w-full flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3 text-left cursor-pointer rounded-xl"
+              [disabled]="!temItens"
+              [attr.aria-expanded]="temItens ? openCat() === linha.key : null"
+              [class]="
+                'w-full flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3 text-left rounded-xl ' +
+                (temItens ? 'cursor-pointer' : 'cursor-default')
+              "
             >
               <span
                 class="h-9 w-9 rounded-xl grid place-items-center bg-muted text-muted-foreground shrink-0"
@@ -283,13 +276,17 @@
                   }
                 }
               </span>
-              <app-icon
-                [name]="openCat() === linha.key ? 'expand_less' : 'expand_more'"
-                className="text-muted-foreground"
-                [style]="{ fontSize: '20px' }"
-              />
+              @if (temItens) {
+                <app-icon
+                  [name]="openCat() === linha.key ? 'expand_less' : 'expand_more'"
+                  className="text-muted-foreground"
+                  [style]="{ fontSize: '20px' }"
+                />
+              } @else {
+                <span class="w-5 shrink-0" aria-hidden="true"></span>
+              }
             </button>
-            @if (openCat() === linha.key) {
+            @if (openCat() === linha.key && temItens) {
               <div class="px-3.5 pb-3.5 space-y-2">
                 @for (sub of linha.subitems; track sub.key) {
                   <div

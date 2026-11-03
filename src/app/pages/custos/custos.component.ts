@@ -1,11 +1,6 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CategoryBehavior } from 'mintly-lib';
-import {
-  CustosService,
-  ExpenseItem,
-  ExpenseSubitem,
-  ChannelFilter,
-} from '../../services/custos.service';
+import { CustosService, ExpenseItem, ExpenseSubitem } from '../../services/custos.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { HintComponent } from '../../shared/hint.component';
@@ -25,7 +20,6 @@ const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigi
 
 type Compare = 'anterior' | 'media3';
 type Lente = 'todos' | 'variaveis' | 'fixos';
-type Canal = 'geral' | 'salao' | 'delivery';
 
 interface LinhaDespesa extends ExpenseItem {
   metric: number;
@@ -68,7 +62,6 @@ export class CustosComponent implements OnInit {
   protected valueMode = signal<'brl' | 'pct'>('brl');
   protected compare = signal<Compare>('anterior');
   protected lente = signal<Lente>('todos');
-  protected canal = signal<Canal>('geral');
   protected trendMode = signal<'total' | 'categoria'>('total');
   protected openCat = signal<string | null>(null);
   protected subDestaque = signal<string | null>(null);
@@ -98,11 +91,6 @@ export class CustosComponent implements OnInit {
     { value: 'todos', label: 'Todos' },
     { value: 'variaveis', label: 'Só variáveis' },
     { value: 'fixos', label: 'Só fixos' },
-  ];
-  protected canalOpts: ToggleGroupOption[] = [
-    { value: 'geral', label: 'Geral' },
-    { value: 'salao', label: 'Salão' },
-    { value: 'delivery', label: 'Delivery' },
   ];
 
   protected trendSeriesTotal: LineSeries[] = [
@@ -165,16 +153,11 @@ export class CustosComponent implements OnInit {
     return this.customMonth();
   }
 
-  private channelQuery(): ChannelFilter {
-    const c = this.canal();
-    return c === 'salao' ? 'dineIn' : c === 'delivery' ? 'delivery' : undefined;
-  }
-
   private load(): void {
     this.openCat.set(null);
     this.subDestaque.set(null);
     this.svc
-      .refresh(this.monthQuery(), this.channelQuery())
+      .refresh(this.monthQuery())
       .catch(() => this.toast.error('Não foi possível carregar os dados de custos.'));
   }
 
@@ -186,11 +169,6 @@ export class CustosComponent implements OnInit {
   setCustomMonth(v: string): void {
     this.customMonth.set(v);
     if (this.monthSel() === 'personalizado') this.load();
-  }
-
-  setCanal(c: Canal): void {
-    this.canal.set(c);
-    this.load();
   }
 
   toggleCat(key: string): void {
