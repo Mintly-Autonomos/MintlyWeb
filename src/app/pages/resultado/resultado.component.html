@@ -193,7 +193,7 @@
         title="Leitura do mês"
         [description]="'O que explica o resultado de ' + fmtMonthLong(d.referenceMonth) + '.'"
       />
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 auto-rows-fr gap-6">
         @for (insight of d.insights; track insight.kind) {
           @switch (insight.kind) {
             @case ('profitChanged') {

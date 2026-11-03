@@ -220,7 +220,7 @@
     <!-- 4 — Insights -->
     <section>
       <app-section-header title="O que fazer primeiro" />
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 auto-rows-fr gap-6">
         @for (i of d.insights; track i.kind) {
           <app-insight-card
             [severity]="insightSeverity(i)"

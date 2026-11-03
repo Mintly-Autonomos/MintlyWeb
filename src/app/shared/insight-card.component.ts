@@ -48,11 +48,11 @@ const SEVERITY: Record<InsightSeverity, SeverityMeta> = {
   selector: 'app-insight-card',
   standalone: true,
   imports: [IconComponent, ButtonComponent],
-  host: { class: 'block' },
+  host: { class: 'block h-full' },
   template: `
     <div
       [class]="
-        'm3-card rounded-2xl p-5 border ' +
+        'm3-card rounded-2xl p-5 border h-full ' +
         meta.ring +
         ' flex flex-col transition-all duration-200 hover:m3-elev hover:-translate-y-0.5'
       "

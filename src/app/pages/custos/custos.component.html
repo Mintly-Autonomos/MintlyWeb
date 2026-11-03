@@ -123,7 +123,7 @@
         description="Gastos que fugiram do padrão dos últimos meses"
       />
       @if (d.anomalies.length) {
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 auto-rows-fr gap-6">
           @for (a of d.anomalies; track a.itemKey + (a.subitemKey ?? '')) {
             <app-insight-card
               severity="atencao"
