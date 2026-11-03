@@ -24,6 +24,7 @@ const prato = (over: Partial<Prato>): Prato => ({
 interface Internals {
   f: { set(v: { nome: string; categoria: string; preco: string; custo: string }): void };
   precoEditado: { set(v: string): void };
+  precoEditandoId(): string | null;
   adicionar(): Promise<void>;
   iniciarEdicao(p: Prato): void;
   salvarEdicao(p: Prato): Promise<void>;
@@ -74,12 +75,18 @@ describe('CardapioComponent', () => {
     expect(text()).toContain('R$ 12,00');
   });
 
-  it('mostra a margem (preço − custo e % do preço) e traço enquanto não há custo', () => {
+  it('mostra a margem só em porcentagem, e traço enquanto não há custo', () => {
     const { root, text } = render([
       prato({}),
       prato({ id: 'p2', name: 'Suco', cost: 0, price: 8, category: null }),
     ]);
-    expect(text()).toContain('R$ 8,00 (40%)');
+    // 20 de preço e 12 de custo: sobram 40% do preço.
+    expect(text()).toContain('40%');
+    expect(text()).not.toContain('R$ 8,00 (40%)');
+    const linhaFrango = Array.from(root.querySelectorAll('tr')).find((r) =>
+      r.textContent?.includes('Frango Original'),
+    );
+    expect(linhaFrango?.textContent).not.toMatch(/R\$ 8,00/);
     const linhaSuco = Array.from(root.querySelectorAll('tr')).find((r) =>
       r.textContent?.includes('Suco'),
     );
@@ -210,6 +217,59 @@ describe('CardapioComponent', () => {
       const { fixture } = render([prato({ id: 'a' })], { item: 'a' });
       fixture.destroy();
       expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe('preço vindo do simulador (Previsões)', () => {
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn();
+    });
+
+    const campoPreco = (root: HTMLElement) =>
+      root.querySelector<HTMLInputElement>('input[aria-label^="Novo preço de"]');
+
+    it('abre "Mudar preço" já com o valor do simulador, é só confirmar', async () => {
+      const { fixture, root, c, svc, text } = render([prato({ id: 'a', price: 20 })], {
+        item: 'a',
+        preco: '22.5',
+      });
+      fixture.detectChanges();
+      expect(c.precoEditandoId()).toBe('a');
+      expect(campoPreco(root)?.value).toBe('22,50');
+      expect(root.querySelector('[data-testid=preco-do-simulador]')).not.toBeNull();
+      expect(text()).toContain('confirme em Salvar');
+      expect(svc.changePrice).not.toHaveBeenCalled();
+
+      await c.salvarPreco(prato({ id: 'a', price: 20 }));
+      expect(svc.changePrice).toHaveBeenCalledWith('a', 22.5);
+    });
+
+    it('sem preço no link (vindo do sino), só destaca: não abre o editor', () => {
+      const { fixture, root, c } = render([prato({ id: 'a' })], { item: 'a' });
+      fixture.detectChanges();
+      expect(c.precoEditandoId()).toBeNull();
+      expect(campoPreco(root)).toBeNull();
+    });
+
+    it('preço igual ao atual não abre o editor (não há o que confirmar)', () => {
+      const { fixture, c } = render([prato({ id: 'a', price: 20 })], { item: 'a', preco: '20' });
+      fixture.detectChanges();
+      expect(c.precoEditandoId()).toBeNull();
+    });
+
+    it.each(['abc', '', '-5'])('preço inválido "%s" é ignorado', (preco) => {
+      const { fixture, c } = render([prato({ id: 'a', price: 20 })], { item: 'a', preco });
+      fixture.detectChanges();
+      expect(c.precoEditandoId()).toBeNull();
+    });
+
+    it('prato inativo não abre o editor de preço', () => {
+      const { fixture, c } = render([prato({ id: 'a', active: false })], {
+        item: 'a',
+        preco: '30',
+      });
+      fixture.detectChanges();
+      expect(c.precoEditandoId()).toBeNull();
     });
   });
 
