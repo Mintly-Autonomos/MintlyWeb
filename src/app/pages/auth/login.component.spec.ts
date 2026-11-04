@@ -56,7 +56,11 @@ describe('LoginComponent — conta lembrada neste aparelho', () => {
     const { root, campo, text } = render(davi);
     const cartao = root.querySelector('[data-testid=conta-salva]');
     expect(cartao?.textContent).toContain('Davi Lee');
-    expect(cartao?.textContent).toContain('davi@teste.com');
+    // O e-mail aparece só em parte; o inteiro não vai para a tela.
+    expect(cartao?.querySelector('[data-testid=email-parcial]')?.textContent?.trim()).toBe(
+      'da***@teste.com',
+    );
+    expect(cartao?.textContent).not.toContain('davi@teste.com');
     expect(cartao?.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AAA');
     expect(campo('email')).toBeNull();
     expect(campo('remember')).toBeNull();
