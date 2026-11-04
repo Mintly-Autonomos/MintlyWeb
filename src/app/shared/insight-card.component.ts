@@ -64,6 +64,16 @@ const SEVERITY: Record<InsightSeverity, SeverityMeta> = {
         <span [class]="'text-[11px] font-bold uppercase tracking-wider ' + meta.text">{{
           meta.label
         }}</span>
+        @if (ia) {
+          <span
+            class="ml-auto inline-flex items-center gap-1 text-[10.5px] font-medium text-muted-foreground"
+            title="Texto escrito pela IA com os números do seu restaurante"
+            data-testid="insight-ia"
+          >
+            <app-icon name="auto_awesome" [style]="{ fontSize: '13px' }" />
+            IA
+          </span>
+        }
       </div>
       <div class="mt-3 text-[14px] font-semibold leading-snug">{{ title }}</div>
       <p class="text-[13px] text-muted-foreground leading-relaxed mt-1.5 flex-1">
@@ -84,6 +94,8 @@ export class InsightCardComponent {
   @Input() title = '';
   @Input() description = '';
   @Input() action = '';
+  /** 	rue quando o título e a descrição vieram da IA (mostra um selo discreto). */
+  @Input() ia = false;
   @Output() actionClick = new EventEmitter<void>();
 
   get meta(): SeverityMeta {

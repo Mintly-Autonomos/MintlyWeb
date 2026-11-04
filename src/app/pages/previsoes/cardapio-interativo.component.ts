@@ -1,5 +1,8 @@
 import { Component, Input, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import type { AiPriceSuggestion } from 'mintly-lib';
+import { AiService } from '../../services/ai.service';
+import { apiErrorMessage } from '../../shared/api-error-message';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { HintComponent } from '../../shared/hint.component';
@@ -51,6 +54,7 @@ const FORMA: Record<Quadrante, ScatterPoint['forma']> = {
 })
 export class CardapioInterativoComponent {
   private svc = inject(CardapioService);
+  private ai = inject(AiService);
 
   /** Prato a abrir já selecionado (vindo do sino: "Rever preço"). */
   @Input() set initialItem(id: string | null) {
@@ -92,8 +96,21 @@ export class CardapioInterativoComponent {
   });
   protected faixa = computed(() => {
     const p = this.pratoSel();
-    return p ? faixaPreco(p) : null;
+    if (!p) return null;
+    const base = faixaPreco(p);
+    // A sugestão da IA pode passar do alcance normal do controle: a faixa cresce até o preço simulado.
+    const atual = this.precos()[p.id] ?? p.price;
+    return { ...base, max: Math.max(base.max, Math.ceil(atual / base.passo) * base.passo) };
   });
+
+  // ── sugestão da IA ──
+  protected uso = this.ai.uso;
+  protected sugerindo = signal(false);
+  protected sugestao = signal<AiPriceSuggestion | null>(null);
+  protected erroIa = signal<string | null>(null);
+  /** O preço sugerido foi colocado no simulador (o prato tem custo e vendas, então está na análise). */
+  protected aplicada = signal(false);
+  protected semChamadas = computed(() => this.uso()?.remainingToday === 0);
   protected impacto = computed(() => {
     const i = this.item();
     const o = this.original();
@@ -137,6 +154,7 @@ export class CardapioInterativoComponent {
   private pendingFocus: string | null = null;
 
   constructor() {
+    void this.ai.carregarUso();
     // Quando os pratos chegam, abre o prato pedido pelo sino (se ainda não tinha dados).
     effect(() => {
       this.svc.pratos();
@@ -160,6 +178,38 @@ export class CardapioInterativoComponent {
           ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
       250,
     );
+  }
+
+  /**
+   * Pede à IA o aumento ideal do prato que está há mais tempo sem mudar de preço. Se o prato está na análise
+   * (tem custo e vendas), já o seleciona e coloca o preço sugerido no simulador; é só uma simulação, nada é
+   * gravado no Cardápio.
+   */
+  async sugerirComIa(): Promise<void> {
+    if (this.sugerindo()) return;
+    this.sugerindo.set(true);
+    this.erroIa.set(null);
+    try {
+      const s = await this.ai.sugerirPreco();
+      this.sugestao.set(s);
+      const naAnalise = this.analise().itens.some((i) => i.id === s.menuItemId);
+      this.aplicada.set(naAnalise && s.increasePercent > 0);
+      if (naAnalise) {
+        this.selecionado.set(s.menuItemId);
+        if (s.increasePercent > 0) this.setPreco(s.menuItemId, s.suggestedPrice);
+      }
+    } catch (err) {
+      this.erroIa.set(
+        apiErrorMessage(err, 'Não foi possível pedir a sugestão agora. Tente de novo.'),
+      );
+    } finally {
+      this.sugerindo.set(false);
+    }
+  }
+
+  /** `11,7%` */
+  protected pct(n: number): string {
+    return `${n.toFixed(1).replace('.', ',')}%`;
   }
 
   selecionar(id: string): void {
