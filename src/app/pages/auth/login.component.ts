@@ -7,6 +7,7 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 import { AlertComponent } from '../../shared/alert.component';
 import { AuthService } from '../../services/auth.service';
 import { apiErrorInfo } from '../../shared/api-error';
+import { maskEmail } from '../../shared/mask-email';
 
 @Component({
   selector: 'app-login',
@@ -55,7 +56,9 @@ import { apiErrorInfo } from '../../shared/api-error';
             }
             <div class="min-w-0">
               <div class="text-sm font-semibold truncate">{{ conta.nome }}</div>
-              <div class="text-[13px] text-muted-foreground truncate">{{ conta.email }}</div>
+              <div class="text-[13px] text-muted-foreground truncate" data-testid="email-parcial">
+                {{ emailParcial(conta.email) }}
+              </div>
             </div>
           </div>
         } @else {
@@ -192,6 +195,9 @@ export class LoginComponent {
   protected showPwd = signal(false);
   protected loading = signal(false);
   protected error = signal<string | null>(null);
+
+  /** O cartão da conta lembrada mostra o e-mail só em parte; o e-mail inteiro continua guardado para entrar. */
+  protected emailParcial = maskEmail;
 
   /** Não é você? Esquece a conta lembrada neste aparelho e volta ao login com e-mail e senha. */
   usarOutraConta(): void {
