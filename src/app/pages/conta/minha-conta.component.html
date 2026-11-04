@@ -1,0 +1,591 @@
+<app-modal
+  [open]="aberto()"
+  title="Minha conta"
+  [subtitle]="dados()?.email ?? ''"
+  size="lg"
+  (closed)="closed.emit()"
+>
+  @if (!dados()) {
+    <p class="py-10 text-center text-[13px] text-muted-foreground" data-testid="conta-carregando">
+      @if (ocupado() === 'carregar') {
+        Carregando sua conta…
+      } @else {
+        Não foi possível carregar sua conta.
+      }
+    </p>
+  } @else {
+    <div class="space-y-5">
+      @if (ehDono()) {
+        <div
+          class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
+          role="tablist"
+        >
+          @for (a of ['dados', 'restaurante']; track a) {
+            <button
+              type="button"
+              role="tab"
+              [attr.aria-selected]="aba() === a"
+              [attr.data-testid]="'aba-' + a"
+              (click)="aba.set($any(a))"
+              [class]="
+                'h-8 px-4 rounded-full text-[13px] font-semibold transition-colors cursor-pointer ' +
+                (aba() === a
+                  ? 'bg-mint-soft text-ocean'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+              "
+            >
+              {{ a === 'dados' ? 'Meus dados' : 'Restaurante' }}
+            </button>
+          }
+        </div>
+      }
+
+      @if (aba() === 'dados') {
+        <!-- Dados pessoais -->
+        <section class="rounded-2xl border border-border p-4 space-y-3" data-testid="secao-dados">
+          <h4 class="text-[14px] font-bold">Dados pessoais</h4>
+          <div class="flex items-center gap-4" data-testid="bloco-foto">
+            @if (foto(); as src) {
+              <img
+                [src]="src"
+                alt="Sua foto de perfil"
+                class="h-16 w-16 rounded-full object-cover shrink-0"
+                data-testid="foto-atual"
+              />
+            } @else {
+              <div
+                class="h-16 w-16 rounded-full bg-ocean text-white grid place-items-center text-lg font-semibold shrink-0"
+                data-testid="foto-iniciais"
+              >
+                {{ iniciais() }}
+              </div>
+            }
+            <div class="space-y-1.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  (click)="escolherFoto()"
+                  [disabled]="ocupado() === 'foto'"
+                  class="h-9 px-4 rounded-full text-[13px] font-semibold border border-border hover:bg-muted cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="trocar-foto"
+                >
+                  {{ foto() ? 'Trocar foto' : 'Adicionar foto' }}
+                </button>
+                @if (foto()) {
+                  <button
+                    type="button"
+                    (click)="removerFoto()"
+                    [disabled]="ocupado() === 'foto'"
+                    class="h-9 px-3 rounded-full text-[13px] font-semibold text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    data-testid="remover-foto"
+                  >
+                    Remover
+                  </button>
+                }
+              </div>
+              @if (erros().foto; as e) {
+                <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+              }
+            </div>
+            <input
+              #fotoInput
+              type="file"
+              class="hidden"
+              [accept]="avatarAccept"
+              (change)="trocarFoto($event)"
+              data-testid="arquivo-foto"
+            />
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="block">
+              <span class="text-[12px] font-medium block mb-1">Nome</span>
+              <input
+                type="text"
+                maxlength="80"
+                [value]="nome()"
+                (input)="nome.set(valor($event))"
+                [class]="inputClass"
+                data-testid="campo-nome"
+              />
+            </label>
+            <label class="block">
+              <span class="text-[12px] font-medium block mb-1">Telefone</span>
+              <input
+                type="tel"
+                maxlength="20"
+                [value]="telefone()"
+                (input)="telefone.set(valor($event))"
+                placeholder="(11) 99999-0000"
+                [class]="inputClass"
+                data-testid="campo-telefone"
+              />
+            </label>
+          </div>
+          @if (erros().dados; as e) {
+            <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+          }
+          <button
+            type="button"
+            (click)="salvarDados()"
+            [disabled]="!dadosMudaram() || !dadosValidos() || ocupado() === 'dados'"
+            class="h-10 px-5 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="salvar-dados"
+          >
+            Salvar dados
+          </button>
+        </section>
+
+        <!-- E-mail -->
+        <section class="rounded-2xl border border-border p-4 space-y-3" data-testid="secao-email">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 class="text-[14px] font-bold">E-mail de acesso</h4>
+              <p class="text-[13px] text-muted-foreground">{{ dados()?.email }}</p>
+            </div>
+            @if (!emailAberto()) {
+              <button
+                type="button"
+                (click)="emailAberto.set(true)"
+                class="h-9 px-4 rounded-full text-[13px] font-semibold border border-border hover:bg-muted cursor-pointer"
+                data-testid="abrir-email"
+              >
+                Alterar e-mail
+              </button>
+            }
+          </div>
+          @if (emailAberto()) {
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="block">
+                <span class="text-[12px] font-medium block mb-1">Novo e-mail</span>
+                <input
+                  type="email"
+                  [value]="novoEmail()"
+                  (input)="novoEmail.set(valor($event))"
+                  autocomplete="off"
+                  [class]="inputClass"
+                  data-testid="campo-novo-email"
+                />
+              </label>
+              <label class="block">
+                <span class="text-[12px] font-medium block mb-1">Sua senha atual</span>
+                <input
+                  type="password"
+                  [value]="senhaEmail()"
+                  (input)="senhaEmail.set(valor($event))"
+                  autocomplete="current-password"
+                  [class]="inputClass"
+                  data-testid="campo-senha-email"
+                />
+              </label>
+            </div>
+            @if (erros().email; as e) {
+              <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+            }
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                (click)="trocarEmail()"
+                [disabled]="!emailValido() || senhaEmail() === '' || ocupado() === 'email'"
+                class="h-10 px-5 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="trocar-email"
+              >
+                Trocar e-mail
+              </button>
+              <button
+                type="button"
+                (click)="emailAberto.set(false)"
+                class="h-10 px-4 rounded-full text-sm font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          }
+        </section>
+
+        <!-- Senha -->
+        <section class="rounded-2xl border border-border p-4 space-y-3" data-testid="secao-senha">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 class="text-[14px] font-bold">Senha</h4>
+              <p class="text-[13px] text-muted-foreground">
+                Ao trocar, você sai de todos os aparelhos e entra de novo com a senha nova.
+              </p>
+            </div>
+            @if (!senhaAberta()) {
+              <button
+                type="button"
+                (click)="senhaAberta.set(true)"
+                class="h-9 px-4 rounded-full text-[13px] font-semibold border border-border hover:bg-muted cursor-pointer"
+                data-testid="abrir-senha"
+              >
+                Trocar senha
+              </button>
+            }
+          </div>
+          @if (senhaAberta()) {
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <label class="block">
+                <span class="text-[12px] font-medium block mb-1">Senha atual</span>
+                <input
+                  type="password"
+                  [value]="senhaAtual()"
+                  (input)="senhaAtual.set(valor($event))"
+                  autocomplete="current-password"
+                  [class]="inputClass"
+                  data-testid="campo-senha-atual"
+                />
+              </label>
+              <label class="block">
+                <span class="text-[12px] font-medium block mb-1">Senha nova</span>
+                <input
+                  type="password"
+                  [value]="senhaNova()"
+                  (input)="senhaNova.set(valor($event))"
+                  autocomplete="new-password"
+                  [class]="inputClass"
+                  data-testid="campo-senha-nova"
+                />
+              </label>
+              <label class="block">
+                <span class="text-[12px] font-medium block mb-1">Repita a senha nova</span>
+                <input
+                  type="password"
+                  [value]="senhaConfirma()"
+                  (input)="senhaConfirma.set(valor($event))"
+                  autocomplete="new-password"
+                  [class]="inputClass"
+                  data-testid="campo-senha-confirma"
+                />
+              </label>
+            </div>
+            <p
+              [class]="
+                'text-[12px] ' +
+                (senhaNova() === '' || senhaNovaForte() ? 'text-muted-foreground' : 'text-warning')
+              "
+              data-testid="regra-senha"
+            >
+              Mínimo de 8 caracteres, com letra maiúscula, minúscula e número.
+            </p>
+            @if (senhaConfirma() !== '' && !senhasConferem()) {
+              <p class="text-[12.5px] text-error" data-testid="senhas-diferentes">
+                As senhas não conferem.
+              </p>
+            }
+            @if (erros().senha; as e) {
+              <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+            }
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                (click)="trocarSenha()"
+                [disabled]="
+                  senhaAtual() === '' ||
+                  !senhaNovaForte() ||
+                  !senhasConferem() ||
+                  ocupado() === 'senha'
+                "
+                class="h-10 px-5 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="trocar-senha"
+              >
+                Trocar senha
+              </button>
+              <button
+                type="button"
+                (click)="senhaAberta.set(false)"
+                class="h-10 px-4 rounded-full text-sm font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          }
+        </section>
+      } @else {
+        <!-- Nome do restaurante -->
+        <section
+          class="rounded-2xl border border-border p-4 space-y-3"
+          data-testid="secao-restaurante"
+        >
+          <h4 class="text-[14px] font-bold">Nome do restaurante</h4>
+          <input
+            type="text"
+            maxlength="80"
+            [value]="nomeRest()"
+            (input)="nomeRest.set(valor($event))"
+            [class]="inputClass"
+            aria-label="Nome do restaurante"
+            data-testid="campo-restaurante"
+          />
+          @if (erros().restaurante; as e) {
+            <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+          }
+          <button
+            type="button"
+            (click)="salvarRestaurante()"
+            [disabled]="!restauranteMudou() || ocupado() === 'restaurante'"
+            class="h-10 px-5 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="salvar-restaurante"
+          >
+            Salvar nome
+          </button>
+        </section>
+
+        <!-- Funcionários -->
+        <section
+          class="rounded-2xl border border-border p-4 space-y-3"
+          data-testid="secao-funcionarios"
+        >
+          <div>
+            <h4 class="text-[14px] font-bold">Funcionários</h4>
+            <p class="text-[13px] text-muted-foreground">
+              Pessoas que entram no Mintly com o próprio e-mail e senha. Elas veem e lançam os dados
+              do restaurante, mas não gerenciam funcionários, o nome do restaurante nem a exclusão.
+              Cada um tem a própria foto de perfil, que ele mesmo troca em "Minha conta".
+            </p>
+            <p class="text-[12.5px] font-medium mt-1.5" data-testid="vagas-funcionarios">
+              {{ ativos() }} de {{ limiteFuncionarios() }} funcionários ativos · plano
+              {{ nomePlano() }}
+            </p>
+          </div>
+
+          @if (membros().length === 0) {
+            <p class="text-[13px] text-muted-foreground" data-testid="sem-funcionarios">
+              Nenhum funcionário ainda.
+            </p>
+          } @else {
+            <ul class="divide-y divide-border rounded-xl border border-border">
+              @for (m of membros(); track m.id) {
+                <li class="p-3 space-y-2" [attr.data-testid]="'funcionario-' + m.id">
+                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    @if (m.foto) {
+                      <img
+                        [src]="m.foto"
+                        [alt]="'Foto de ' + m.nome"
+                        class="h-10 w-10 rounded-full object-cover shrink-0"
+                        [attr.data-testid]="'foto-membro-' + m.id"
+                      />
+                    } @else {
+                      <div
+                        class="h-10 w-10 rounded-full bg-ocean text-white grid place-items-center text-sm font-semibold shrink-0"
+                        [attr.data-testid]="'iniciais-membro-' + m.id"
+                      >
+                        {{ iniciaisDe(m.nome) }}
+                      </div>
+                    }
+                    <div class="min-w-0 flex-1">
+                      <div class="text-[13.5px] font-semibold truncate">{{ m.nome }}</div>
+                      <div class="text-[12.5px] text-muted-foreground truncate">{{ m.email }}</div>
+                    </div>
+                    <app-chip [tone]="m.status === 'active' ? 'success' : 'neutral'">{{
+                      m.status === 'active' ? 'Ativo' : 'Inativo'
+                    }}</app-chip>
+                    <button
+                      type="button"
+                      (click)="membroSenhaId.set(membroSenhaId() === m.id ? null : m.id)"
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                    >
+                      Nova senha
+                    </button>
+                    <button
+                      type="button"
+                      (click)="alternarMembro(m)"
+                      [disabled]="
+                        ocupado() === 'membro' || (m.status !== 'active' && limiteDeFuncionarios())
+                      "
+                      [title]="
+                        m.status !== 'active' && limiteDeFuncionarios()
+                          ? 'Sem vaga no plano: inative outro funcionário antes.'
+                          : ''
+                      "
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      [attr.data-testid]="'alternar-' + m.id"
+                    >
+                      {{ m.status === 'active' ? 'Inativar' : 'Reativar' }}
+                    </button>
+                  </div>
+                  @if (membroSenhaId() === m.id) {
+                    <div class="flex flex-wrap items-center gap-2">
+                      <input
+                        type="password"
+                        [value]="membroNovaSenha()"
+                        (input)="membroNovaSenha.set(valor($event))"
+                        autocomplete="new-password"
+                        placeholder="Senha nova (8+, maiúscula, minúscula e número)"
+                        [class]="inputClass + ' sm:max-w-[340px]'"
+                        [attr.data-testid]="'senha-membro-' + m.id"
+                      />
+                      <button
+                        type="button"
+                        (click)="definirSenhaMembro(m)"
+                        [disabled]="membroNovaSenha().length < 8 || ocupado() === 'membro'"
+                        class="h-9 px-4 rounded-full text-[13px] font-semibold bg-mint text-primary-foreground cursor-pointer disabled:opacity-50"
+                        [attr.data-testid]="'salvar-senha-membro-' + m.id"
+                      >
+                        Salvar senha
+                      </button>
+                    </div>
+                  }
+                </li>
+              }
+            </ul>
+          }
+
+          @if (limiteDeFuncionarios()) {
+            <p class="text-[12.5px] text-muted-foreground" data-testid="limite-funcionarios">
+              Você usa as {{ limiteFuncionarios() }} vagas de funcionário do plano
+              {{ nomePlano() }}. Inative alguém
+              @if (plano() === 'basic') {
+                ou mude para o plano Pro (até {{ limitePro }})
+              }
+              para adicionar outro.
+            </p>
+          } @else {
+            <div class="rounded-xl bg-muted/50 p-3 space-y-3">
+              <div class="text-[13px] font-semibold">Adicionar funcionário</div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label class="block">
+                  <span class="text-[12px] font-medium block mb-1">Nome</span>
+                  <input
+                    type="text"
+                    maxlength="80"
+                    [value]="novoMembro().nome"
+                    (input)="setMembro('nome', valor($event))"
+                    [class]="inputClass"
+                    data-testid="membro-nome"
+                  />
+                </label>
+                <label class="block">
+                  <span class="text-[12px] font-medium block mb-1">E-mail</span>
+                  <input
+                    type="email"
+                    [value]="novoMembro().email"
+                    (input)="setMembro('email', valor($event))"
+                    autocomplete="off"
+                    [class]="inputClass"
+                    data-testid="membro-email"
+                  />
+                </label>
+                <label class="block">
+                  <span class="text-[12px] font-medium block mb-1">Senha</span>
+                  <input
+                    type="password"
+                    [value]="novoMembro().senha"
+                    (input)="setMembro('senha', valor($event))"
+                    autocomplete="new-password"
+                    [class]="inputClass"
+                    data-testid="membro-senha"
+                  />
+                </label>
+              </div>
+              <p class="text-[12px] text-muted-foreground">
+                A senha precisa ter 8+ caracteres, com maiúscula, minúscula e número. Passe-a ao
+                funcionário: ele poderá trocá-la depois.
+              </p>
+              @if (erros().membro; as e) {
+                <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+              }
+              <button
+                type="button"
+                (click)="adicionarMembro()"
+                [disabled]="!membroValido() || ocupado() === 'membro'"
+                class="h-10 px-5 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="adicionar-membro"
+              >
+                Adicionar funcionário
+              </button>
+            </div>
+          }
+        </section>
+
+        <!-- Exclusão -->
+        <section
+          class="rounded-2xl border border-error/40 p-4 space-y-3"
+          data-testid="secao-exclusao"
+        >
+          <div>
+            <h4 class="text-[14px] font-bold text-error">Excluir o restaurante</h4>
+            <p class="text-[13px] text-muted-foreground">
+              Você pede a exclusão e ela é analisada: nada é apagado na hora, e dá para cancelar o
+              pedido enquanto não for concluído.
+            </p>
+          </div>
+
+          @if (exclusaoEm(); as quando) {
+            <div
+              class="rounded-xl bg-warning/10 border border-warning/30 p-3 text-[13px]"
+              data-testid="exclusao-pedida"
+            >
+              Pedido de exclusão feito em <strong>{{ dataPedido(quando) }}</strong
+              >. Nada foi apagado ainda.
+            </div>
+            @if (erros().exclusao; as e) {
+              <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+            }
+            <button
+              type="button"
+              (click)="cancelarExclusao()"
+              [disabled]="ocupado() === 'exclusao'"
+              class="h-10 px-5 rounded-full text-sm font-semibold border border-border hover:bg-muted cursor-pointer disabled:opacity-50"
+              data-testid="cancelar-exclusao"
+            >
+              Cancelar o pedido
+            </button>
+          } @else if (!exclusaoAberta()) {
+            <button
+              type="button"
+              (click)="exclusaoAberta.set(true)"
+              class="h-10 px-5 rounded-full text-sm font-semibold border border-error/40 text-error hover:bg-error/10 cursor-pointer"
+              data-testid="abrir-exclusao"
+            >
+              Solicitar exclusão
+            </button>
+          } @else {
+            <label class="block">
+              <span class="text-[12px] font-medium block mb-1">Motivo (opcional)</span>
+              <input
+                type="text"
+                maxlength="500"
+                [value]="exclusaoMotivo()"
+                (input)="exclusaoMotivo.set(valor($event))"
+                [class]="inputClass"
+                data-testid="exclusao-motivo"
+              />
+            </label>
+            <label class="block">
+              <span class="text-[12px] font-medium block mb-1">Confirme com a sua senha</span>
+              <input
+                type="password"
+                [value]="exclusaoSenha()"
+                (input)="exclusaoSenha.set(valor($event))"
+                autocomplete="current-password"
+                [class]="inputClass + ' sm:max-w-[320px]'"
+                data-testid="exclusao-senha"
+              />
+            </label>
+            @if (erros().exclusao; as e) {
+              <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+            }
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                (click)="pedirExclusao()"
+                [disabled]="exclusaoSenha() === '' || ocupado() === 'exclusao'"
+                class="h-10 px-5 rounded-full text-sm font-semibold bg-error text-white hover:brightness-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="confirmar-exclusao"
+              >
+                Confirmar pedido de exclusão
+              </button>
+              <button
+                type="button"
+                (click)="exclusaoAberta.set(false)"
+                class="h-10 px-4 rounded-full text-sm font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          }
+        </section>
+      }
+    </div>
+  }
+</app-modal>
