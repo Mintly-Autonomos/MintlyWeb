@@ -11,11 +11,11 @@ export function tierLabel(tier: SubscriptionTier | null | undefined): string {
   return tier ? SUBSCRIPTION_TIER_LABEL[tier] : '';
 }
 
-/** O que cada tipo oferece. O Pro ainda não tem vantagens extras: a frase só diz isso, sem prometer nada específico. */
+/** O que cada tipo oferece. O diferencial do Pro é a análise aprimorada por IA; o Básico traz as análises calculadas pelo sistema. */
 export function tierBlurb(tier: SubscriptionTier): string {
   return tier === 'pro'
-    ? 'Tudo do Básico. Os recursos exclusivos do Pro chegarão em breve.'
-    : 'Tudo o que o Mintly oferece hoje.';
+    ? 'Tudo do Básico, com as análises do Mintly aprimoradas por IA e recomendações para cada prato do cardápio: subir o preço, reposicionar ou tirar.'
+    : 'Todas as telas e relatórios do Mintly, com as análises calculadas pelo sistema.';
 }
 
 /**
