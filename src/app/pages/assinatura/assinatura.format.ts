@@ -1,4 +1,4 @@
-import { SUBSCRIPTION_TIER_LABEL } from 'mintly-lib';
+import { SUBSCRIPTION_TIER_LABEL, memberLimitForTier } from 'mintly-lib';
 import type { SubscriptionPlanOption, SubscriptionState, SubscriptionTier } from 'mintly-lib';
 import { formatBRL } from '../../shared/format';
 
@@ -11,11 +11,22 @@ export function tierLabel(tier: SubscriptionTier | null | undefined): string {
   return tier ? SUBSCRIPTION_TIER_LABEL[tier] : '';
 }
 
-/** O que cada tipo oferece. O Pro ainda não tem vantagens extras: a frase só diz isso, sem prometer nada específico. */
+/**
+ * Quantos funcionários (logins ativos, fora o dono) o tipo permite: "Até 5 funcionários com acesso." O número vem
+ * da lib, a mesma constante que a API usa para barrar.
+ */
+export function employeesLimitText(tier: SubscriptionTier): string {
+  return `Até ${memberLimitForTier(tier)} funcionários com acesso.`;
+}
+
+/**
+ * O que cada tipo oferece. O diferencial do Pro é a análise aprimorada por IA; o Básico traz as análises
+ * calculadas pelo sistema. Os dois dizem quantos funcionários podem ter acesso.
+ */
 export function tierBlurb(tier: SubscriptionTier): string {
   return tier === 'pro'
-    ? 'Tudo do Básico. Os recursos exclusivos do Pro chegarão em breve.'
-    : 'Tudo o que o Mintly oferece hoje.';
+    ? `Tudo do Básico, com as análises do Mintly aprimoradas por IA e recomendações para cada prato do cardápio: subir o preço, reposicionar ou tirar. ${employeesLimitText(tier)}`
+    : `Todas as telas e relatórios do Mintly, com as análises calculadas pelo sistema. ${employeesLimitText(tier)}`;
 }
 
 /**
@@ -36,7 +47,10 @@ export function tierChangeNotice(
     description:
       `Mudar de plano não dá desconto nem crédito: o tempo que ainda resta do ${from} (até ${fmtEndsAt(state.endsAt)}) ` +
       `é descartado, e o ${to} começa a contar hoje, não quando o ${from} terminaria.` +
-      (downgrade ? ' Você perde os recursos do Pro a partir do pagamento.' : ''),
+      (downgrade
+        ? ` Você perde os recursos do Pro a partir do pagamento. O ${to} permite até ${memberLimitForTier(selected)} funcionários ativos: ` +
+          'se você tiver mais, os mais recentes ficam inativos (nada é apagado, e você reativa quem quiser quando houver vaga).'
+        : ` Você passa a poder ter até ${memberLimitForTier(selected)} funcionários ativos.`),
   };
 }
 

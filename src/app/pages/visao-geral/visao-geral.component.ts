@@ -1,5 +1,7 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import type { AiInsightText } from 'mintly-lib';
+import { AiService, textoDaIa } from '../../services/ai.service';
 import { DashboardService, OverviewInsight } from '../../services/dashboard.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -87,6 +89,7 @@ export class VisaoGeralComponent implements OnInit {
   private svc = inject(DashboardService);
   private toast = inject(ToastService);
   private router = inject(Router);
+  private ai = inject(AiService);
 
   protected monthOpts = MONTH_OPTS;
   // Do dia 1 ao 12 abre no mês passado (já fechado); depois, no mês atual.
@@ -95,6 +98,9 @@ export class VisaoGeralComponent implements OnInit {
   protected scoreOpen = signal(false);
 
   protected data = this.svc.data;
+  /** Textos que a IA escreveu para os insights desta tela (vazio = texto de sempre). */
+  protected textosIa = signal<AiInsightText[]>([]);
+  private rodadaIa = 0;
   protected loading = this.svc.loading;
   protected fmtBRL = formatBRL;
   protected pctFmt = pctFmt;
@@ -222,9 +228,25 @@ export class VisaoGeralComponent implements OnInit {
   }
 
   private load(): void {
+    this.textosIa.set([]);
     this.svc
       .refresh(this.monthQuery())
+      .then(() => void this.carregarIa())
       .catch(() => this.toast.error('Não foi possível carregar a visão geral.'));
+  }
+
+  /** Pede à IA o texto dos cards. Nunca atrapalha: sem resposta, os cards ficam com o texto de sempre. */
+  private async carregarIa(): Promise<void> {
+    const d = this.data();
+    if (!d || d.insights.length === 0) return;
+    const rodada = ++this.rodadaIa;
+    const textos = await this.ai.textosInsights('overview', this.monthQuery(), d.insights);
+    if (rodada === this.rodadaIa) this.textosIa.set(textos);
+  }
+
+  /** O insight da posição index tem texto da IA? */
+  insightIa(i: OverviewInsight, index: number): boolean {
+    return textoDaIa(this.textosIa(), index, i.kind) !== undefined;
   }
 
   setMonth(m: MonthOpt): void {
@@ -241,7 +263,9 @@ export class VisaoGeralComponent implements OnInit {
     return i.severity === 'positive' ? 'positivo' : i.severity === 'info' ? 'atencao' : 'atencao';
   }
 
-  insightTitle(i: OverviewInsight): string {
+  insightTitle(i: OverviewInsight, index = -1): string {
+    const ia = index >= 0 ? textoDaIa(this.textosIa(), index, i.kind) : undefined;
+    if (ia) return ia.title;
     switch (i.kind) {
       case 'cashTight':
         return `Caixa apertado a partir do dia ${i.date.slice(8, 10)}`;
@@ -258,7 +282,9 @@ export class VisaoGeralComponent implements OnInit {
     }
   }
 
-  insightDescription(i: OverviewInsight): string {
+  insightDescription(i: OverviewInsight, index = -1): string {
+    const ia = index >= 0 ? textoDaIa(this.textosIa(), index, i.kind) : undefined;
+    if (ia) return ia.description;
     switch (i.kind) {
       case 'cashTight':
         return `Contas concentradas devem reduzir seu caixa para cerca de ${this.fmtBRL(i.balance)} por volta do dia ${i.date.slice(8, 10)}.`;

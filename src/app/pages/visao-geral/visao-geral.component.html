@@ -200,11 +200,12 @@
     <section>
       <app-section-header title="O que fazer primeiro" />
       <div class="grid grid-cols-1 lg:grid-cols-2 auto-rows-fr gap-6">
-        @for (i of d.insights; track i.kind) {
+        @for (i of d.insights; track i.kind; let idx = $index) {
           <app-insight-card
             [severity]="insightSeverity(i)"
-            [title]="insightTitle(i)"
-            [description]="insightDescription(i)"
+            [title]="insightTitle(i, idx)"
+            [description]="insightDescription(i, idx)"
+            [ia]="insightIa(i, idx)"
             [action]="insightAction(i)"
             (actionClick)="insightGo(i)"
           />
