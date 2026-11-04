@@ -69,6 +69,8 @@ export class CardapioComponent implements OnInit, OnDestroy {
   protected adding = signal(false);
   protected busyId = signal<string | null>(null);
   protected editandoId = signal<string | null>(null);
+  /** Prato que está pedindo a confirmação de "excluir de vez" (a exclusão não tem volta). */
+  protected excluindoId = signal<string | null>(null);
   protected precoEditandoId = signal<string | null>(null);
   protected destaque = signal<string | null>(null);
   /** Preço vindo do simulador (Previsões): abre o editor de preço já preenchido para a pessoa só confirmar. */
@@ -274,6 +276,28 @@ export class CardapioComponent implements OnInit, OnDestroy {
     try {
       await this.svc.keepPrice(p.id);
       this.toast.success(`Certo! Só voltamos a avisar sobre ${p.name} daqui a uns 5 meses e meio.`);
+    } catch (err) {
+      this.toast.error(this.svc.errorMessage(err));
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  pedirExclusao(p: Prato): void {
+    this.excluindoId.set(p.id);
+  }
+
+  cancelarExclusao(): void {
+    this.excluindoId.set(null);
+  }
+
+  /** Exclui de vez. Para só tirar do cardápio sem perder o prato, use Inativar. */
+  async excluir(p: Prato): Promise<void> {
+    this.busyId.set(p.id);
+    try {
+      await this.svc.remove(p.id);
+      this.excluindoId.set(null);
+      this.toast.success(`${p.name} foi excluído.`);
     } catch (err) {
       this.toast.error(this.svc.errorMessage(err));
     } finally {

@@ -45,6 +45,7 @@ describe('CardapioComponent', () => {
       changePrice: vi.fn(() => Promise.resolve()),
       keepPrice: vi.fn(() => Promise.resolve()),
       setActive: vi.fn(() => Promise.resolve()),
+      remove: vi.fn(() => Promise.resolve()),
       errorMessage: (e: unknown) => String(e),
     };
     const toast = { success: vi.fn(), error: vi.fn() };
@@ -173,6 +174,60 @@ describe('CardapioComponent', () => {
     const { c, svc } = render([p]);
     await c.alternarAtivo(p);
     expect(svc.setActive).toHaveBeenCalledWith('p1', false);
+  });
+
+  describe('excluir de vez', () => {
+    const clicar = (root: HTMLElement, testid: string) =>
+      (root.querySelector(`[data-testid="${testid}"]`) as HTMLButtonElement).click();
+
+    it('Excluir pede confirmação antes de apagar (nada é chamado no primeiro clique) e avisa que não tem volta', () => {
+      const { fixture, root, svc, text } = render([prato({})]);
+      clicar(root, 'excluir-prato');
+      fixture.detectChanges();
+      expect(svc.remove).not.toHaveBeenCalled();
+      expect(text()).toContain('Excluir Frango Original de vez? Não tem volta');
+      expect(root.querySelector('[data-testid="excluir-prato"]')).toBeNull();
+    });
+
+    it('confirmar exclui o prato, avisa e fecha a confirmação', async () => {
+      const { fixture, root, svc, toast } = render([prato({})]);
+      clicar(root, 'excluir-prato');
+      fixture.detectChanges();
+      clicar(root, 'confirmar-exclusao');
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(svc.remove).toHaveBeenCalledWith('p1');
+      expect(toast.success).toHaveBeenCalledWith('Frango Original foi excluído.');
+      expect(root.querySelector('[data-testid="confirma-exclusao"]')).toBeNull();
+    });
+
+    it('cancelar volta aos botões de sempre sem excluir', () => {
+      const { fixture, root, svc, c } = render([prato({})]);
+      clicar(root, 'excluir-prato');
+      fixture.detectChanges();
+      (c as unknown as { cancelarExclusao(): void }).cancelarExclusao();
+      fixture.detectChanges();
+      expect(svc.remove).not.toHaveBeenCalled();
+      expect(root.querySelector('[data-testid="excluir-prato"]')).not.toBeNull();
+    });
+
+    it('se a exclusão falha, mostra o erro e mantém a confirmação aberta', async () => {
+      const { fixture, root, svc, toast } = render([prato({})]);
+      svc.remove.mockRejectedValueOnce('erro de rede');
+      clicar(root, 'excluir-prato');
+      fixture.detectChanges();
+      clicar(root, 'confirmar-exclusao');
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(toast.error).toHaveBeenCalledWith('erro de rede');
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(root.querySelector('[data-testid="confirma-exclusao"]')).not.toBeNull();
+    });
+
+    it('prato inativo também pode ser excluído', () => {
+      const { root } = render([prato({ active: false })]);
+      expect(root.querySelector('[data-testid="excluir-prato"]')).not.toBeNull();
+    });
   });
 
   it('cardápio vazio mostra o convite para cadastrar, sem tabela', () => {

@@ -335,6 +335,28 @@
                     >
                       Cancelar
                     </button>
+                  } @else if (excluindoId() === p.id) {
+                    <span class="text-[12px] text-error mr-1" data-testid="confirma-exclusao">
+                      Excluir {{ p.name }} de vez? Não tem volta. Para só tirar do cardápio, use
+                      Inativar.
+                    </span>
+                    <button
+                      type="button"
+                      (click)="excluir(p)"
+                      [disabled]="busyId() === p.id"
+                      class="h-8 px-3 rounded-lg bg-error text-white text-[12px] font-semibold hover:brightness-95 cursor-pointer disabled:opacity-60"
+                      data-testid="confirmar-exclusao"
+                    >
+                      Sim, excluir
+                    </button>
+                    <button
+                      type="button"
+                      (click)="cancelarExclusao()"
+                      [disabled]="busyId() === p.id"
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
                   } @else {
                     @if (p.active) {
                       <button
@@ -371,6 +393,15 @@
                       class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
                     >
                       {{ p.active ? 'Inativar' : 'Reativar' }}
+                    </button>
+                    <button
+                      type="button"
+                      (click)="pedirExclusao(p)"
+                      [disabled]="busyId() === p.id"
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-error hover:bg-muted cursor-pointer"
+                      data-testid="excluir-prato"
+                    >
+                      Excluir
                     </button>
                   }
                 </td>

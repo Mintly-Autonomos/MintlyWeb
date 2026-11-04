@@ -245,6 +245,18 @@ export class CardapioService {
     await this.refresh();
   }
 
+  /** Exclui o prato de vez (sem volta). As vendas já registradas guardam o nome e o preço e não mudam. */
+  async remove(id: string): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      const i = this.mockStore.findIndex((x) => x.id === id);
+      if (i >= 0) this.mockStore.splice(i, 1);
+    } else {
+      await this.call((headers) => this.menuClient.delete(id, headers));
+    }
+    await this.refresh();
+  }
+
   async setActive(id: string, active: boolean): Promise<void> {
     if (environment.useMocks) {
       await delay();
