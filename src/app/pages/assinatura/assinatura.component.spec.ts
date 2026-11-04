@@ -241,6 +241,9 @@ describe('AssinaturaComponent', () => {
       expect(texts[1]).toContain('análises do Mintly aprimoradas por IA');
       expect(texts[1]).toContain('recomendações para cada prato do cardápio');
       expect(texts[0]).not.toContain('IA');
+      // o limite de funcionários de cada tipo (os números vêm da lib)
+      expect(texts[0]).toContain('Até 5 funcionários com acesso');
+      expect(texts[1]).toContain('Até 20 funcionários com acesso');
     });
 
     it('sem assinatura começa no Básico', async () => {
