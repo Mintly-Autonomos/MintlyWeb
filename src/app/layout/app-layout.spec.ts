@@ -1,7 +1,9 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { TourService } from '../tutorial/tour.service';
 import { AppLayoutComponent } from './app-layout.component';
+import { ContaService } from '../services/conta.service';
 
 // A lib lê a URL da API ao instanciar os clients (no app, o main.ts define antes do bootstrap).
 declare const process: { env: Record<string, string | undefined> };
@@ -136,5 +138,50 @@ describe('AppLayoutComponent — menu no celular', () => {
     fundo.click();
     fixture.detectChanges();
     expect(gaveta(el)).toBeNull();
+  });
+});
+
+describe('AppLayoutComponent — menu do usuário: Minha conta', () => {
+  const montar = () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([{ path: '**', children: [] }]),
+        // O modal busca a conta ao abrir; aqui só interessa que ele abre.
+        {
+          provide: ContaService,
+          useValue: {
+            dados: signal(null),
+            restaurante: signal(''),
+            membros: signal([]),
+            exclusaoPedidaEm: signal(null),
+            carregarConta: () => new Promise<void>(() => undefined),
+            carregarRestaurante: () => Promise.resolve(),
+            carregarMembros: () => Promise.resolve(),
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AppLayoutComponent);
+    fixture.detectChanges();
+    return { fixture, el: fixture.nativeElement as HTMLElement };
+  };
+
+  it('o menu do usuário tem "Minha conta", e o modal só existe depois de pedir', () => {
+    const { fixture, el } = montar();
+    const botaoUsuario = el.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement;
+    botaoUsuario.click();
+    fixture.detectChanges();
+
+    const item = el.querySelector('[data-testid="menu-minha-conta"]') as HTMLButtonElement;
+    expect(item).not.toBeNull();
+    expect(item.textContent).toContain('Minha conta');
+    expect(el.querySelector('app-minha-conta')).toBeNull();
+
+    item.click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-minha-conta')).not.toBeNull();
+    expect(el.querySelector('[role="dialog"]')?.textContent).toContain('Minha conta');
+    // O menu fecha ao abrir o modal.
+    expect(el.querySelector('[data-testid="menu-minha-conta"]')).toBeNull();
   });
 });

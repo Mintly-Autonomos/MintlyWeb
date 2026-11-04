@@ -12,6 +12,7 @@ import { IconComponent } from '../shared/icon.component';
 import { ToastService } from '../shared/toast.service';
 import { AVATAR_ACCEPT, readAvatarFile } from '../shared/avatar-file';
 import { fmtEndsAt, tierLabel } from '../pages/assinatura/assinatura.format';
+import { MinhaContaComponent } from '../pages/conta/minha-conta.component';
 
 const NAV = [
   { to: '/visao-geral', label: 'Visão Geral', icon: 'space_dashboard' },
@@ -37,6 +38,7 @@ const NAV = [
     LogoComponent,
     IconComponent,
     TourOverlayComponent,
+    MinhaContaComponent,
   ],
   host: {
     '(document:keydown.escape)': 'menuOpen.set(false)',
@@ -306,6 +308,16 @@ const NAV = [
                   <button
                     type="button"
                     role="menuitem"
+                    (click)="abrirConta()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-[13.5px] hover:bg-muted text-left cursor-pointer"
+                    data-testid="menu-minha-conta"
+                  >
+                    <app-icon name="manage_accounts" [style]="{ fontSize: '19px' }" />
+                    Minha conta
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
                     (click)="pickAvatar()"
                     class="w-full flex items-center gap-3 px-4 py-2.5 text-[13.5px] hover:bg-muted text-left cursor-pointer"
                   >
@@ -361,6 +373,11 @@ const NAV = [
           </div>
         </header>
 
+        <!-- Fora do <header>: o backdrop-filter dele viraria o bloco do "fixed" e o modal ficaria preso na barra. -->
+        @if (contaAberta()) {
+          <app-minha-conta [open]="true" (closed)="contaAberta.set(false)" />
+        }
+
         <main class="flex-1 px-4 sm:px-6 md:px-10 py-6 md:py-8">
           <router-outlet />
         </main>
@@ -381,6 +398,8 @@ export class AppLayoutComponent implements OnInit {
   /** Gaveta do menu no celular (abaixo de 768 px a barra lateral não aparece). */
   protected menuOpen = signal(false);
   protected userMenuOpen = signal(false);
+  /** Modal "Minha conta" (dados do usuário e do restaurante). */
+  protected contaAberta = signal(false);
   protected avatarBusy = signal(false);
   protected readonly avatarAccept = AVATAR_ACCEPT;
   private avatarInput = viewChild<ElementRef<HTMLInputElement>>('avatarInput');
@@ -408,6 +427,11 @@ export class AppLayoutComponent implements OnInit {
     this.userMenuOpen.set(false);
     this.notificationsOpen.set(false);
     this.tour.start(this.router.url);
+  }
+
+  abrirConta(): void {
+    this.userMenuOpen.set(false);
+    this.contaAberta.set(true);
   }
 
   pickAvatar(): void {

@@ -248,7 +248,7 @@ export const COMMON_STEPS: TourStep[] = [
   {
     target: 'conta',
     title: 'Sua conta',
-    text: 'Aqui ficam sua foto, sua assinatura e a saída da conta.',
+    text: 'Aqui ficam “Minha conta” (seus dados, foto e senha; se você é o dono, também o restaurante e os funcionários), sua assinatura e a saída da conta.',
   },
   {
     target: 'ajuda',
