@@ -10,8 +10,8 @@ import {
   viewChild,
 } from '@angular/core';
 import { AuthService } from '../../services/auth.service';
-import { SUBSCRIPTION_TIER_LABEL } from 'mintly-lib';
-import { ContaService, LIMITE_FUNCIONARIOS, Membro } from '../../services/conta.service';
+import { SUBSCRIPTION_MEMBER_LIMIT, SUBSCRIPTION_TIER_LABEL, memberLimitForTier } from 'mintly-lib';
+import { ContaService, Membro } from '../../services/conta.service';
 import { AVATAR_ACCEPT, readAvatarFile } from '../../shared/avatar-file';
 import { ChipComponent } from '../../shared/chip.component';
 import { ModalComponent } from '../../shared/modal.component';
@@ -133,10 +133,10 @@ export class MinhaContaComponent {
   // Vagas do plano: contam só os funcionários ATIVOS (inativar libera a vaga; reativar ocupa uma).
   protected plano = computed(() => this.auth.subscriptionState().tier ?? 'basic');
   protected nomePlano = computed(() => SUBSCRIPTION_TIER_LABEL[this.plano()]);
-  protected limiteFuncionarios = computed(() => LIMITE_FUNCIONARIOS[this.plano()]);
+  protected limiteFuncionarios = computed(() => memberLimitForTier(this.plano()));
   protected ativos = computed(() => this.membros().filter((m) => m.status === 'active').length);
   protected limiteDeFuncionarios = computed(() => this.ativos() >= this.limiteFuncionarios());
-  protected limitePro = LIMITE_FUNCIONARIOS.pro;
+  protected limitePro = SUBSCRIPTION_MEMBER_LIMIT.pro;
 
   protected valor(e: Event): string {
     return (e.target as HTMLInputElement).value;

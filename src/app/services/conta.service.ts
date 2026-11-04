@@ -27,12 +27,6 @@ export interface ContaDados {
   papel: 'owner' | 'member';
 }
 
-/**
- * Funcionários ATIVOS que cada plano permite (o dono não conta). É o mesmo valor da API (que é quem barra):
- * aqui serve só para mostrar "3 de 5" e esconder o formulário quando as vagas acabam.
- */
-export const LIMITE_FUNCIONARIOS: Record<'basic' | 'pro', number> = { basic: 5, pro: 20 };
-
 function delay(ms = 300): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

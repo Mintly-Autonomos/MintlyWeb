@@ -1,13 +1,9 @@
 import { signal } from '@angular/core';
+import { SUBSCRIPTION_MEMBER_LIMIT } from 'mintly-lib';
 import { TestBed } from '@angular/core/testing';
 import { MinhaContaComponent, senhaForte } from './minha-conta.component';
 import { AuthService } from '../../services/auth.service';
-import {
-  ContaDados,
-  ContaService,
-  LIMITE_FUNCIONARIOS,
-  Membro,
-} from '../../services/conta.service';
+import { ContaDados, ContaService, Membro } from '../../services/conta.service';
 import { ToastService } from '../../shared/toast.service';
 
 const dono: ContaDados = {
@@ -330,8 +326,10 @@ describe('MinhaContaComponent', () => {
         membro({ id: `m${i}`, nome: `F${i}`, email: `f${i}@t.com` }),
       );
 
-    it(`plano Básico: ${LIMITE_FUNCIONARIOS.basic} funcionários ativos; no limite some o formulário e o aviso cita o plano e o Pro`, async () => {
-      const { q, text } = await naAbaRestaurante({ membros: ativos(LIMITE_FUNCIONARIOS.basic) });
+    it(`plano Básico: ${SUBSCRIPTION_MEMBER_LIMIT.basic} funcionários ativos; no limite some o formulário e o aviso cita o plano e o Pro`, async () => {
+      const { q, text } = await naAbaRestaurante({
+        membros: ativos(SUBSCRIPTION_MEMBER_LIMIT.basic),
+      });
       expect(q('limite-funcionarios')).not.toBeNull();
       expect(q('adicionar-membro')).toBeNull();
       expect(text()).toContain('5 de 5 funcionários ativos');
@@ -353,9 +351,9 @@ describe('MinhaContaComponent', () => {
       expect(text()).toContain('5 de 20 funcionários ativos · plano Pro');
     });
 
-    it(`plano Pro: com ${LIMITE_FUNCIONARIOS.pro} ativos o formulário some e não oferece o Pro de novo`, async () => {
+    it(`plano Pro: com ${SUBSCRIPTION_MEMBER_LIMIT.pro} ativos o formulário some e não oferece o Pro de novo`, async () => {
       const { q, text } = await naAbaRestaurante({
-        membros: ativos(LIMITE_FUNCIONARIOS.pro),
+        membros: ativos(SUBSCRIPTION_MEMBER_LIMIT.pro),
         tier: 'pro',
       });
       expect(q('adicionar-membro')).toBeNull();
