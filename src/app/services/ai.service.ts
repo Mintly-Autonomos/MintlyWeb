@@ -56,6 +56,12 @@ export class AiService {
   /** Chamadas usadas e restantes hoje (`null` até saber). */
   readonly uso = signal<AiUsage | null>(null);
 
+  /** A IA faz parte do plano Pro (assinatura ativa). No Básico nada é pedido à API e as telas não mostram a IA. */
+  get disponivel(): boolean {
+    const s = this.auth.subscriptionState();
+    return s.status === 'active' && s.tier === 'pro';
+  }
+
   /** Depois de um 429/503 não insiste nos textos dos cards até recarregar a página. */
   private semTextos = false;
 
@@ -77,6 +83,7 @@ export class AiService {
 
   /** Quantas chamadas restam hoje. Silencioso: sem essa informação a tela só não mostra o contador. */
   async carregarUso(): Promise<void> {
+    if (!this.disponivel) return;
     if (environment.useMocks) {
       this.uso.update((u) => u ?? { limitPerDay: 20, usedToday: 0, remainingToday: 20 });
       return;
@@ -98,7 +105,7 @@ export class AiService {
     month?: string,
     atuais: { kind: string }[] = [],
   ): Promise<AiInsightText[]> {
-    if (this.semTextos) return [];
+    if (!this.disponivel || this.semTextos) return [];
     if (environment.useMocks) {
       await delay();
       return atuais.flatMap((a, index) =>
@@ -120,7 +127,7 @@ export class AiService {
       return [];
     } catch (err) {
       const status = apiErrorInfo(err).status;
-      if (status === 429 || status === 503) this.semTextos = true;
+      if (status === 403 || status === 429 || status === 503) this.semTextos = true;
       return [];
     }
   }
@@ -130,6 +137,7 @@ export class AiService {
    * mudar). Erros sobem (429: acabou o limite do dia; 503: IA fora do ar) para a tela mostrar a mensagem.
    */
   async sugerirPreco(menuItemId?: string): Promise<AiPriceSuggestion> {
+    if (!this.disponivel) throw new Error('A sugestão de preço com IA faz parte do plano Pro.');
     if (environment.useMocks) {
       await delay(900);
       const sugestao = this.sugestaoDeDemonstracao(menuItemId);

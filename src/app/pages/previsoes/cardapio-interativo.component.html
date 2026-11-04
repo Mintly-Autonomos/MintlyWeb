@@ -57,23 +57,32 @@
       <!-- Simulador do item -->
       <div id="cardapio-simulador" class="m3-card rounded-2xl p-5 xl:sticky xl:top-4">
         <!-- Sugestão da IA: escolhe o prato parado há mais tempo e sugere o aumento ideal -->
-        <div class="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            (click)="sugerirComIa()"
-            [disabled]="sugerindo() || semChamadas()"
-            class="inline-flex items-center gap-2 h-10 px-4 rounded-full text-sm font-semibold bg-mint-soft text-ocean hover:brightness-95 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            data-testid="sugerir-ia"
-          >
-            <app-icon name="auto_awesome" [style]="{ fontSize: '18px' }" />
-            {{ sugerindo() ? 'Pensando…' : 'Sugerir aumento com IA' }}
-          </button>
-          @if (uso(); as u) {
-            <span class="text-[12px] text-muted-foreground" data-testid="uso-ia">
-              {{ u.remainingToday }} de {{ u.limitPerDay }} sugestões hoje
-            </span>
-          }
-        </div>
+        @if (!iaDisponivel()) {
+          <p class="text-[12.5px] text-muted-foreground" data-testid="ia-so-pro">
+            A sugestão de preço com IA faz parte do plano Pro.
+            <a routerLink="/assinatura" class="font-semibold text-ocean hover:underline"
+              >Conhecer o Pro</a
+            >
+          </p>
+        } @else {
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              (click)="sugerirComIa()"
+              [disabled]="sugerindo() || semChamadas()"
+              class="inline-flex items-center gap-2 h-10 px-4 rounded-full text-sm font-semibold bg-mint-soft text-ocean hover:brightness-95 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              data-testid="sugerir-ia"
+            >
+              <app-icon name="auto_awesome" [style]="{ fontSize: '18px' }" />
+              {{ sugerindo() ? 'Pensando…' : 'Sugerir aumento com IA' }}
+            </button>
+            @if (uso(); as u) {
+              <span class="text-[12px] text-muted-foreground" data-testid="uso-ia">
+                {{ u.remainingToday }} de {{ u.limitPerDay }} sugestões hoje
+              </span>
+            }
+          </div>
+        }
         @if (erroIa(); as e) {
           <p class="mt-3 text-[12.5px] text-error" role="alert" data-testid="erro-ia">{{ e }}</p>
         }

@@ -44,6 +44,7 @@ interface Interno {
   faixa(): { max: number };
   semChamadas(): boolean;
   pct(n: number): string;
+  iaDisponivel(): boolean;
 }
 
 const httpError = (status: number, message: string) => ({
@@ -51,8 +52,9 @@ const httpError = (status: number, message: string) => ({
 });
 
 describe('CardapioInterativoComponent: sugestão de aumento pela IA', () => {
-  function montar(pratos: Prato[] = [prato()]) {
+  function montar(pratos: Prato[] = [prato()], disponivel = true) {
     const ai = {
+      disponivel,
       uso: signal<{ limitPerDay: number; usedToday: number; remainingToday: number } | null>(null),
       carregarUso: vi.fn(() => Promise.resolve()),
       sugerirPreco: vi.fn(() => Promise.resolve(sugestao())),
@@ -189,6 +191,12 @@ describe('CardapioInterativoComponent: sugestão de aumento pela IA', () => {
     expect(c.semChamadas()).toBe(true);
     ai.uso.set({ limitPerDay: 20, usedToday: 19, remainingToday: 1 });
     expect(c.semChamadas()).toBe(false);
+  });
+
+  it('no Básico o botão dá lugar ao convite para o Pro (a IA é do plano Pro)', () => {
+    expect(montar().c.iaDisponivel()).toBe(true);
+    TestBed.resetTestingModule();
+    expect(montar([prato()], false).c.iaDisponivel()).toBe(false);
   });
 
   it('formata o aumento com vírgula', () => {

@@ -105,6 +105,8 @@ export class CardapioInterativoComponent {
 
   // ── sugestão da IA ──
   protected uso = this.ai.uso;
+  /** A IA é do plano Pro: no Básico o botão dá lugar a um convite para conhecer o Pro. */
+  protected iaDisponivel = (): boolean => this.ai.disponivel;
   protected sugerindo = signal(false);
   protected sugestao = signal<AiPriceSuggestion | null>(null);
   protected erroIa = signal<string | null>(null);

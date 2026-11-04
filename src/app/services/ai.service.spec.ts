@@ -42,13 +42,21 @@ const sugestao = {
 describe('AiService', () => {
   let svc: AiService;
   let aiClient: Record<string, ReturnType<typeof vi.fn>>;
-  let auth: { getAccessToken: ReturnType<typeof vi.fn>; refresh: ReturnType<typeof vi.fn> };
+  let auth: {
+    getAccessToken: ReturnType<typeof vi.fn>;
+    refresh: ReturnType<typeof vi.fn>;
+    subscriptionState: ReturnType<typeof vi.fn>;
+  };
   const pratos = signal<unknown[]>([]);
 
   beforeEach(() => {
     flags.useMocks = false;
     aiClient = { usage: vi.fn(), insights: vi.fn(), priceSuggestion: vi.fn() };
-    auth = { getAccessToken: vi.fn(() => 'token'), refresh: vi.fn(() => Promise.resolve(true)) };
+    auth = {
+      getAccessToken: vi.fn(() => 'token'),
+      refresh: vi.fn(() => Promise.resolve(true)),
+      subscriptionState: vi.fn(() => ({ status: 'active', tier: 'pro' })),
+    };
     pratos.set([]);
     TestBed.configureTestingModule({
       providers: [
@@ -229,6 +237,70 @@ describe('AiService', () => {
       await vi.advanceTimersByTimeAsync(1000);
       expect(((await promessa) as Error).message).toContain('Cadastre pelo menos um prato');
     });
+  });
+});
+
+describe('AiService: a IA é do plano Pro', () => {
+  let svc: AiService;
+  let aiClient: Record<string, ReturnType<typeof vi.fn>>;
+  const estado = signal<{ status: string; tier: string | null }>({
+    status: 'active',
+    tier: 'basic',
+  });
+
+  beforeEach(() => {
+    flags.useMocks = false;
+    aiClient = { usage: vi.fn(), insights: vi.fn(), priceSuggestion: vi.fn() };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        {
+          provide: AuthService,
+          useValue: {
+            getAccessToken: () => 'token',
+            refresh: vi.fn(),
+            subscriptionState: () => estado(),
+          },
+        },
+        { provide: CardapioService, useValue: { pratos: signal([]) } },
+        { provide: MintlyClientService, useValue: { client: { aiClient } } },
+      ],
+    });
+    svc = TestBed.inject(AiService);
+  });
+
+  it('só está disponível com assinatura ativa do Pro', () => {
+    estado.set({ status: 'active', tier: 'basic' });
+    expect(svc.disponivel).toBe(false);
+    estado.set({ status: 'expired', tier: 'pro' });
+    expect(svc.disponivel).toBe(false);
+    estado.set({ status: 'none', tier: null });
+    expect(svc.disponivel).toBe(false);
+    estado.set({ status: 'active', tier: 'pro' });
+    expect(svc.disponivel).toBe(true);
+  });
+
+  it('no Básico não chama a API: textos dos cards vêm vazios e o uso não é pedido', async () => {
+    estado.set({ status: 'active', tier: 'basic' });
+    expect(await svc.textosInsights('overview', '2026-10')).toEqual([]);
+    await svc.carregarUso();
+    expect(aiClient['insights']).not.toHaveBeenCalled();
+    expect(aiClient['usage']).not.toHaveBeenCalled();
+    expect(svc.uso()).toBeNull();
+  });
+
+  it('no Básico a sugestão de preço recusa sem chamar a API', async () => {
+    estado.set({ status: 'active', tier: 'basic' });
+    await expect(svc.sugerirPreco()).rejects.toThrow('plano Pro');
+    expect(aiClient['priceSuggestion']).not.toHaveBeenCalled();
+  });
+
+  it('um 403 da API (plano mudou com o app aberto) para de pedir textos dos cards', async () => {
+    estado.set({ status: 'active', tier: 'pro' });
+    aiClient['insights'].mockRejectedValue({ response: { status: 403, data: { message: 'Pro' } } });
+    expect(await svc.textosInsights('overview')).toEqual([]);
+    expect(await svc.textosInsights('overview')).toEqual([]);
+    expect(aiClient['insights']).toHaveBeenCalledTimes(1);
   });
 });
 
