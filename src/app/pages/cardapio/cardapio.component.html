@@ -10,6 +10,7 @@
       </div>
       <button
         type="button"
+        data-tour="novo-prato"
         (click)="toggleAdd()"
         class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-sm font-semibold bg-mint-soft text-ocean hover:brightness-95 transition cursor-pointer"
       >
@@ -96,7 +97,7 @@
 
     @if (pratos().length > 0) {
       <div class="flex flex-wrap items-center gap-3 mb-3">
-        <label class="relative block w-full sm:w-[280px]">
+        <label class="relative block w-full sm:w-[280px]" data-tour="busca">
           <span class="sr-only">Buscar prato</span>
           <app-icon
             name="search"
@@ -128,7 +129,7 @@
         description="Cadastre seus pratos com preço, custo e quanto vendem por mês. O Mintly mostra quais proteger, promover ou repensar e avisa quando um preço ficar parado por muito tempo."
       />
     } @else {
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto" data-tour="tabela">
         <table class="w-full text-[13px]">
           <thead>
             <tr

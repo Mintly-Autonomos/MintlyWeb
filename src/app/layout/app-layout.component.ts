@@ -6,6 +6,8 @@ import { AuthService } from '../services/auth.service';
 import { apiErrorInfo } from '../shared/api-error';
 import { NotificationsService, AppNotification } from '../services/notifications.service';
 import { LogoComponent } from '../shared/logo.component';
+import { TourOverlayComponent } from '../tutorial/tour-overlay.component';
+import { TourService } from '../tutorial/tour.service';
 import { IconComponent } from '../shared/icon.component';
 import { ToastService } from '../shared/toast.service';
 import { AVATAR_ACCEPT, readAvatarFile } from '../shared/avatar-file';
@@ -35,6 +37,7 @@ const NAV = [
     NgTemplateOutlet,
     LogoComponent,
     IconComponent,
+    TourOverlayComponent,
     MinhaContaComponent,
   ],
   host: {
@@ -45,6 +48,7 @@ const NAV = [
     <div class="min-h-screen w-full flex bg-background text-foreground">
       <!-- Sidebar -->
       <aside
+        data-tour="menu-lateral"
         class="w-[260px] shrink-0 hidden md:flex flex-col border-r border-border bg-sidebar sticky top-0 h-screen"
       >
         <div class="px-6 py-5">
@@ -151,6 +155,7 @@ const NAV = [
             type="button"
             (click)="menuOpen.set(true)"
             aria-label="Abrir menu"
+            data-tour="menu-celular"
             [attr.aria-expanded]="menuOpen()"
             class="md:hidden h-10 w-10 -ml-1 shrink-0 rounded-full border border-border grid place-items-center hover:bg-muted cursor-pointer"
           >
@@ -164,6 +169,16 @@ const NAV = [
           </div>
           <div class="ml-auto flex items-center gap-2">
             <button
+              type="button"
+              (click)="abrirTutorial()"
+              aria-label="Tutorial desta página"
+              title="Tutorial desta página"
+              data-tour="ajuda"
+              class="h-10 w-10 rounded-full border border-border grid place-items-center hover:bg-muted cursor-pointer"
+            >
+              <app-icon name="help_outline" [style]="{ fontSize: '20px' }" />
+            </button>
+            <button
               (click)="theme.toggleTheme()"
               class="hidden sm:grid h-10 w-10 rounded-full border border-border place-items-center hover:bg-muted cursor-pointer"
               [attr.aria-label]="theme.isDark() ? 'Ativar modo claro' : 'Ativar modo escuro'"
@@ -173,7 +188,7 @@ const NAV = [
                 [style]="{ fontSize: '20px' }"
               />
             </button>
-            <div class="relative">
+            <div class="relative" data-tour="notificacoes">
               <button
                 type="button"
                 (click)="notificationsOpen.set(!notificationsOpen())"
@@ -253,7 +268,7 @@ const NAV = [
                 </div>
               }
             </div>
-            <div class="relative">
+            <div class="relative" data-tour="conta">
               <button
                 type="button"
                 (click)="userMenuOpen.set(!userMenuOpen())"
@@ -368,11 +383,14 @@ const NAV = [
         </main>
       </div>
     </div>
+
+    <app-tour-overlay />
   `,
 })
 export class AppLayoutComponent implements OnInit {
   protected theme = inject(ThemeService);
   private auth = inject(AuthService);
+  private tour = inject(TourService);
   protected notifications = inject(NotificationsService);
   protected navItems = NAV;
   private toast = inject(ToastService);
@@ -401,6 +419,14 @@ export class AppLayoutComponent implements OnInit {
     this.notifications.refresh().catch(() => {
       // Silencioso: notificações são um extra, não deve travar o layout se falhar.
     });
+  }
+
+  /** Botão "?": tutorial da tela em que a pessoa está. */
+  abrirTutorial(): void {
+    this.menuOpen.set(false);
+    this.userMenuOpen.set(false);
+    this.notificationsOpen.set(false);
+    this.tour.start(this.router.url);
   }
 
   abrirConta(): void {

@@ -2,6 +2,7 @@
   <!-- 1 — Mês -->
   <div class="flex flex-wrap items-center gap-2">
     <div
+      data-tour="periodo"
       class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
     >
       @for (m of monthOpts; track m.key) {
@@ -43,7 +44,7 @@
   @if (data(); as d) {
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       <!-- 2 — Score -->
-      <div class="lg:col-span-4">
+      <div class="lg:col-span-4" data-tour="saude">
         <button
           type="button"
           (click)="scoreOpen.set(true)"
@@ -214,6 +215,7 @@
     <!-- 5 & 6 — Gráficos -->
     <div class="grid grid-cols-1 gap-6">
       <app-chart-card
+        data-tour="grafico-receita-custos"
         title="Receita vs. Custos e despesas"
         description="Últimos 6 meses e projeção do fechamento do mês atual."
         [loading]="loading()"
@@ -233,7 +235,7 @@
     </div>
 
     <!-- 7 — Ações rápidas -->
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="flex flex-wrap items-center gap-3" data-tour="acoes">
       <app-button icon="point_of_sale" (clicked)="goTo('/movimentacoes')">Lançar venda</app-button>
       <app-button variant="tonal" icon="receipt_long" (clicked)="goTo('/movimentacoes')"
         >Lançar despesa</app-button
