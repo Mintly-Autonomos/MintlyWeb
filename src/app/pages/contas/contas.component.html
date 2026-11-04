@@ -8,6 +8,7 @@
       </p>
     </div>
     <button
+      data-tour="nova-conta"
       (click)="openCreate()"
       class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0"
     >
@@ -17,7 +18,7 @@
   </div>
 
   <!-- Summary -->
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" data-tour="resumo">
     <div class="m3-card p-5 flex flex-col gap-1">
       <span class="text-[12px] text-muted-foreground font-medium uppercase tracking-wide"
         >Saldo total</span
@@ -45,6 +46,7 @@
 
   <!-- Filter bar -->
   <app-filter-bar
+    data-tour="filtros"
     placeholder="Buscar conta…"
     [query]="query()"
     (queryChange)="query.set($event)"
@@ -91,7 +93,7 @@
       description="Ajuste os filtros ou tente outro termo de busca."
     />
   } @else {
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="cartoes">
       @for (a of sorted(); track a.id) {
         <div
           [class]="'m3-card p-5 flex flex-col gap-4 relative ' + (!a.active ? 'opacity-60' : '')"

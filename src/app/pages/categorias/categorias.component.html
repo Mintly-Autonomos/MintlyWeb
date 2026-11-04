@@ -8,6 +8,7 @@
       </p>
     </div>
     <button
+      data-tour="nova-categoria"
       (click)="openCreate()"
       class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0"
     >
@@ -16,7 +17,7 @@
   </div>
 
   <!-- Tabs -->
-  <div class="flex gap-1 p-1 bg-muted rounded-2xl w-fit">
+  <div class="flex gap-1 p-1 bg-muted rounded-2xl w-fit" data-tour="abas">
     <button
       type="button"
       (click)="tab.set('income')"
@@ -65,6 +66,7 @@
 
   <!-- Filter bar -->
   <app-filter-bar
+    data-tour="filtros"
     placeholder="Buscar categoria…"
     [query]="query()"
     (queryChange)="query.set($event)"
@@ -125,7 +127,7 @@
       description="Tente outro termo de busca, ajuste os filtros ou crie uma nova categoria para este tipo."
     />
   } @else {
-    <div class="m3-card overflow-hidden">
+    <div class="m3-card overflow-hidden" data-tour="tabela">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>

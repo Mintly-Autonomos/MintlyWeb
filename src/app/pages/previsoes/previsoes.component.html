@@ -3,6 +3,7 @@
   <div class="flex flex-wrap items-center gap-3">
     <div class="text-[13px] text-muted-foreground font-medium">Projetar para os próximos</div>
     <div
+      data-tour="periodo"
       class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
     >
       @for (h of horizonteOpts; track h) {
@@ -25,7 +26,10 @@
   </div>
 
   <!-- Abas -->
-  <div class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card h-10">
+  <div
+    data-tour="abas"
+    class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card h-10"
+  >
     <button
       type="button"
       (click)="setTab('simular')"
@@ -109,7 +113,11 @@
         </div>
 
         <!-- Bloco central: simulador + projeção -->
-        <div id="previsoes-simulador" class="m3-card m3-elev rounded-3xl p-5 md:p-6 scroll-mt-24">
+        <div
+          id="previsoes-simulador"
+          class="m3-card m3-elev rounded-3xl p-5 md:p-6 scroll-mt-24"
+          data-tour="projecao"
+        >
           <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
             <div>
               <h2 class="text-[17px] font-bold tracking-tight inline-flex items-center gap-2">
@@ -584,7 +592,7 @@
         </div>
 
         <!-- Fique de olho -->
-        <section>
+        <section data-tour="fique-de-olho">
           <app-section-header
             title="Fique de olho"
             description="Alertas curtos gerados a partir das suas projeções — clique para simular."
