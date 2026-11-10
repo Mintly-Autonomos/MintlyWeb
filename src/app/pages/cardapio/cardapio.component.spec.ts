@@ -179,9 +179,13 @@ describe('CardapioComponent', () => {
       expect(text()).toContain('Frango Ativo');
       expect(text()).not.toContain('Prato Inativo');
       expect(text()).toContain('1 de 1 prato');
-      expect(root.querySelector('[data-testid="alternar-inativos"]')?.textContent).toContain(
-        'Mostrar 1 inativo',
+      const chave = root.querySelector('[data-testid="alternar-inativos"]')!;
+      expect(chave.getAttribute('role')).toBe('switch');
+      expect(chave.getAttribute('aria-checked')).toBe('false'); // desligado por padrão
+      expect(root.querySelector('[data-testid="rotulo-inativos"]')?.textContent).toContain(
+        'Mostrar inativos',
       );
+      expect(root.querySelector('[data-testid="rotulo-inativos"]')?.textContent).toContain('(1)');
     });
 
     it('Mostrar inativos traz o prato de volta (com Reativar) e Ocultar esconde de novo', () => {
@@ -194,17 +198,20 @@ describe('CardapioComponent', () => {
         root.querySelector('[role="switch"][aria-label="Reativar Prato Inativo"]'),
       ).not.toBeNull();
       expect(text()).toContain('2 de 2 pratos');
-      expect(root.querySelector('[data-testid="alternar-inativos"]')?.textContent).toContain(
-        'Ocultar 1 inativo',
-      );
+      expect(
+        root.querySelector('[data-testid="alternar-inativos"]')?.getAttribute('aria-checked'),
+      ).toBe('true');
       alternar(root);
       fixture.detectChanges();
       expect(text()).not.toContain('Prato Inativo');
     });
 
-    it('sem nenhum inativo o botão não aparece', () => {
+    it('sem nenhum inativo o toggle continua visível, mas desabilitado e sem contagem', () => {
       const { root } = render([ativo]);
-      expect(root.querySelector('[data-testid="alternar-inativos"]')).toBeNull();
+      const chave = root.querySelector<HTMLButtonElement>('[data-testid="alternar-inativos"]')!;
+      expect(chave).not.toBeNull();
+      expect(chave.disabled).toBe(true);
+      expect(root.querySelector('[data-testid="rotulo-inativos"]')?.textContent).not.toContain('(');
     });
 
     it('se todos estão inativos, a lista explica e o botão leva até eles', () => {
