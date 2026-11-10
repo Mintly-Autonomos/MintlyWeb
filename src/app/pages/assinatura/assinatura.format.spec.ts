@@ -1,6 +1,7 @@
 import { computeSubscriptionState, subscriptionPlanPrice } from 'mintly-lib';
 import {
   expiryNoticeText,
+  employeesLimitText,
   fmtEndsAt,
   formatCents,
   planLabel,
@@ -91,9 +92,21 @@ describe('tierLabel e tierBlurb', () => {
     expect(tierLabel(null)).toBe('');
   });
 
-  it('o Pro não promete recurso específico', () => {
-    expect(tierBlurb('basic')).toBe('Tudo o que o Mintly oferece hoje.');
-    expect(tierBlurb('pro')).toContain('chegarão em breve');
+  it('o diferencial do Pro é a análise aprimorada por IA; o Básico não cita IA', () => {
+    expect(tierBlurb('basic')).toBe(
+      'Todas as telas e relatórios do Mintly, com as análises calculadas pelo sistema. Até 5 funcionários com acesso.',
+    );
+    expect(tierBlurb('basic')).not.toContain('IA');
+    expect(tierBlurb('pro')).toContain('Tudo do Básico');
+    expect(tierBlurb('pro')).toContain('aprimoradas por IA');
+    expect(tierBlurb('pro')).toContain('recomendações para cada prato do cardápio');
+  });
+
+  it('os dois dizem quantos funcionários têm acesso: Básico 5 e Pro 20 (números da lib)', () => {
+    expect(employeesLimitText('basic')).toBe('Até 5 funcionários com acesso.');
+    expect(employeesLimitText('pro')).toBe('Até 20 funcionários com acesso.');
+    expect(tierBlurb('basic')).toContain('Até 5 funcionários com acesso.');
+    expect(tierBlurb('pro')).toContain('Até 20 funcionários com acesso.');
   });
 });
 
@@ -124,13 +137,18 @@ describe('tierChangeNotice (troca de tipo não dá desconto e conta de hoje)', (
     expect(n.description).toContain(fmtEndsAt(active('basic').endsAt));
     expect(n.description).toContain('o Pro começa a contar hoje, não quando o Básico terminaria');
     expect(n.description).not.toContain('perde');
+    expect(n.description).toContain('Você passa a poder ter até 20 funcionários ativos.');
   });
 
-  it('downgrade: mesma regra e avisa que perde os recursos do Pro', () => {
+  it('downgrade: mesma regra, avisa que perde os recursos do Pro e o que acontece com funcionários acima do limite', () => {
     const n = tierChangeNotice(active('pro'), 'basic')!;
     expect(n.title).toBe('Você está mudando do Pro para o Básico');
     expect(n.description).toContain('o Básico começa a contar hoje, não quando o Pro terminaria');
     expect(n.description).toContain('Você perde os recursos do Pro');
+    expect(n.description).toContain('O Básico permite até 5 funcionários ativos');
+    expect(n.description).toContain('os mais recentes ficam inativos');
+    expect(n.description).toContain('nada é apagado');
+    expect(n.description).toContain('reativa quem quiser quando houver vaga');
   });
 });
 
