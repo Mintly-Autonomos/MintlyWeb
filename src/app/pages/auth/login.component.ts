@@ -120,6 +120,8 @@ import { maskEmail } from '../../shared/mask-email';
           }
           <a
             routerLink="/auth/esqueci-senha"
+            [state]="{ email: emailParaRecuperar() }"
+            data-testid="esqueci-senha"
             class="text-[13px] text-ocean font-medium hover:underline py-2 -my-2"
             >Esqueci minha senha</a
           >
@@ -195,6 +197,11 @@ export class LoginComponent {
   protected showPwd = signal(false);
   protected loading = signal(false);
   protected error = signal<string | null>(null);
+
+  /** O e-mail que a pessoa já informou (digitado ou da conta lembrada): a tela de recuperação já abre com ele. */
+  protected emailParaRecuperar(): string {
+    return (this.saved()?.email ?? this.email).trim();
+  }
 
   /** O cartão da conta lembrada mostra o e-mail só em parte; o e-mail inteiro continua guardado para entrar. */
   protected emailParcial = maskEmail;

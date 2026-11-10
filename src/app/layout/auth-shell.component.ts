@@ -51,7 +51,7 @@ export class AuthShellComponent {
             <app-logo
               [size]="36"
               tagline="Gestão para o seu negócio"
-              to="/auth/login"
+              [to]="logoTo"
               variant="gradient"
             />
           </div>
@@ -78,7 +78,7 @@ export class AuthShellComponent {
             <app-logo
               [size]="36"
               tagline="Gestão para o seu negócio"
-              to="/auth/login"
+              [to]="logoTo"
               variant="gradient"
             />
           </div>
@@ -157,6 +157,8 @@ export class AuthCardComponent {
   @Input() subtitle = '';
   @Input() wide = false;
   @Input() hasFooter = false;
+  /** Para onde o logo leva. `null` tira o link (cadastro: nada que tire a pessoa do fluxo). */
+  @Input() logoTo: string | null = '/auth/login';
 
   protected asideItems = [
     {

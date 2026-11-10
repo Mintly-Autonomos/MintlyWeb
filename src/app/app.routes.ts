@@ -176,6 +176,18 @@ export const routes: Routes = [
       },
     ],
   },
+  // Textos legais: públicos (o cadastro abre em outra aba, sem tirar a pessoa do fluxo).
+  {
+    path: 'termos',
+    title: 'Termos de Uso',
+    loadComponent: () => import('./pages/legal/termos.component').then((m) => m.TermosComponent),
+  },
+  {
+    path: 'privacidade',
+    title: 'Política de Privacidade',
+    loadComponent: () =>
+      import('./pages/legal/privacidade.component').then((m) => m.PrivacidadeComponent),
+  },
   {
     path: '**',
     title: 'Página não encontrada',

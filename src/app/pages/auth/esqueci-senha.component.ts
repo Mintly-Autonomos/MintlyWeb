@@ -1,5 +1,5 @@
 import { Component, signal, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthCardComponent } from '../../layout/auth-shell.component';
 import { IconComponent } from '../../shared/icon.component';
@@ -58,14 +58,6 @@ import { AuthService } from '../../services/auth.service';
               <span>Enviar link de redefinição</span
               ><app-icon name="send" [style]="{ fontSize: '20px' }" />
             }
-          </button>
-          <button
-            type="button"
-            (click)="router.navigate(['/auth/login'])"
-            class="w-full h-12 rounded-xl border border-border bg-card text-foreground font-medium text-sm hover:bg-muted transition flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <app-icon name="arrow_back" [style]="{ fontSize: '20px' }" />
-            <span>Voltar para o login</span>
           </button>
         </form>
         <div slot="footer">
@@ -132,12 +124,17 @@ import { AuthService } from '../../services/auth.service';
   `,
 })
 export class EsqueciSenhaComponent {
-  protected router = inject(Router);
   private auth = inject(AuthService);
-  protected email = '';
+  /** Vem preenchido com o e-mail que a pessoa já digitou no login (`history.state.email`). */
+  protected email: string = EsqueciSenhaComponent.emailDoLogin();
   protected loading = signal(false);
   protected sent = signal(false);
   protected error = signal<string | null>(null);
+
+  private static emailDoLogin(): string {
+    const email = (typeof history !== 'undefined' ? history.state : null)?.email;
+    return typeof email === 'string' ? email : '';
+  }
 
   async onSubmit(): Promise<void> {
     this.error.set(null);
