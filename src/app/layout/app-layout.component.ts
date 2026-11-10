@@ -484,6 +484,11 @@ export class AppLayoutComponent implements OnInit {
 
   /** "Não quero mudar": mantém o preço e o aviso some (só volta daqui a ~5,5 meses). */
   async dismissNotification(n: AppNotification): Promise<void> {
+    if (n.kind === 'overview') {
+      this.notifications.dismissOverviewNotice();
+      this.toast.info('Tudo bem. Você encontra as recomendações no topo da Visão Geral.');
+      return;
+    }
     if (n.kind === 'subscription') {
       this.notifications.dismissSubscriptionNotice();
       this.toast.info('Tudo bem. Lembramos de novo na próxima vez que você entrar.');
@@ -532,7 +537,7 @@ export class AppLayoutComponent implements OnInit {
       title: 'Contas Financeiras',
       sub: 'Gerencie onde o dinheiro do seu negócio entra e sai.',
     },
-    '/visao-geral': { title: 'Visão Geral', sub: 'Como está seu restaurante hoje' },
+    '/visao-geral': { title: 'Visão Geral', sub: 'Como está seu negócio hoje' },
     '/fluxo-de-caixa': { title: 'Fluxo de Caixa', sub: 'Seu dinheiro hoje e nos próximos dias' },
     '/receitas': { title: 'Receitas', sub: 'De onde vem o seu faturamento' },
     '/custos': { title: 'Custos & Despesas', sub: 'Para onde vai o seu dinheiro' },

@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type { AiInsightText } from 'mintly-lib';
 import { AiService, textoDaIa } from '../../services/ai.service';
+import { NotificationsService } from '../../services/notifications.service';
 import { DashboardService, OverviewInsight } from '../../services/dashboard.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
@@ -44,7 +45,7 @@ function pillarColor(score: number | null): string {
 const PILLAR_LABEL: Record<string, string> = {
   netMargin: 'Margem líquida',
   runway: 'Fôlego de caixa',
-  primeCost: 'Prime Cost',
+  primeCost: 'Custo primário',
   revenueTrend: 'Tendência de vendas',
 };
 
@@ -90,6 +91,7 @@ export class VisaoGeralComponent implements OnInit {
   private toast = inject(ToastService);
   private router = inject(Router);
   private ai = inject(AiService);
+  private notifications = inject(NotificationsService);
 
   protected monthOpts = MONTH_OPTS;
   // Do dia 1 ao 12 abre no mês passado (já fechado); depois, no mês atual.
@@ -216,8 +218,27 @@ export class VisaoGeralComponent implements OnInit {
     ];
   });
 
+  /** Nenhum lançamento no período (nem série, nem cascata): os gráficos mostram o convite para lançar. */
+  protected semMovimento = computed(() => {
+    const d = this.data();
+    if (!d) return false;
+    const w = d.profitWaterfall;
+    return (
+      d.revenueVsExpense.every((p) => !p.revenue && !p.expense) &&
+      !w.grossRevenue &&
+      !w.taxes &&
+      !w.cmv &&
+      !w.operatingExpenses
+    );
+  });
+
   ngOnInit(): void {
     this.load();
+  }
+
+  /** Atalho do estado vazio: abre Movimentações já com o formulário de nova entrada ou saída. */
+  lancar(tipo: 'entrada' | 'saida'): void {
+    this.router.navigate(['/movimentacoes'], { queryParams: { nova: tipo } });
   }
 
   private monthQuery(): string | undefined {
@@ -231,7 +252,12 @@ export class VisaoGeralComponent implements OnInit {
     this.textosIa.set([]);
     this.svc
       .refresh(this.monthQuery())
-      .then(() => void this.carregarIa())
+      .then(() => {
+        // O sino lembra de "O que fazer primeiro" nas outras telas: só o que pede ação (conquista não conta).
+        const pendentes = (this.data()?.insights ?? []).filter((i) => i.severity !== 'positive');
+        this.notifications.setRecomendacoes(pendentes.length);
+        void this.carregarIa();
+      })
       .catch(() => this.toast.error('Não foi possível carregar a visão geral.'));
   }
 
@@ -272,7 +298,7 @@ export class VisaoGeralComponent implements OnInit {
       case 'cmvAboveTarget':
         return `Custo dos ingredientes acima do ideal (${pctFmt(i.pct * 100)})`;
       case 'primeCostAboveTarget':
-        return `Prime Cost acima do ideal (${pctFmt(i.pct * 100)})`;
+        return `Custo primário acima do ideal (${pctFmt(i.pct * 100)})`;
       case 'expenseAnomaly':
         return `${i.name} acima do normal`;
       case 'breakEvenReached':
