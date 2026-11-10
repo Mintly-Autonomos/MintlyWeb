@@ -2,6 +2,7 @@ import { Location } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/icon.component';
+import { ToggleComponent } from '../../shared/toggle.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { ToastService } from '../../shared/toast.service';
@@ -33,7 +34,14 @@ export const DESTAQUE_MS = 4000;
 @Component({
   selector: 'app-cardapio',
   standalone: true,
-  imports: [IconComponent, ChipComponent, EmptyStateComponent, MoneyInputDirective, RouterLink],
+  imports: [
+    IconComponent,
+    ChipComponent,
+    EmptyStateComponent,
+    MoneyInputDirective,
+    RouterLink,
+    ToggleComponent,
+  ],
   templateUrl: './cardapio.component.html',
 })
 export class CardapioComponent implements OnInit, OnDestroy {

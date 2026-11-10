@@ -373,14 +373,20 @@
                     >
                       Editar
                     </button>
-                    <button
-                      type="button"
-                      (click)="alternarAtivo(p)"
-                      [disabled]="busyId() === p.id"
-                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
-                    >
-                      {{ p.active ? 'Inativar' : 'Reativar' }}
-                    </button>
+                    <span class="inline-flex items-center gap-2 align-middle ml-1">
+                      <span
+                        class="text-[12px]"
+                        [class]="p.active ? 'text-success' : 'text-muted-foreground'"
+                        >{{ p.active ? 'Ativo' : 'Inativo' }}</span
+                      >
+                      <app-toggle
+                        [checked]="p.active"
+                        [disabled]="busyId() === p.id"
+                        [label]="(p.active ? 'Inativar ' : 'Reativar ') + p.name"
+                        [testId]="'status-' + p.id"
+                        (changed)="alternarAtivo(p)"
+                      />
+                    </span>
                   }
                 </td>
               </tr>

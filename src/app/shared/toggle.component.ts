@@ -8,6 +8,8 @@ import { Component, Input, Output, EventEmitter } from '@angular/core';
       type="button"
       role="switch"
       [attr.aria-checked]="checked"
+      [attr.aria-label]="label || null"
+      [attr.data-testid]="testId || null"
       [disabled]="disabled"
       (click)="!disabled && changed.emit(!checked)"
       [class]="
@@ -28,5 +30,8 @@ import { Component, Input, Output, EventEmitter } from '@angular/core';
 export class ToggleComponent {
   @Input() checked = false;
   @Input() disabled = false;
+  /** Nome acessível do controle (leitor de tela), por exemplo "Inativar Frango Coreano". */
+  @Input() label = '';
+  @Input() testId = '';
   @Output() changed = new EventEmitter<boolean>();
 }

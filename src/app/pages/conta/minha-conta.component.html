@@ -386,22 +386,25 @@
                     >
                       Nova senha
                     </button>
-                    <button
-                      type="button"
-                      (click)="alternarMembro(m)"
-                      [disabled]="
-                        ocupado() === 'membro' || (m.status !== 'active' && limiteDeFuncionarios())
-                      "
+                    <span
+                      class="inline-flex items-center"
                       [title]="
                         m.status !== 'active' && limiteDeFuncionarios()
                           ? 'Sem vaga no plano: inative outro funcionário antes.'
                           : ''
                       "
-                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      [attr.data-testid]="'alternar-' + m.id"
                     >
-                      {{ m.status === 'active' ? 'Inativar' : 'Reativar' }}
-                    </button>
+                      <app-toggle
+                        [checked]="m.status === 'active'"
+                        [disabled]="
+                          ocupado() === 'membro' ||
+                          (m.status !== 'active' && limiteDeFuncionarios())
+                        "
+                        [label]="(m.status === 'active' ? 'Inativar ' : 'Reativar ') + m.nome"
+                        [testId]="'alternar-' + m.id"
+                        (changed)="alternarMembro(m)"
+                      />
+                    </span>
                   </div>
                   @if (membroSenhaId() === m.id) {
                     <div class="flex flex-wrap items-center gap-2">

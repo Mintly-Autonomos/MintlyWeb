@@ -33,9 +33,9 @@ export class FilterDropdownCoordinator {
   imports: [IconComponent],
   template: `
     <div class="space-y-2">
-      <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-2 sm:flex-wrap">
         <div
-          class="flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card flex-1 min-w-[200px] focus-within:border-mint focus-within:ring-2 focus-within:ring-mint/20 transition"
+          class="flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card flex-1 min-w-0 sm:min-w-[200px] focus-within:border-mint focus-within:ring-2 focus-within:ring-mint/20 transition"
         >
           <app-icon
             name="search"
@@ -63,8 +63,10 @@ export class FilterDropdownCoordinator {
         <button
           type="button"
           (click)="toggleOpen()"
+          [attr.aria-expanded]="filtersOpen()"
+          data-testid="alternar-filtros"
           [class]="
-            'inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-[13px] font-medium transition cursor-pointer ' +
+            'inline-flex shrink-0 items-center gap-1.5 h-9 px-3 rounded-lg border text-[13px] font-medium transition cursor-pointer ' +
             (filtersOpen() || activeCount > 0
               ? 'border-border bg-muted text-foreground'
               : 'border-border bg-card text-foreground hover:bg-muted')
@@ -116,7 +118,15 @@ export class FilterBarComponent {
   @Output() queryChange = new EventEmitter<string>();
   @Output() clearAll = new EventEmitter<void>();
 
-  protected filtersOpen = signal(false);
+  /**
+   * No celular as opções de filtro já abrem à mostra (são poucas e esconder atrás do botão só adiciona um
+   * toque); no computador ficam recolhidas atrás do botão "Filtros". A pessoa pode abrir/fechar nos dois.
+   */
+  protected filtersOpen = signal(FilterBarComponent.isMobile());
+
+  private static isMobile(): boolean {
+    return typeof matchMedia === 'function' && matchMedia('(max-width: 639px)').matches;
+  }
 
   toggleOpen(): void {
     this.filtersOpen.update((v) => !v);

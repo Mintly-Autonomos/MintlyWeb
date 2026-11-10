@@ -190,7 +190,9 @@ describe('CardapioComponent', () => {
       fixture.detectChanges();
       expect(text()).toContain('Prato Inativo');
       expect(text()).toContain('(inativo)');
-      expect(text()).toContain('Reativar');
+      expect(
+        root.querySelector('[role="switch"][aria-label="Reativar Prato Inativo"]'),
+      ).not.toBeNull();
       expect(text()).toContain('2 de 2 pratos');
       expect(root.querySelector('[data-testid="alternar-inativos"]')?.textContent).toContain(
         'Ocultar 1 inativo',
@@ -237,6 +239,43 @@ describe('CardapioComponent', () => {
       const { c, toast } = render([inativo]);
       await c.alternarAtivo(inativo);
       expect(toast.success).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('status como toggle (igual a Contas e Categorias)', () => {
+    const chave = (root: HTMLElement, id: string) =>
+      root.querySelector<HTMLButtonElement>(`[data-testid="status-${id}"]`)!;
+
+    it('cada prato tem o toggle de status, ligado para ativo, com nome acessível e sem botão "Inativar"', () => {
+      const { root, text } = render([prato({})]);
+      const t = chave(root, 'p1');
+      expect(t.getAttribute('role')).toBe('switch');
+      expect(t.getAttribute('aria-checked')).toBe('true');
+      expect(t.getAttribute('aria-label')).toBe('Inativar Frango Original');
+      expect(text()).toContain('Ativo');
+      expect(text()).not.toContain('Inativar ');
+      expect(
+        [...root.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Inativar'),
+      ).toBe(false);
+    });
+
+    it('desligar o toggle inativa o prato', async () => {
+      const { root, svc, fixture } = render([prato({})]);
+      chave(root, 'p1').click();
+      await fixture.whenStable();
+      expect(svc.setActive).toHaveBeenCalledWith('p1', false);
+    });
+
+    it('prato inativo aparece com o toggle desligado e ligar reativa', async () => {
+      const { root, svc, fixture } = render([prato({ active: false })]);
+      (root.querySelector('[data-testid="alternar-inativos"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      const t = chave(root, 'p1');
+      expect(t.getAttribute('aria-checked')).toBe('false');
+      expect(t.getAttribute('aria-label')).toBe('Reativar Frango Original');
+      t.click();
+      await fixture.whenStable();
+      expect(svc.setActive).toHaveBeenCalledWith('p1', true);
     });
   });
 
