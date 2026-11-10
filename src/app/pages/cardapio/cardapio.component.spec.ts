@@ -168,6 +168,78 @@ describe('CardapioComponent', () => {
     expect(svc.changePrice).toHaveBeenCalledWith('p1', 25.9);
   });
 
+  describe('pratos inativos ficam escondidos', () => {
+    const ativo = prato({ id: 'a', name: 'Frango Ativo' });
+    const inativo = prato({ id: 'i', name: 'Prato Inativo', active: false });
+    const alternar = (root: HTMLElement) =>
+      (root.querySelector('[data-testid="alternar-inativos"]') as HTMLButtonElement).click();
+
+    it('a lista começa só com os ativos e o botão avisa quantos inativos existem', () => {
+      const { root, text } = render([ativo, inativo]);
+      expect(text()).toContain('Frango Ativo');
+      expect(text()).not.toContain('Prato Inativo');
+      expect(text()).toContain('1 de 1 prato');
+      expect(root.querySelector('[data-testid="alternar-inativos"]')?.textContent).toContain(
+        'Mostrar 1 inativo',
+      );
+    });
+
+    it('Mostrar inativos traz o prato de volta (com Reativar) e Ocultar esconde de novo', () => {
+      const { fixture, root, text } = render([ativo, inativo]);
+      alternar(root);
+      fixture.detectChanges();
+      expect(text()).toContain('Prato Inativo');
+      expect(text()).toContain('(inativo)');
+      expect(text()).toContain('Reativar');
+      expect(text()).toContain('2 de 2 pratos');
+      expect(root.querySelector('[data-testid="alternar-inativos"]')?.textContent).toContain(
+        'Ocultar 1 inativo',
+      );
+      alternar(root);
+      fixture.detectChanges();
+      expect(text()).not.toContain('Prato Inativo');
+    });
+
+    it('sem nenhum inativo o botão não aparece', () => {
+      const { root } = render([ativo]);
+      expect(root.querySelector('[data-testid="alternar-inativos"]')).toBeNull();
+    });
+
+    it('se todos estão inativos, a lista explica e o botão leva até eles', () => {
+      const { fixture, root, text } = render([inativo]);
+      expect(root.querySelector('[data-testid="lista-vazia"]')?.textContent).toContain(
+        'Todos os pratos estão inativos',
+      );
+      alternar(root);
+      fixture.detectChanges();
+      expect(text()).toContain('Prato Inativo');
+    });
+
+    it('a busca vale só para o que está na lista (inativo escondido não aparece nela)', () => {
+      const { fixture, root, text } = render([ativo, inativo]);
+      (root.querySelector('input[type="search"]') as HTMLInputElement).value = 'inativo';
+      root
+        .querySelector('input[type="search"]')!
+        .dispatchEvent(new Event('input', { bubbles: true }));
+      fixture.detectChanges();
+      expect(text()).toContain('Nenhum prato encontrado para "inativo"');
+    });
+
+    it('ao inativar, avisa que o prato saiu da lista e como reativar', async () => {
+      const { c, toast } = render([ativo]);
+      await c.alternarAtivo(ativo);
+      expect(toast.success).toHaveBeenCalledWith(
+        expect.stringContaining('Frango Ativo foi inativado e saiu da lista'),
+      );
+    });
+
+    it('ao reativar não repete o aviso de inativação', async () => {
+      const { c, toast } = render([inativo]);
+      await c.alternarAtivo(inativo);
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+  });
+
   it('inativar chama o serviço com o contrário do estado atual', async () => {
     const p = prato({});
     const { c, svc } = render([p]);

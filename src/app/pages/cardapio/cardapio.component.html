@@ -113,12 +113,21 @@
           />
         </label>
         <span class="text-[12.5px] text-muted-foreground">
-          {{ visiveis().length }} de {{ pratos().length }}
-          {{ pratos().length === 1 ? 'prato' : 'pratos' }}
-          @if (inativos() > 0) {
-            · {{ inativos() }} {{ inativos() === 1 ? 'inativo' : 'inativos' }}
-          }
+          {{ visiveis().length }} de {{ base().length }}
+          {{ base().length === 1 ? 'prato' : 'pratos' }}
         </span>
+        @if (inativos() > 0) {
+          <button
+            type="button"
+            (click)="mostrarInativos.set(!mostrarInativos())"
+            [attr.aria-pressed]="mostrarInativos()"
+            class="h-8 px-3 rounded-lg text-[12px] font-medium text-ocean hover:bg-muted cursor-pointer"
+            data-testid="alternar-inativos"
+          >
+            {{ mostrarInativos() ? 'Ocultar' : 'Mostrar' }}
+            {{ inativos() }} {{ inativos() === 1 ? 'inativo' : 'inativos' }}
+          </button>
+        }
       </div>
     }
 
@@ -380,8 +389,12 @@
         </table>
       </div>
       @if (visiveis().length === 0) {
-        <p class="text-[13px] text-muted-foreground py-6 text-center">
-          Nenhum prato encontrado para "{{ busca() }}".
+        <p class="text-[13px] text-muted-foreground py-6 text-center" data-testid="lista-vazia">
+          @if (busca()) {
+            Nenhum prato encontrado para "{{ busca() }}".
+          } @else {
+            Todos os pratos estão inativos. Use "Mostrar inativos" para reativar.
+          }
         </p>
       }
     }

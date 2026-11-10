@@ -45,6 +45,7 @@ interface Interno {
   semChamadas(): boolean;
   pct(n: number): string;
   iaDisponivel(): boolean;
+  pratos(): { id: string }[];
 }
 
 const httpError = (status: number, message: string) => ({
@@ -191,6 +192,15 @@ describe('CardapioInterativoComponent: sugestão de aumento pela IA', () => {
     expect(c.semChamadas()).toBe(true);
     ai.uso.set({ limitPerDay: 20, usedToday: 19, remainingToday: 1 });
     expect(c.semChamadas()).toBe(false);
+  });
+
+  it('prato inativo não entra na tela (só os ativos, em ordem alfabética)', () => {
+    const { c } = montar([
+      prato({ id: 'z', name: 'Zebra' }),
+      prato({ id: 'i', name: 'Inativo', active: false }),
+      prato({ id: 'a', name: 'Abacate' }),
+    ]);
+    expect(c.pratos().map((p) => p.id)).toEqual(['a', 'z']);
   });
 
   it('no Básico o botão dá lugar ao convite para o Pro (a IA é do plano Pro)', () => {
