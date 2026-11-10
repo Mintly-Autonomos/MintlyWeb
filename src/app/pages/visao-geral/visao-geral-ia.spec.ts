@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AiService } from '../../services/ai.service';
 import { DashboardService } from '../../services/dashboard.service';
+import { NotificationsService } from '../../services/notifications.service';
 import { ToastService } from '../../shared/toast.service';
 import { VisaoGeralComponent } from './visao-geral.component';
 
@@ -52,6 +53,7 @@ describe('VisaoGeralComponent: textos da IA nos cards', () => {
         { provide: DashboardService, useValue: dash },
         { provide: AiService, useValue: ai },
         { provide: ToastService, useValue: toast },
+        { provide: NotificationsService, useValue: { setRecomendacoes: vi.fn() } },
       ],
     });
     // Template vazio: aqui só importa o texto dos cards (a lógica da classe é a mesma), sem os gráficos.

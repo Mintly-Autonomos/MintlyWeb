@@ -14,6 +14,7 @@ import { SUBSCRIPTION_MEMBER_LIMIT, SUBSCRIPTION_TIER_LABEL, memberLimitForTier 
 import { ContaService, Membro } from '../../services/conta.service';
 import { AVATAR_ACCEPT, readAvatarFile } from '../../shared/avatar-file';
 import { ChipComponent } from '../../shared/chip.component';
+import { ToggleComponent } from '../../shared/toggle.component';
 import { ModalComponent } from '../../shared/modal.component';
 import { ToastService } from '../../shared/toast.service';
 import { apiErrorInfo } from '../../shared/api-error';
@@ -53,7 +54,7 @@ type Secao =
 @Component({
   selector: 'app-minha-conta',
   standalone: true,
-  imports: [ModalComponent, ChipComponent],
+  imports: [ModalComponent, ChipComponent, ToggleComponent],
   templateUrl: './minha-conta.component.html',
 })
 export class MinhaContaComponent {

@@ -8,7 +8,6 @@ import { FormFieldComponent } from '../../shared/form-field.component';
 import { AuthService } from '../../services/auth.service';
 import { AlertComponent } from '../../shared/alert.component';
 import { passwordRules } from '../../shared/password-rules';
-import { readAvatarFile } from '../../shared/avatar-file';
 import { maskPhoneBR } from '../../shared/format';
 
 @Component({
@@ -26,7 +25,7 @@ import { maskPhoneBR } from '../../shared/format';
     <app-auth-card
       title="Crie sua conta Mintly"
       subtitle="Crie sua conta em menos de 1 minuto. O Mintly funciona por assinatura: depois do cadastro você escolhe o plano e paga para liberar o acesso."
-      [hasFooter]="true"
+      [logoTo]="null"
     >
       <!-- Stepper -->
       <div class="flex items-center gap-2 mb-6">
@@ -83,71 +82,6 @@ import { maskPhoneBR } from '../../shared/format';
             longos. Você cria a conta agora e, em seguida, escolhe o plano e faz o pagamento. O
             acesso é liberado quando o pagamento é aprovado.
           </app-alert>
-          <div class="flex flex-col items-center gap-2 mb-1">
-            <button
-              type="button"
-              (click)="fileInput.click()"
-              aria-label="Adicionar foto de perfil"
-              class="relative h-24 w-24 rounded-full overflow-hidden border-2 border-dashed border-border hover:border-mint transition cursor-pointer group shrink-0"
-            >
-              @if (avatarPreview()) {
-                <img [src]="avatarPreview()" alt="" class="h-full w-full object-cover" />
-              } @else if (initialsPreview()) {
-                <span
-                  class="h-full w-full grid place-items-center bg-mint-soft text-ocean text-2xl font-bold"
-                >
-                  {{ initialsPreview() }}
-                </span>
-              } @else {
-                <span class="h-full w-full grid place-items-center bg-muted text-muted-foreground">
-                  <app-icon name="person" [style]="{ fontSize: '36px' }" />
-                </span>
-              }
-              <span
-                class="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/30 transition grid place-items-center"
-              >
-                <app-icon
-                  name="photo_camera"
-                  [style]="{ fontSize: '22px' }"
-                  className="text-white opacity-0 group-hover:opacity-100 transition"
-                />
-              </span>
-            </button>
-            <input
-              #fileInput
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              class="hidden"
-              (change)="onAvatarPicked($event)"
-            />
-            <div class="flex items-center gap-2 text-[12px]">
-              <button
-                type="button"
-                (click)="fileInput.click()"
-                class="text-ocean font-semibold hover:underline cursor-pointer"
-              >
-                {{ avatarPreview() ? 'Trocar foto' : 'Adicionar foto' }}
-              </button>
-              @if (avatarPreview()) {
-                <span class="text-muted-foreground">·</span>
-                <button
-                  type="button"
-                  (click)="removeAvatar()"
-                  class="text-muted-foreground hover:text-error cursor-pointer"
-                >
-                  Remover
-                </button>
-              }
-            </div>
-            @if (avatarError()) {
-              <p class="text-[12px] text-error text-center">{{ avatarError() }}</p>
-            } @else {
-              <p class="text-[11px] text-muted-foreground text-center">
-                JPG, PNG ou WebP · até 1MB
-              </p>
-            }
-          </div>
-
           <app-form-field label="Seu nome" icon="person">
             <input
               [(ngModel)]="name"
@@ -268,8 +202,25 @@ import { maskPhoneBR } from '../../shared/format';
               class="mt-0.5 h-4 w-4 rounded border-border accent-mint"
             />
             <span class="text-[13px] text-foreground/80"
-              >Concordo com os <span class="text-ocean font-medium">Termos de Uso</span> e
-              <span class="text-ocean font-medium">Política de Privacidade</span></span
+              >Li e concordo com os
+              <a
+                routerLink="/termos"
+                target="_blank"
+                rel="noopener"
+                data-testid="link-termos"
+                class="text-ocean font-medium hover:underline"
+                >Termos de Uso</a
+              >
+              e com a
+              <a
+                routerLink="/privacidade"
+                target="_blank"
+                rel="noopener"
+                data-testid="link-privacidade"
+                class="text-ocean font-medium hover:underline"
+                >Política de Privacidade</a
+              >
+              (abrem em outra aba)</span
             >
           </label>
         }
@@ -303,11 +254,6 @@ import { maskPhoneBR } from '../../shared/format';
           </button>
         }
       </form>
-
-      <div slot="footer">
-        Já tem conta?
-        <a routerLink="/auth/login" class="text-ocean font-semibold hover:underline">Fazer login</a>
-      </div>
     </app-auth-card>
   `,
 })
@@ -326,9 +272,6 @@ export class CadastroComponent {
   protected showPwd = signal(false);
   protected loading = signal(false);
   protected error = signal<string | null>(null);
-
-  protected avatarPreview = signal<string | null>(null);
-  protected avatarError = signal<string | null>(null);
 
   // Métodos (não computed()): name/phone/email/password/... são campos simples
   // (ngModel), não signals — um computed() aqui só reagiria à leitura de `step()`
@@ -367,33 +310,6 @@ export class CadastroComponent {
     return digits.length === 10 || digits.length === 11;
   }
 
-  protected initialsPreview(): string {
-    const parts = this.name.trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return '';
-    return (
-      (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
-    ).toUpperCase();
-  }
-
-  onAvatarPicked(ev: Event): void {
-    const input = ev.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = ''; // permite escolher o mesmo arquivo de novo depois de remover
-    if (!file) return;
-
-    readAvatarFile(file)
-      .then((dataUrl) => {
-        this.avatarError.set(null);
-        this.avatarPreview.set(dataUrl);
-      })
-      .catch((err: Error) => this.avatarError.set(err.message));
-  }
-
-  removeAvatar(): void {
-    this.avatarPreview.set(null);
-    this.avatarError.set(null);
-  }
-
   async onSubmit(): Promise<void> {
     if (!this.canNext()) return;
     this.error.set(null);
@@ -407,7 +323,6 @@ export class CadastroComponent {
       await this.auth.signup({
         name: this.name.trim(),
         phone: this.phone.replace(/\D/g, ''),
-        avatar: this.avatarPreview() ?? undefined,
         email,
         password: this.password,
         restaurantName: this.restaurant.trim(),

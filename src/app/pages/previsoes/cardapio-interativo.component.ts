@@ -69,9 +69,10 @@ export class CardapioInterativoComponent {
 
   protected loading = this.svc.loading;
   protected pratos = computed(() =>
-    [...this.svc.pratos()].sort(
-      (a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'pt-BR'),
-    ),
+    this.svc
+      .pratos()
+      .filter((p) => p.active)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
   );
 
   // ── análise e simulador ──

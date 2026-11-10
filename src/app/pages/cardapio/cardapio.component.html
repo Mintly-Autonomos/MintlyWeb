@@ -113,11 +113,30 @@
           />
         </label>
         <span class="text-[12.5px] text-muted-foreground">
-          {{ visiveis().length }} de {{ pratos().length }}
-          {{ pratos().length === 1 ? 'prato' : 'pratos' }}
-          @if (inativos() > 0) {
-            · {{ inativos() }} {{ inativos() === 1 ? 'inativo' : 'inativos' }}
-          }
+          {{ visiveis().length }} de {{ base().length }}
+          {{ base().length === 1 ? 'prato' : 'pratos' }}
+        </span>
+        <!-- Sempre visível (desligado por padrão): é por aqui que se chega aos pratos inativos para reativar -->
+        <span
+          class="inline-flex items-center gap-2 sm:ml-auto"
+          [title]="inativos() === 0 ? 'Nenhum prato inativo' : ''"
+        >
+          <span
+            class="text-[12.5px] text-muted-foreground"
+            data-testid="rotulo-inativos"
+            [class.opacity-60]="inativos() === 0"
+            >Mostrar inativos
+            @if (inativos() > 0) {
+              <span class="font-semibold text-foreground">({{ inativos() }})</span>
+            }
+          </span>
+          <app-toggle
+            [checked]="mostrarInativos()"
+            [disabled]="inativos() === 0"
+            label="Mostrar pratos inativos"
+            testId="alternar-inativos"
+            (changed)="mostrarInativos.set($event)"
+          />
         </span>
       </div>
     }
@@ -364,14 +383,20 @@
                     >
                       Editar
                     </button>
-                    <button
-                      type="button"
-                      (click)="alternarAtivo(p)"
-                      [disabled]="busyId() === p.id"
-                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
-                    >
-                      {{ p.active ? 'Inativar' : 'Reativar' }}
-                    </button>
+                    <span class="inline-flex items-center gap-2 align-middle ml-1">
+                      <span
+                        class="text-[12px]"
+                        [class]="p.active ? 'text-success' : 'text-muted-foreground'"
+                        >{{ p.active ? 'Ativo' : 'Inativo' }}</span
+                      >
+                      <app-toggle
+                        [checked]="p.active"
+                        [disabled]="busyId() === p.id"
+                        [label]="(p.active ? 'Inativar ' : 'Reativar ') + p.name"
+                        [testId]="'status-' + p.id"
+                        (changed)="alternarAtivo(p)"
+                      />
+                    </span>
                   }
                 </td>
               </tr>
@@ -380,8 +405,12 @@
         </table>
       </div>
       @if (visiveis().length === 0) {
-        <p class="text-[13px] text-muted-foreground py-6 text-center">
-          Nenhum prato encontrado para "{{ busca() }}".
+        <p class="text-[13px] text-muted-foreground py-6 text-center" data-testid="lista-vazia">
+          @if (busca()) {
+            Nenhum prato encontrado para "{{ busca() }}".
+          } @else {
+            Todos os pratos estão inativos. Use "Mostrar inativos" para reativar.
+          }
         </p>
       }
     }

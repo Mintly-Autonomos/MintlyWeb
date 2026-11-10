@@ -59,7 +59,8 @@ import { RouterLink } from '@angular/router';
 export class LogoComponent {
   @Input() size = 36;
   @Input() tagline = '';
-  @Input() to = '/';
+  /** Destino do clique; `null` deixa o logo sem link (por exemplo, dentro do cadastro). */
+  @Input() to: string | null = '/';
   /** `auto`: verde no tema claro e branca no escuro; `gradient`: a mesma em qualquer tema (telas de autenticação). */
   @Input() variant: 'auto' | 'gradient' = 'auto';
 }

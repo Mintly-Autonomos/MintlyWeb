@@ -1,5 +1,6 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Workbook } from 'exceljs';
 import {
   parseNumberBR,
@@ -124,6 +125,9 @@ export class MovimentacoesComponent implements OnInit {
   private contasSvc = inject(ContasService);
   private categoriasSvc = inject(CategoriasService);
   private toast = inject(ToastService);
+  // Opcionais: o atalho `?nova=` só existe quando a tela é aberta pelo roteador.
+  private route = inject(ActivatedRoute, { optional: true });
+  private router = inject(Router, { optional: true });
   private cardapioSvc = inject(CardapioService);
 
   // ── UI state ──────────────────────────────────────────────────────────
@@ -291,6 +295,16 @@ export class MovimentacoesComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    // Atalhos de outras telas (estado vazio): /movimentacoes?nova=entrada|saida abre o formulário na hora.
+    const nova = this.route?.snapshot.queryParamMap.get('nova');
+    if (nova === 'entrada' || nova === 'saida') {
+      this.openCreate(nova === 'entrada' ? 'income' : 'expense');
+      void this.router?.navigate([], {
+        queryParams: { nova: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
     this.svc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
     this.categoriasSvc.refresh().catch((err) => this.toast.error(this.errMsg(err)));
     // Os pratos do cardápio alimentam a escolha de "Pratos vendidos" na entrada.

@@ -6,11 +6,12 @@ import { mesesParado } from './cardapio.builder';
 import { formatBRL } from '../shared/format';
 
 const SUBSCRIPTION_NOTICE_ID = 'subscription-expiring';
+const OVERVIEW_NOTICE_ID = 'overview-pending';
 const DISMISSED_KEY = 'mintly-sub-notice-dismissed';
 
 export interface AppNotification {
-  /** 'price': aviso de preço parado; 'subscription': a assinatura está para vencer. */
-  kind: 'price' | 'subscription';
+  /** 'price': aviso de preço parado; 'subscription': a assinatura está para vencer; 'overview': há itens em "O que fazer primeiro". */
+  kind: 'price' | 'subscription' | 'overview';
   /** Id do prato — o aviso existe enquanto o preço não for revisado. */
   id: string;
   title: string;
@@ -35,11 +36,45 @@ export class NotificationsService {
   /** Data limite cujo aviso a pessoa dispensou nesta sessão (aparece de novo no próximo acesso). */
   private dismissedFor = signal<string | null>(this.readDismissed());
 
+  /** Quantas recomendações "O que fazer primeiro" a Visão Geral mostrou por último (0 = nada pendente). */
+  private recomendacoes = signal(0);
+  /** "Agora não" neste acesso: some até a próxima vez que a pessoa entrar. */
+  private overviewDispensado = signal(false);
+
   readonly notifications = computed<AppNotification[]>(() => [
+    ...this.overviewNotice(),
     ...this.subscriptionNotice(),
     ...this.cardapio.alertas().map((a) => this.toNotification(a)),
   ]);
   readonly count = computed(() => this.notifications().length);
+
+  /** Chamado pela Visão Geral com o número de recomendações pendentes. */
+  setRecomendacoes(total: number): void {
+    this.recomendacoes.set(Math.max(0, total));
+  }
+
+  dismissOverviewNotice(): void {
+    this.overviewDispensado.set(true);
+  }
+
+  private overviewNotice(): AppNotification[] {
+    const n = this.recomendacoes();
+    if (n <= 0 || this.overviewDispensado()) return [];
+    return [
+      {
+        kind: 'overview',
+        id: OVERVIEW_NOTICE_ID,
+        title: `${n} ${n === 1 ? 'recomendação pendente' : 'recomendações pendentes'} em "O que fazer primeiro"`,
+        description:
+          'Veja o que precisa de atenção no seu negócio agora. Fica no topo da Visão Geral.',
+        itemName: 'O que fazer primeiro',
+        actionLabel: 'Ver agora',
+        actionRoute: '/visao-geral',
+        actionQueryParams: {},
+        dismissLabel: 'Agora não',
+      },
+    ];
+  }
 
   /** Faltando 3 dias ou menos para vencer. No dia do vencimento a pessoa já cai na tela de assinatura. */
   private subscriptionNotice(): AppNotification[] {

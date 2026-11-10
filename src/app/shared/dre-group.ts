@@ -18,13 +18,13 @@ export const DRE_GROUP_OPTIONS: DreGroupOption[] = [
     value: 'cmv',
     label: 'Ingredientes e insumos (CMV)',
     short: 'CMV',
-    description: 'Comida, bebida e embalagem que viram prato. Entra no CMV e no Prime Cost.',
+    description: 'Comida, bebida e embalagem que viram prato. Entra no CMV e no custo primário.',
   },
   {
     value: 'labor',
     label: 'Mão de obra',
     short: 'Mão de obra',
-    description: 'Salário, pró-labore e encargos. Entra no Prime Cost, não no CMV.',
+    description: 'Salário, pró-labore e encargos. Entra no custo primário, não no CMV.',
   },
   {
     value: 'opex',

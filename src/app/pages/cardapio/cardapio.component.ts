@@ -2,6 +2,7 @@ import { Location } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/icon.component';
+import { ToggleComponent } from '../../shared/toggle.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { ToastService } from '../../shared/toast.service';
@@ -33,7 +34,14 @@ export const DESTAQUE_MS = 4000;
 @Component({
   selector: 'app-cardapio',
   standalone: true,
-  imports: [IconComponent, ChipComponent, EmptyStateComponent, MoneyInputDirective, RouterLink],
+  imports: [
+    IconComponent,
+    ChipComponent,
+    EmptyStateComponent,
+    MoneyInputDirective,
+    RouterLink,
+    ToggleComponent,
+  ],
   templateUrl: './cardapio.component.html',
 })
 export class CardapioComponent implements OnInit, OnDestroy {
@@ -55,10 +63,16 @@ export class CardapioComponent implements OnInit, OnDestroy {
   );
 
   protected busca = signal('');
+  /** Pratos inativos ficam escondidos da lista; "Mostrar inativos" traz eles de volta (para reativar). */
+  protected mostrarInativos = signal(false);
+  /** A lista antes da busca: todos os pratos, ou só os ativos. */
+  protected base = computed(() =>
+    this.mostrarInativos() ? this.pratos() : this.pratos().filter((p) => p.active),
+  );
   protected visiveis = computed(() => {
     const q = normalizeDishName(this.busca());
-    if (!q) return this.pratos();
-    return this.pratos().filter(
+    if (!q) return this.base();
+    return this.base().filter(
       (p) =>
         normalizeDishName(p.name).includes(q) || normalizeDishName(p.category ?? '').includes(q),
     );
@@ -285,6 +299,11 @@ export class CardapioComponent implements OnInit, OnDestroy {
     this.busyId.set(p.id);
     try {
       await this.svc.setActive(p.id, !p.active);
+      if (p.active) {
+        this.toast.success(
+          `${p.name} foi inativado e saiu da lista. Para reativar, use "Mostrar inativos".`,
+        );
+      }
     } catch (err) {
       this.toast.error(this.svc.errorMessage(err));
     } finally {

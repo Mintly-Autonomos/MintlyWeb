@@ -42,6 +42,25 @@
   </div>
 
   @if (data(); as d) {
+    <!-- Primeiro: o que precisa de atenção (orienta o que resolver antes de olhar os números) -->
+    @if (d.insights.length > 0) {
+      <section id="o-que-fazer-primeiro" data-testid="o-que-fazer-primeiro" class="scroll-mt-4">
+        <app-section-header title="O que fazer primeiro" />
+        <div class="grid grid-cols-1 lg:grid-cols-2 auto-rows-fr gap-6">
+          @for (i of d.insights; track i.kind; let idx = $index) {
+            <app-insight-card
+              [severity]="insightSeverity(i)"
+              [title]="insightTitle(i, idx)"
+              [description]="insightDescription(i, idx)"
+              [ia]="insightIa(i, idx)"
+              [action]="insightAction(i)"
+              (actionClick)="insightGo(i)"
+            />
+          }
+        </div>
+      </section>
+    }
+
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       <!-- 2 — Score -->
       <div class="lg:col-span-4" data-tour="saude">
@@ -58,7 +77,7 @@
             >
               <span>Saúde financeira</span>
               <app-hint
-                text="Calculado a partir da sua margem de lucro, controle de custos (prime cost), fôlego de caixa e tendência de vendas."
+                text="Calculado a partir da sua margem de lucro, controle de custos (custo primário), fôlego de caixa e tendência de vendas."
               />
             </div>
             <div class="relative w-[180px] h-[180px] mt-2">
@@ -170,7 +189,7 @@
           />
         </app-stat-card>
         <app-stat-card
-          label="Prime Cost"
+          label="Custo primário"
           [value]="pctFmt((d.cards.primeCost.pct ?? 0) * 100)"
           [delta]="statDelta(d.cards.primeCost.deltaPoints, { points: true })"
           icon="stacked_bar_chart"
@@ -196,23 +215,6 @@
       </div>
     </div>
 
-    <!-- 4 — Insights -->
-    <section>
-      <app-section-header title="O que fazer primeiro" />
-      <div class="grid grid-cols-1 lg:grid-cols-2 auto-rows-fr gap-6">
-        @for (i of d.insights; track i.kind; let idx = $index) {
-          <app-insight-card
-            [severity]="insightSeverity(i)"
-            [title]="insightTitle(i, idx)"
-            [description]="insightDescription(i, idx)"
-            [ia]="insightIa(i, idx)"
-            [action]="insightAction(i)"
-            (actionClick)="insightGo(i)"
-          />
-        }
-      </div>
-    </section>
-
     <!-- 5 & 6 — Gráficos -->
     <div class="grid grid-cols-1 gap-6">
       <app-chart-card
@@ -221,7 +223,21 @@
         description="Últimos 6 meses e projeção do fechamento do mês atual."
         [loading]="loading()"
         [height]="340"
+        [empty]="semMovimento()"
+        emptyIcon="monitoring"
+        emptyTitle="Ainda não há lançamentos para mostrar"
+        emptyDescription="Registre uma venda ou uma despesa e este gráfico passa a mostrar a evolução da sua receita e dos seus custos."
       >
+        <app-button slot="empty-action" icon="point_of_sale" (clicked)="lancar('entrada')"
+          >Lançar venda</app-button
+        >
+        <app-button
+          slot="empty-action"
+          variant="tonal"
+          icon="receipt_long"
+          (clicked)="lancar('saida')"
+          >Lançar despesa</app-button
+        >
         <app-area-chart
           [data]="mainData()"
           categoryKey="month"
@@ -230,15 +246,33 @@
         />
       </app-chart-card>
 
-      <app-chart-card title="Como seu lucro se forma" [loading]="loading()" [height]="340">
+      <app-chart-card
+        title="Como seu lucro se forma"
+        [loading]="loading()"
+        [height]="340"
+        [empty]="semMovimento()"
+        emptyIcon="waterfall_chart"
+        emptyTitle="Seu lucro vai aparecer aqui"
+        emptyDescription="Com vendas e despesas registradas, mostramos do que entrou até o que sobrou, passo a passo."
+      >
+        <app-button slot="empty-action" icon="point_of_sale" (clicked)="lancar('entrada')"
+          >Lançar venda</app-button
+        >
+        <app-button
+          slot="empty-action"
+          variant="tonal"
+          icon="receipt_long"
+          (clicked)="lancar('saida')"
+          >Lançar despesa</app-button
+        >
         <app-waterfall-chart [rows]="waterfall()" />
       </app-chart-card>
     </div>
 
     <!-- 7 — Ações rápidas -->
     <div class="flex flex-wrap items-center gap-3" data-tour="acoes">
-      <app-button icon="point_of_sale" (clicked)="goTo('/movimentacoes')">Lançar venda</app-button>
-      <app-button variant="tonal" icon="receipt_long" (clicked)="goTo('/movimentacoes')"
+      <app-button icon="point_of_sale" (clicked)="lancar('entrada')">Lançar venda</app-button>
+      <app-button variant="tonal" icon="receipt_long" (clicked)="lancar('saida')"
         >Lançar despesa</app-button
       >
       <app-button variant="outlined" icon="description" (clicked)="goTo('/resultado')"
@@ -250,7 +284,7 @@
       [open]="scoreOpen()"
       (closed)="scoreOpen.set(false)"
       title="Como calculamos sua saúde"
-      [subtitle]="'Score ' + (d.health.score ?? '—') + '/100 — média ponderada de 4 pilares.'"
+      [subtitle]="'Nota ' + (d.health.score ?? '—') + '/100 — média ponderada de 4 pilares.'"
     >
       <div class="space-y-5">
         @for (p of d.health.pillars; track p.key) {
