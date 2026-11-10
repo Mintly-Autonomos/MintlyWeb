@@ -62,8 +62,11 @@ export class AiService {
     return s.status === 'active' && s.tier === 'pro';
   }
 
-  /** Depois de um 429/503 não insiste nos textos dos cards até recarregar a página. */
+  /** Limite do dia (429) ou plano sem IA (403): não insiste nos textos dos cards até recarregar a página. */
   private semTextos = false;
+  /** IA fora do ar ou lenta (503): dá uma pausa antes de tentar de novo (uma falha momentânea não vale a sessão toda). */
+  private pausaAte = 0;
+  private static readonly PAUSA_MS = 60_000;
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
@@ -105,7 +108,7 @@ export class AiService {
     month?: string,
     atuais: { kind: string }[] = [],
   ): Promise<AiInsightText[]> {
-    if (!this.disponivel || this.semTextos) return [];
+    if (!this.disponivel || this.semTextos || Date.now() < this.pausaAte) return [];
     if (environment.useMocks) {
       await delay();
       return atuais.flatMap((a, index) =>
@@ -127,7 +130,8 @@ export class AiService {
       return [];
     } catch (err) {
       const status = apiErrorInfo(err).status;
-      if (status === 403 || status === 429 || status === 503) this.semTextos = true;
+      if (status === 403 || status === 429) this.semTextos = true;
+      else if (status === 503) this.pausaAte = Date.now() + AiService.PAUSA_MS;
       return [];
     }
   }

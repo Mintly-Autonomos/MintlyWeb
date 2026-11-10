@@ -112,12 +112,31 @@ describe('AiService', () => {
       await expect(svc.textosInsights('overview')).resolves.toEqual([]);
     });
 
-    it('depois de 503 ou 429 não insiste (não gasta chamada nem tempo) até recarregar a página', async () => {
+    it('depois do 429 (limite do dia) não insiste (não gasta chamada nem tempo) até recarregar a página', async () => {
       aiClient['insights'].mockRejectedValue(httpError(429));
       await svc.textosInsights('overview');
       await svc.textosInsights('overview');
       await svc.textosInsights('overview', '2026-09');
       expect(aiClient['insights']).toHaveBeenCalledTimes(1);
+    });
+
+    it('depois de um 503 (IA fora do ar ou lenta) dá uma pausa de 1 minuto e volta a tentar, sem precisar recarregar', async () => {
+      vi.useFakeTimers();
+      try {
+        aiClient['insights']
+          .mockRejectedValueOnce(httpError(503))
+          .mockReturnValueOnce(ok({ page: 'overview', insights: textos, cached: false, ...uso }));
+        expect(await svc.textosInsights('overview')).toEqual([]);
+        // dentro da pausa: nem chama a API
+        expect(await svc.textosInsights('overview', '2026-09')).toEqual([]);
+        expect(aiClient['insights']).toHaveBeenCalledTimes(1);
+        // passado 1 minuto: tenta de novo e os textos voltam
+        vi.advanceTimersByTime(61_000);
+        expect(await svc.textosInsights('overview', '2026-09')).toEqual(textos);
+        expect(aiClient['insights']).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('um erro qualquer (500) não bloqueia as próximas tentativas', async () => {
