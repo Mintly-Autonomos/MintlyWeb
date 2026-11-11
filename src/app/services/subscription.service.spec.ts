@@ -304,8 +304,8 @@ describe('SubscriptionService (modo mock)', () => {
   });
 
   it('o total do plano no checkout vem da tabela da lib', async () => {
-    expect((await svc.checkout(12)).totalCents).toBe(153000);
-    expect((await svc.checkout(12, 'pro')).totalCents).toBe(233580);
+    expect((await svc.checkout(12)).totalCents).toBe(152898);
+    expect((await svc.checkout(12, 'pro')).totalCents).toBe(234498);
   });
 
   it('o checkout leva o tipo e o simulador aprova o Pro gravando o tipo', async () => {

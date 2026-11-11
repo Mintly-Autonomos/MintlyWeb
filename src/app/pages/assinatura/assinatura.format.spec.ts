@@ -34,14 +34,14 @@ describe('planLabel', () => {
 });
 
 describe('preço por mês e economia', () => {
-  it('3 meses: R$ 142,50 por mês e economiza R$ 22,50', () => {
+  it('3 meses: R$ 142,41 por mês e economiza R$ 22,48', () => {
     const plan = subscriptionPlanPrice(3);
-    expect(norm(planPerMonthLabel(plan))).toBe('R$ 142,50 por mês · 90 dias de acesso');
-    expect(planSavingCents(plan)).toBe(2250);
+    expect(norm(planPerMonthLabel(plan))).toBe('R$ 142,41 por mês · 90 dias de acesso');
+    expect(planSavingCents(plan)).toBe(2248);
   });
 
-  it('12 meses economiza R$ 270,00; 1 mês não economiza nada', () => {
-    expect(planSavingCents(subscriptionPlanPrice(12))).toBe(27000);
+  it('12 meses economiza R$ 269,82; 1 mês não economiza nada', () => {
+    expect(planSavingCents(subscriptionPlanPrice(12))).toBe(26982);
     expect(planSavingCents(subscriptionPlanPrice(1))).toBe(0);
   });
 });

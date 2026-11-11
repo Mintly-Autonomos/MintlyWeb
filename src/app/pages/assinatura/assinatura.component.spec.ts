@@ -98,26 +98,26 @@ describe('AssinaturaComponent', () => {
     const texts = radios(f).map((r) => norm(r.textContent));
     expect(texts).toHaveLength(4);
     expect(texts[0]).toContain('1 mês');
-    expect(texts[0]).toContain('R$ 150,00');
+    expect(texts[0]).toContain('R$ 149,90');
     expect(texts[0]).not.toContain('desconto');
     expect(texts[1]).toContain('3 meses');
     expect(texts[1]).toContain('5% de desconto');
-    expect(texts[1]).toContain('R$ 427,50');
+    expect(texts[1]).toContain('R$ 427,22');
     expect(texts[2]).toContain('10% de desconto');
-    expect(texts[2]).toContain('R$ 810,00');
+    expect(texts[2]).toContain('R$ 809,46');
     expect(texts[3]).toContain('15% de desconto');
-    expect(texts[3]).toContain('R$ 1.530,00');
+    expect(texts[3]).toContain('R$ 1.528,98');
   });
 
   it('mostra o preço por mês e quanto se economiza', async () => {
     const f = await render();
     const three = norm(radios(f)[1].textContent);
-    expect(three).toContain('R$ 142,50 por mês');
+    expect(three).toContain('R$ 142,41 por mês');
     expect(three).toContain('90 dias de acesso');
     expect(norm(radios(f)[0].textContent)).toContain('30 dias de acesso');
     expect(norm(radios(f)[2].textContent)).toContain('180 dias de acesso');
     expect(norm(radios(f)[3].textContent)).toContain('360 dias de acesso');
-    expect(three).toContain('você economiza R$ 22,50');
+    expect(three).toContain('você economiza R$ 22,48');
   });
 
   it('o plano de 3 meses já vem marcado e o botão mostra o valor a pagar', async () => {
@@ -128,7 +128,7 @@ describe('AssinaturaComponent', () => {
       'false',
       'false',
     ]);
-    expect(norm(payButton(f).textContent)).toContain('Pagar R$ 427,50');
+    expect(norm(payButton(f).textContent)).toContain('Pagar R$ 427,22');
   });
 
   it('trocar de plano muda a marcação e o valor do botão', async () => {
@@ -136,7 +136,7 @@ describe('AssinaturaComponent', () => {
     radios(f)[3].click();
     f.detectChanges();
     expect(radios(f)[3].getAttribute('aria-checked')).toBe('true');
-    expect(norm(payButton(f).textContent)).toContain('Pagar R$ 1.530,00');
+    expect(norm(payButton(f).textContent)).toContain('Pagar R$ 1.528,98');
   });
 
   it('pagar cria a cobrança do plano escolhido e vai para o endereço devolvido', async () => {
@@ -235,9 +235,9 @@ describe('AssinaturaComponent', () => {
       const texts = tierCards(f).map((r) => norm(r.textContent));
       expect(texts).toHaveLength(2);
       expect(texts[0]).toContain('Básico');
-      expect(texts[0]).toContain('R$ 150,00 por mês');
+      expect(texts[0]).toContain('R$ 149,90 por mês');
       expect(texts[1]).toContain('Pro');
-      expect(texts[1]).toContain('R$ 229,00 por mês');
+      expect(texts[1]).toContain('R$ 229,90 por mês');
       expect(texts[1]).toContain('análises do Mintly aprimoradas por IA');
       expect(texts[1]).toContain('recomendações para cada prato do cardápio');
       expect(texts[0]).not.toContain('IA');
@@ -257,14 +257,14 @@ describe('AssinaturaComponent', () => {
       f.detectChanges();
       const texts = radios(f).map((r) => norm(r.textContent));
       expect(texts).toHaveLength(4);
-      expect(texts[0]).toContain('R$ 229,00');
+      expect(texts[0]).toContain('R$ 229,90');
       expect(texts[1]).toContain('5% de desconto');
-      expect(texts[1]).toContain('R$ 652,65');
+      expect(texts[1]).toContain('R$ 655,22');
       expect(texts[2]).toContain('10% de desconto');
-      expect(texts[2]).toContain('R$ 1.236,60');
+      expect(texts[2]).toContain('R$ 1.241,46');
       expect(texts[3]).toContain('15% de desconto');
-      expect(texts[3]).toContain('R$ 2.335,80');
-      expect(norm(payButton(f).textContent)).toContain('Pagar R$ 652,65 · Pro');
+      expect(texts[3]).toContain('R$ 2.344,98');
+      expect(norm(payButton(f).textContent)).toContain('Pagar R$ 655,22 · Pro');
     });
 
     it('pagar o Pro manda o tipo junto com o período', async () => {

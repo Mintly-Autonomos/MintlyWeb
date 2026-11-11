@@ -78,8 +78,8 @@ import { maskPhoneBR } from '../../shared/format';
 
         @if (step() === 0) {
           <app-alert variant="info" title="O Mintly é por assinatura">
-            Planos de 1, 3, 6 ou 12 meses, a partir de R$ 150 por mês, com desconto nos planos mais
-            longos. Você cria a conta agora e, em seguida, escolhe o plano e faz o pagamento. O
+            Planos de 1, 3, 6 ou 12 meses, a partir de R$ 149,90 por mês, com desconto nos planos
+            mais longos. Você cria a conta agora e, em seguida, escolhe o plano e faz o pagamento. O
             acesso é liberado quando o pagamento é aprovado.
           </app-alert>
           <app-form-field label="Seu nome" icon="person">
