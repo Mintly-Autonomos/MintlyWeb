@@ -11,7 +11,7 @@ function report(
   over: Partial<ResultReport['breakEven']> = {},
   netProfit = -13360.16,
   deltas: Partial<ResultReport['deltas']> = {},
-  extra: { cmv?: number; items?: unknown[] } = {},
+  extra: { cmv?: number; items?: unknown[]; current?: Record<string, number> } = {},
 ) {
   const current = {
     grossRevenue: 8130,
@@ -22,6 +22,10 @@ function report(
     operatingExpenses: 21164.96,
     netProfit,
     netMargin: netProfit / 8130,
+    nonOperatingIncome: 0,
+    nonOperatingExpenses: 0,
+    resultAfterNonOperating: netProfit,
+    ...extra.current,
   };
   return {
     referenceMonth: '2026-10',
@@ -83,7 +87,7 @@ describe('ResultadoComponent', () => {
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
     const text = () => (root.textContent ?? '').replace(/\s+/g, ' ');
-    return { root, text };
+    return { root, text, fixture };
   }
 
   const bigNumber = (root: HTMLElement) =>
@@ -230,5 +234,63 @@ describe('ResultadoComponent', () => {
     );
     expect(root.querySelector('[role=progressbar]')).toBeNull();
     expect(text()).toContain('custos variáveis consomem toda a venda');
+  });
+
+  describe('não operacional e regime (relatório: DRE e Anexo II)', () => {
+    it('sem não operacional o DRE termina em "Resultado do mês"', () => {
+      const { text } = render(report());
+      expect(text()).toContain('Resultado do mês');
+      expect(text()).not.toContain('Entradas não operacionais');
+    });
+
+    it('com empréstimo e equipamento: linhas separadas depois do lucro operacional', () => {
+      const { text } = render(
+        report(
+          {},
+          1500,
+          {},
+          {
+            current: {
+              nonOperatingIncome: 10000,
+              nonOperatingExpenses: 4000,
+              resultAfterNonOperating: 7500,
+            },
+          },
+        ),
+      );
+      const t = text();
+      expect(t).toContain('Resultado operacional (lucro do mês)');
+      expect(t).toContain('Entradas não operacionais');
+      expect(t).toContain('(−) Saídas não operacionais');
+      expect(t).toContain('Resultado depois do não operacional');
+      expect(t.indexOf('Resultado operacional')).toBeLessThan(
+        t.indexOf('Entradas não operacionais'),
+      );
+      expect(t).toMatch(/Resultado depois do não operacional.*R\$\s?7\.500,00/);
+    });
+
+    it('regime já configurado continua clicável para trocar, inclusive para o Anexo II', async () => {
+      const { root, fixture } = render(report());
+      const restaurante = TestBed.inject(RestauranteService) as unknown as {
+        updateTaxRegime: ReturnType<typeof vi.fn>;
+      };
+      restaurante.updateTaxRegime = vi.fn(() => Promise.resolve());
+      const toast = TestBed.inject(ToastService) as unknown as {
+        success: ReturnType<typeof vi.fn>;
+      };
+
+      const chip = root.querySelector<HTMLButtonElement>('[data-testid=trocar-regime]');
+      expect(chip?.textContent).toContain('Anexo I');
+      chip!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      await (
+        fixture.componentInstance as unknown as { setRegime(r: string): Promise<void> }
+      ).setRegime('simplesNacionalAnexoII');
+      expect(restaurante.updateTaxRegime).toHaveBeenCalledWith('simplesNacionalAnexoII');
+      expect(toast.success).toHaveBeenCalledWith('Regime tributário alterado.');
+    });
   });
 });

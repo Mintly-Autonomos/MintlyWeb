@@ -26,6 +26,9 @@ function buildMockReport(): ResultReport {
     operatingExpenses: m.despesasOperacionais,
     netProfit: m.lucroLiquido,
     netMargin: m.lucroLiquido / m.receitaBruta,
+    nonOperatingIncome: 0,
+    nonOperatingExpenses: 0,
+    resultAfterNonOperating: m.lucroLiquido,
   };
   const previous = {
     grossRevenue: m.anterior.receitaBruta,
@@ -36,6 +39,9 @@ function buildMockReport(): ResultReport {
     operatingExpenses: m.anterior.despesasOperacionais,
     netProfit: m.anterior.lucroLiquido,
     netMargin: m.anterior.margemLiquida / 100,
+    nonOperatingIncome: 0,
+    nonOperatingExpenses: 0,
+    resultAfterNonOperating: m.anterior.lucroLiquido,
   };
   const delta = (a: number, b: number) => (b === 0 ? null : (a - b) / b);
 
@@ -85,6 +91,12 @@ function buildMockReport(): ResultReport {
       grossMargin: delta(current.grossMargin, previous.grossMargin),
       operatingExpenses: delta(current.operatingExpenses, previous.operatingExpenses),
       netProfit: delta(current.netProfit, previous.netProfit),
+      nonOperatingIncome: null,
+      nonOperatingExpenses: null,
+      resultAfterNonOperating: delta(
+        current.resultAfterNonOperating,
+        previous.resultAfterNonOperating,
+      ),
     },
     tax: {
       regime: TaxRegime.SimplesNacionalAnexoI,
