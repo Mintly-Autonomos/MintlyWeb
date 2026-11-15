@@ -10,6 +10,7 @@ import {
   inject,
 } from '@angular/core';
 import { chartScale, fitLabel, roundTo, scaleTicks } from './chart-scale';
+import { seriesSummary } from './chart-summary';
 
 export interface BarSeries {
   key: string;
@@ -73,6 +74,8 @@ const CHAR_PX = 6.6;
   template: `
     @if (hasData) {
       <svg
+        role="img"
+        [attr.aria-label]="ariaLabel()"
         [attr.viewBox]="'0 0 ' + size().w + ' ' + size().h"
         class="w-full h-full block"
         (mouseleave)="hover.set(null)"
@@ -271,6 +274,17 @@ export class BarChartComponent implements AfterViewInit, OnDestroy, OnChanges {
   private resizeObserver?: ResizeObserver;
 
   protected size = signal({ w: 600, h: 300 });
+
+  /** Texto alternativo: o que o gráfico mostra, para leitor de tela. */
+  protected ariaLabel(): string {
+    return seriesSummary(
+      'Gráfico de barras',
+      this._data(),
+      this._categoryKey(),
+      this._series(),
+      this.valueFormatter,
+    );
+  }
   protected hover = signal<BarRect | null>(null);
 
   protected padLeft = computed(() =>

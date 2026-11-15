@@ -33,7 +33,12 @@ describe('Movimentações: validação do formulário (relatório, seção 8.3)'
         provideRouter([]),
         {
           provide: MovimentacoesService,
-          useValue: { ...vazio, movements: signal([]), loading: signal(false) },
+          useValue: {
+            ...vazio,
+            movements: signal([]),
+            loading: signal(false),
+            loaded: signal(true),
+          },
         },
         {
           provide: ContasService,

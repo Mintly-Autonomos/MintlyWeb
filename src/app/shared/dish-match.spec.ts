@@ -64,6 +64,18 @@ describe('splitDishText', () => {
     ]);
   });
 
+  it('vírgula decimal não separa: "Bolo (1,5 kg)" e "Torta 1,5 kg" são um prato só', () => {
+    expect(splitDishText('Bolo de cenoura (1,5 kg), Brigadeiro').map((p) => p.text)).toEqual([
+      'Bolo de cenoura (1,5 kg)',
+      'Brigadeiro',
+    ]);
+    expect(splitDishText('Torta 1,5 kg + Coxinha').map((p) => p.text)).toEqual([
+      'Torta 1,5 kg',
+      'Coxinha',
+    ]);
+    expect(splitDishText('Kit (bolo, vela)').map((p) => p.text)).toEqual(['Kit (bolo, vela)']);
+  });
+
   it('a quantidade fica entre 1 e 99', () => {
     expect(splitDishText('500x Arroz')[0].qty).toBe(99);
     expect(splitDishText('0x Arroz')[0].qty).toBe(1);

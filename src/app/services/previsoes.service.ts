@@ -39,6 +39,8 @@ export class PrevisoesService {
 
   readonly base = signal<PrevBase>(baseVazia());
   readonly loading = signal(false);
+  /** Já terminou de carregar ao menos uma vez: antes disso a tela mostra o esqueleto, não um "vazio" falso. */
+  readonly loaded = signal(false);
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
@@ -125,6 +127,7 @@ export class PrevisoesService {
       this.base.set(buildBase(movs, caixaHoje, ratio, hoje));
     } finally {
       this.loading.set(false);
+      this.loaded.set(true);
     }
   }
 }

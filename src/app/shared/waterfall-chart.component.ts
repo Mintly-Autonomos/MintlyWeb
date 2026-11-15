@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { chartScale, scaleTicks } from './chart-scale';
 import { formatCompact } from './format';
+import { itemsSummary } from './chart-summary';
 
 export interface WaterfallRow {
   label: string;
@@ -60,6 +61,8 @@ interface ComputedBar extends WaterfallRow {
   template: `
     @if (hasData) {
       <svg
+        role="img"
+        [attr.aria-label]="ariaLabel()"
         [attr.viewBox]="'0 0 ' + size().w + ' ' + size().h"
         class="w-full h-full block"
         (mouseleave)="hover.set(null)"
@@ -185,6 +188,11 @@ export class WaterfallChartComponent implements AfterViewInit, OnDestroy, OnChan
   private resizeObserver?: ResizeObserver;
 
   protected size = signal({ w: 600, h: 300 });
+
+  /** Texto alternativo: cada etapa da cascata com o valor, para leitor de tela. */
+  protected ariaLabel(): string {
+    return itemsSummary('Gráfico em cascata', this._rows(), (v) => this.brl(v));
+  }
   protected hover = signal<ComputedBar | null>(null);
 
   private spans = computed(() => waterfallSpans(this.rows));

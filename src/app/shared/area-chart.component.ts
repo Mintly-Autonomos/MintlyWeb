@@ -9,6 +9,7 @@ import {
   inject,
 } from '@angular/core';
 import { chartScale, roundTo, scaleTicks } from './chart-scale';
+import { seriesSummary } from './chart-summary';
 
 export interface AreaSeries {
   key: string;
@@ -49,6 +50,8 @@ interface AxisTick {
   template: `
     @if (hasData) {
       <svg
+        role="img"
+        [attr.aria-label]="ariaLabel()"
         [attr.viewBox]="'0 0 ' + size().w + ' ' + size().h"
         class="w-full h-full block"
         (mousemove)="onMove($event)"
@@ -271,6 +274,17 @@ export class AreaChartComponent implements AfterViewInit, OnDestroy {
   private resizeObserver?: ResizeObserver;
 
   protected size = signal({ w: 600, h: 300 });
+
+  /** Texto alternativo: o que o gráfico mostra, para leitor de tela. */
+  protected ariaLabel(): string {
+    return seriesSummary(
+      'Gráfico de área',
+      this._data(),
+      this._categoryKey(),
+      this._series(),
+      this.valueFormatter,
+    );
+  }
   protected hoverIndex = signal<number | null>(null);
 
   /** Eixo dos valores: degraus redondos de qualquer tamanho; se ajusta aos dados quando a variação é pequena. */

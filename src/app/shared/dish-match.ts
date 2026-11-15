@@ -35,13 +35,37 @@ function withQuantity(raw: string): { text: string; qty: number } {
 }
 
 /**
+ * Corta o texto nos separadores "+", ";", "," e quebra de linha. A vírgula NÃO corta dentro de parênteses
+ * ("Bolo (1,5 kg)") nem entre dois números ("Torta 1,5 kg"): ali ela é casa decimal.
+ */
+function splitPieces(text: string): string[] {
+  const pieces: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '(' || ch === '[') depth++;
+    else if ((ch === ')' || ch === ']') && depth > 0) depth--;
+    const decimal = ch === ',' && /\d/.test(text[i - 1] ?? '') && /\d/.test(text[i + 1] ?? '');
+    const cut = /[+;\n\r]/.test(ch) || (ch === ',' && depth === 0 && !decimal);
+    if (cut) {
+      pieces.push(current);
+      current = '';
+    } else current += ch;
+  }
+  pieces.push(current);
+  return pieces;
+}
+
+/**
  * Separa o texto em pratos por "+", ";", "," e quebra de linha (o " e " NÃO separa: "Soyu e alho" é um
- * nome). O mesmo prato repetido soma as quantidades; pedaço vazio é descartado.
+ * nome; a vírgula de "Bolo (1,5 kg)" também não). O mesmo prato repetido soma as quantidades; pedaço
+ * vazio é descartado.
  */
 export function splitDishText(text: string | null | undefined): DishPart[] {
   if (!text) return [];
   const merged = new Map<string, DishPart>();
-  for (const piece of text.split(/[+;,\n\r]+/)) {
+  for (const piece of splitPieces(text)) {
     const raw = piece.trim();
     if (!raw) continue;
     const { text: name, qty } = withQuantity(raw);

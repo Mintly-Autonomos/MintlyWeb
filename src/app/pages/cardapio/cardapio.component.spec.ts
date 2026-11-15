@@ -47,7 +47,7 @@ describe('CardapioComponent', () => {
       setActive: vi.fn(() => Promise.resolve()),
       errorMessage: (e: unknown) => String(e),
     };
-    const toast = { success: vi.fn(), error: vi.fn() };
+    const toast = { success: vi.fn(), error: vi.fn(), successWithAction: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -234,12 +234,17 @@ describe('CardapioComponent', () => {
       expect(text()).toContain('Nenhum prato encontrado para "inativo"');
     });
 
-    it('ao inativar, avisa que o prato saiu da lista e como reativar', async () => {
-      const { c, toast } = render([ativo]);
+    it('ao inativar, avisa que o prato saiu da lista e oferece Desfazer', async () => {
+      const { c, toast, svc } = render([ativo]);
       await c.alternarAtivo(ativo);
-      expect(toast.success).toHaveBeenCalledWith(
+      expect(toast.successWithAction).toHaveBeenCalledWith(
         expect.stringContaining('Frango Ativo foi inativado e saiu da lista'),
+        expect.objectContaining({ label: 'Desfazer' }),
       );
+      const acao = toast.successWithAction.mock.calls[0][1] as { run: () => Promise<void> };
+      await acao.run();
+      expect(svc.setActive).toHaveBeenLastCalledWith(ativo.id, true);
+      expect(toast.success).toHaveBeenCalledWith('Frango Ativo voltou ao cardápio.');
     });
 
     it('ao reativar não repete o aviso de inativação', async () => {

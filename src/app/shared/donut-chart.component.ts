@@ -1,4 +1,5 @@
 import { Component, Input, signal, computed } from '@angular/core';
+import { itemsSummary } from './chart-summary';
 
 export interface DonutSlice {
   label: string;
@@ -19,7 +20,12 @@ interface Segment extends DonutSlice {
   host: { class: 'block relative w-full h-full' },
   template: `
     @if (hasData) {
-      <svg viewBox="0 0 100 100" class="w-full h-full block">
+      <svg
+        role="img"
+        [attr.aria-label]="ariaLabel()"
+        viewBox="0 0 100 100"
+        class="w-full h-full block"
+      >
         <g transform="rotate(-90 50 50)">
           <circle
             cx="50"
@@ -78,6 +84,11 @@ export class DonutChartComponent {
 
   @Input() data: DonutSlice[] = [];
   @Input() valueFormatter: (v: number) => string = (v) => String(v);
+
+  /** Texto alternativo: cada fatia com o valor, para leitor de tela. */
+  protected ariaLabel(): string {
+    return itemsSummary('Gráfico de rosca', this.data, this.valueFormatter);
+  }
 
   protected readonly radius = 34;
   protected hover = signal<string | null>(null);
