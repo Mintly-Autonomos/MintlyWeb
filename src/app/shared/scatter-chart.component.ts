@@ -10,7 +10,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { formatBRL } from './format';
+import { formatBRL, formatCompact } from './format';
 
 export type ScatterShape = 'circle' | 'square' | 'diamond' | 'triangle';
 
@@ -20,10 +20,10 @@ export interface ScatterPoint {
   categoria: string | null;
   /** Quantidade vendida. */
   x: number;
-  /** Margem em %. */
+  /** Margem por unidade, em R$. */
   y: number;
-  /** Margem por unidade, em R$ (só para o tooltip). */
-  margem: number;
+  /** Margem em % do preço (só para o tooltip). */
+  margemPct: number;
   grupo: string;
   grupoLabel: string;
   cor: string;
@@ -62,7 +62,7 @@ const M = { top: 18, right: 24, bottom: 44, left: 64 };
           [attr.viewBox]="'0 0 ' + w() + ' ' + h()"
           class="w-full h-full block"
           role="img"
-          aria-label="Dispersão: quantidade vendida por margem de cada prato"
+          aria-label="Dispersão: quantidade vendida por margem em reais de cada prato"
         >
           <!-- grade -->
           @for (t of yTicks(); track t.v) {
@@ -198,7 +198,9 @@ const M = { top: 18, right: 24, bottom: 44, left: 64 };
               class="cursor-pointer"
               tabindex="0"
               role="button"
-              [attr.aria-label]="p.nome + ': ' + p.x + ' vendidos, margem ' + p.y.toFixed(0) + '%'"
+              [attr.aria-label]="
+                p.nome + ': ' + p.x + ' vendidos, margem de ' + fmtBRL(p.y) + ' por unidade'
+              "
               (click)="pointClick.emit(p.id)"
               (keydown.enter)="pointClick.emit(p.id)"
               (mouseenter)="hover.set(p.id)"
@@ -274,8 +276,8 @@ const M = { top: 18, right: 24, bottom: 44, left: 64 };
               <div class="text-muted-foreground">{{ t.p.categoria }}</div>
             }
             <div class="mt-1 tabular-nums">
-              {{ t.p.x }} vendidos · {{ fmtBRL(t.p.margem) }} de lucro por unidade ({{
-                t.p.y.toFixed(0)
+              {{ t.p.x }} vendidos · {{ fmtBRL(t.p.y) }} de lucro por unidade ({{
+                t.p.margemPct.toFixed(0)
               }}%)
             </div>
             <div class="mt-1 font-semibold">{{ t.p.grupoLabel }}</div>
@@ -405,7 +407,7 @@ export class ScatterChartComponent implements OnInit, OnDestroy {
   protected yTicks(): { v: number; pos: number; label: string }[] {
     return [0, 1, 2, 3, 4].map((i) => {
       const v = this.yMin + ((this.yMax - this.yMin) * i) / 4;
-      return { v, pos: this.py(v), label: `${Math.round(v)}%` };
+      return { v, pos: this.py(v), label: `R$ ${formatCompact(Math.round(v))}` };
     });
   }
 

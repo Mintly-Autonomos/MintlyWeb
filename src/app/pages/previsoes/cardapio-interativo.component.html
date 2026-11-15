@@ -280,15 +280,15 @@
       >
         <span slot="title-extra">
           <app-hint
-            text="Cruzamos quanto cada item vende com quanto ele lucra, para mostrar o que proteger, promover ou repensar. Baseado na metodologia de menu engineering (Kasavana & Smith, 1982)."
+            text="Cruzamos quanto cada item vende com quanto ele deixa por unidade, em R$, para mostrar o que proteger, promover ou repensar. Método de menu engineering de Kasavana & Smith (1982): a linha vertical é 70% da média de vendidos por prato; a horizontal, a margem média do cardápio ponderada pelas vendas."
           />
         </span>
         <app-scatter-chart
           [points]="pontos()"
           [ghost]="fantasma()"
           [selectedId]="selecionado()"
-          [mediaX]="analise().mediaQtd"
-          [mediaY]="analise().mediaMargemPct"
+          [mediaX]="analise().limiarQtd"
+          [mediaY]="analise().margemMedia"
           [xMax]="xMax()"
           [yMin]="yMin()"
           [yMax]="yMax()"

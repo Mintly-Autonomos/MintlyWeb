@@ -106,7 +106,7 @@ export const QUADRANTES: Record<
     icon: 'star',
     label: 'Melhores',
     explicacao:
-      'Vendem acima da média e a margem por unidade também está acima da média. Origem: quadrante «Stars» do menu engineering (Kasavana & Smith, 1982).',
+      'Vendem bem (pelo menos 70% da média de vendas por prato) e a margem por unidade, em R$, está acima da margem média do cardápio. Origem: quadrante «Stars» do menu engineering (Kasavana & Smith, 1982).',
     recomendacao: 'Vendem muito e lucram bem. Proteja: mantenha qualidade e destaque no cardápio.',
     tone: 'mint',
     cor: 'var(--success)',
@@ -115,7 +115,7 @@ export const QUADRANTES: Record<
     icon: 'local_fire_department',
     label: 'Populares',
     explicacao:
-      'Vendem acima da média, mas a margem por unidade fica abaixo da média. Origem: quadrante «Plowhorses» do menu engineering (Kasavana & Smith, 1982).',
+      'Vendem bem (pelo menos 70% da média de vendas por prato), mas a margem por unidade, em R$, fica abaixo da margem média do cardápio. Origem: quadrante «Plowhorses» do menu engineering (Kasavana & Smith, 1982).',
     recomendacao: 'Vendem muito, mas sobra pouco. Vale ajustar preço ou baratear o custo.',
     tone: 'ocean',
     cor: 'var(--ocean)',
@@ -124,7 +124,7 @@ export const QUADRANTES: Record<
     icon: 'diamond',
     label: 'Promissores',
     explicacao:
-      'A margem por unidade está acima da média, mas vendem abaixo da média. Origem: quadrante «Puzzles» do menu engineering (Kasavana & Smith, 1982).',
+      'A margem por unidade, em R$, está acima da margem média do cardápio, mas vendem pouco (menos de 70% da média de vendas por prato). Origem: quadrante «Puzzles» do menu engineering (Kasavana & Smith, 1982).',
     recomendacao: 'Lucram bem, mas vendem pouco. Divulgue e sugira na venda.',
     tone: 'warning',
     cor: 'var(--warning)',
@@ -133,7 +133,7 @@ export const QUADRANTES: Record<
     icon: 'trending_down',
     label: 'Fracos',
     explicacao:
-      'Vendem abaixo da média e a margem por unidade também. Origem: quadrante «Dogs» do menu engineering (Kasavana & Smith, 1982).',
+      'Vendem pouco (menos de 70% da média de vendas por prato) e a margem por unidade, em R$, fica abaixo da margem média do cardápio. Origem: quadrante «Dogs» do menu engineering (Kasavana & Smith, 1982).',
     recomendacao: 'Vendem pouco e lucram pouco. Vale repensar receita, preço ou tirar do cardápio.',
     tone: 'neutral',
     cor: 'var(--muted-foreground)',
@@ -210,21 +210,34 @@ export function recalcular(p: Prato, preco: number): ItemAnalise {
   };
 }
 
+/**
+ * Regra dos 70% de Kasavana & Smith (1982): o prato é popular quando a participação dele nas vendas
+ * é pelo menos 70% da participação esperada (1/N), ou seja, vende pelo menos 70% da média por prato.
+ */
+export const FATOR_POPULARIDADE = 0.7;
+
 export interface AnaliseCardapio {
   itens: ItemAnalise[];
+  /** Média simples de vendidos por prato. */
   mediaQtd: number;
-  mediaMargemPct: number;
+  /** Linha da popularidade: 70% da média de vendidos (regra de Kasavana & Smith). */
+  limiarQtd: number;
+  /** Margem média do cardápio em R$ por unidade, ponderada pelas vendas (Σ margem × vendidos ÷ Σ vendidos). */
+  margemMedia: number;
   grupos: Record<Quadrante, ItemAnalise[]>;
 }
 
-/** Quadrante de um item pelas médias: vende mais/menos que a média × margem % maior/menor que a média. */
+/**
+ * Quadrante pelo método de Kasavana & Smith: popular = vende pelo menos a linha dos 70%; lucrativo =
+ * margem por unidade em R$ (não em %) pelo menos a margem média ponderada pelas vendas.
+ */
 export function quadranteDe(
-  i: Pick<ItemAnalise, 'qtd' | 'margemPct'>,
-  mediaQtd: number,
-  mediaMargemPct: number,
+  i: Pick<ItemAnalise, 'qtd' | 'margem'>,
+  limiarQtd: number,
+  margemMedia: number,
 ): Quadrante {
-  const pop = i.qtd >= mediaQtd;
-  const mar = i.margemPct >= mediaMargemPct;
+  const pop = i.qtd >= limiarQtd;
+  const mar = i.margem >= margemMedia;
   if (pop && mar) return 'estrela';
   if (pop && !mar) return 'cavalo';
   if (!pop && mar) return 'quebraCabeca';
@@ -238,17 +251,19 @@ export function quadranteDe(
 export function analisar(pratos: Prato[], precos: Record<string, number> = {}): AnaliseCardapio {
   const itens = pratos.filter(analisavel).map((p) => recalcular(p, precos[p.id] ?? p.price));
   const n = itens.length || 1;
-  const mediaQtd = itens.reduce((s, i) => s + i.qtd, 0) / n;
-  const mediaMargemPct = itens.reduce((s, i) => s + i.margemPct, 0) / n;
+  const totalQtd = itens.reduce((s, i) => s + i.qtd, 0);
+  const mediaQtd = totalQtd / n;
+  const limiarQtd = mediaQtd * FATOR_POPULARIDADE;
+  const margemMedia = totalQtd > 0 ? itens.reduce((s, i) => s + i.margem * i.qtd, 0) / totalQtd : 0;
   const grupos: Record<Quadrante, ItemAnalise[]> = {
     estrela: [],
     cavalo: [],
     quebraCabeca: [],
     repensar: [],
   };
-  for (const i of itens) grupos[quadranteDe(i, mediaQtd, mediaMargemPct)].push(i);
+  for (const i of itens) grupos[quadranteDe(i, limiarQtd, margemMedia)].push(i);
   for (const k of ORDEM_QUADRANTES) grupos[k].sort((a, b) => b.qtd * b.margem - a.qtd * a.margem);
-  return { itens, mediaQtd, mediaMargemPct, grupos };
+  return { itens, mediaQtd, limiarQtd, margemMedia, grupos };
 }
 
 /** Impacto no lucro do mês de trocar o preço, se o volume se mantiver. */

@@ -122,20 +122,20 @@ export class CardapioInterativoComponent {
   protected quadranteSel = computed(() => {
     const i = this.item();
     const a = this.analise();
-    return i ? quadranteDe(i, a.mediaQtd, a.mediaMargemPct) : null;
+    return i ? quadranteDe(i, a.limiarQtd, a.margemMedia) : null;
   });
 
   protected pontos = computed<ScatterPoint[]>(() => {
     const a = this.analise();
     return a.itens.map((i) => {
-      const g = quadranteDe(i, a.mediaQtd, a.mediaMargemPct);
+      const g = quadranteDe(i, a.limiarQtd, a.margemMedia);
       return {
         id: i.id,
         nome: i.nome,
         categoria: i.categoria,
         x: i.qtd,
-        y: Number(i.margemPct.toFixed(1)),
-        margem: i.margem,
+        y: Number(i.margem.toFixed(2)),
+        margemPct: i.margemPct,
         grupo: g,
         grupoLabel: QUADRANTES[g].label,
         cor: QUADRANTES[g].cor,
@@ -146,12 +146,17 @@ export class CardapioInterativoComponent {
   protected fantasma = computed(() => {
     const i = this.item();
     const o = this.original();
-    return i && o && i.alterado ? { x: o.qtd, y: Number(o.margemPct.toFixed(1)) } : null;
+    return i && o && i.alterado ? { x: o.qtd, y: Number(o.margem.toFixed(2)) } : null;
   });
   protected xMax = computed(() => Math.max(1, ...this.pontos().map((p) => p.x)) * 1.08);
-  protected yMin = computed(() => Math.min(0, ...this.pontos().map((p) => p.y)) - 6);
+  /** Eixo da margem em R$: folga de 8% da faixa (mínimo R$ 1) para os pontos não colarem na borda. */
+  private folgaY = computed(() => {
+    const ys = this.pontos().map((p) => p.y);
+    return Math.max(1, (Math.max(0, ...ys, this.fantasma()?.y ?? 0) - Math.min(0, ...ys)) * 0.08);
+  });
+  protected yMin = computed(() => Math.min(0, ...this.pontos().map((p) => p.y)) - this.folgaY());
   protected yMax = computed(
-    () => Math.max(...this.pontos().map((p) => p.y), this.fantasma()?.y ?? 0) + 8,
+    () => Math.max(0, ...this.pontos().map((p) => p.y), this.fantasma()?.y ?? 0) + this.folgaY(),
   );
 
   private pendingFocus: string | null = null;
