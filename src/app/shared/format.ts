@@ -112,3 +112,14 @@ export function localISODate(date: Date = new Date()): string {
 export function localISOMonth(date: Date = new Date()): string {
   return localISODate(date).slice(0, 7);
 }
+
+/**
+ * Faixa curta de datas para eixo de gráfico (no lugar de "Sem 1"): "2026-11-01".."2026-11-07" ->
+ * "01–07/11"; atravessando o mês, "29/10–04/11"; um dia só, "07/11".
+ */
+export function shortDateRange(from: string, to: string): string {
+  const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  if (from === to) return dm(from);
+  if (from.slice(0, 7) === to.slice(0, 7)) return `${from.slice(8, 10)}–${dm(to)}`;
+  return `${dm(from)}–${dm(to)}`;
+}
