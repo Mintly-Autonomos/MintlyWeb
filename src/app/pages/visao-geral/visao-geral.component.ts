@@ -18,7 +18,7 @@ import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-ch
 import { AreaChartComponent, AreaSeries } from '../../shared/area-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { CMV_HINT, PRIME_COST_HINT } from '../../shared/metric-hints';
-import { statDelta } from '../../shared/stat-delta';
+import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 
@@ -113,6 +113,12 @@ export class VisaoGeralComponent implements OnInit {
   protected readonly pillarDetail = pillarDetail;
   protected readonly pillarColor = pillarColor;
   protected readonly statDelta = statDelta;
+  /** Legenda das variações: "vs. dias 1 a 4 de Outubro/2026" no mês em andamento. */
+  protected notaComparacao = computed(() => {
+    const d = this.data();
+    return d ? comparisonNote(d.comparison, d.referenceMonth) : undefined;
+  });
+  protected mesParcial = computed(() => partialMonthLabel(this.data()?.comparison));
   protected readonly cmvHint = CMV_HINT;
   protected readonly primeCostHint = PRIME_COST_HINT;
   protected readonly Math = Math;
