@@ -1,5 +1,6 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CategoryBehavior } from 'mintly-lib';
+import type { ResultHistoryMonths } from 'mintly-lib';
 import { ResultadoService, OpexItem } from '../../services/resultado.service';
 import { RestauranteService, TaxRegimeKey } from '../../services/restaurante.service';
 import { IconComponent } from '../../shared/icon.component';
@@ -106,6 +107,28 @@ export class ResultadoComponent implements OnInit {
     return d ? comparisonNote(d.comparison, d.referenceMonth) : undefined;
   });
   protected mesParcial = computed(() => partialMonthLabel(this.data()?.comparison));
+  /** Mês futuro (U.4): o DRE mostra só o que já está lançado com competência nele. */
+  protected mesFuturo = computed(() => {
+    const d = this.data();
+    return !!d && d.referenceMonth > monthStr(0);
+  });
+  /** Até 12 meses à frente, como a API aceita. */
+  protected readonly mesMaximo = monthStr(12);
+  /** Meses do gráfico de histórico: 6 ou 12. */
+  protected mesesHistorico = signal<ResultHistoryMonths>(6);
+  /** Mesmo mês do ano anterior (U.4): receita e lucro com a variação. null = sem lançamento lá. */
+  protected anoAnterior = computed(() => {
+    const py = this.data()?.previousYear;
+    if (!py) return null;
+    const nota = `vs. ${fmtMonthLong(py.month)}`;
+    return {
+      mes: fmtMonthLong(py.month),
+      receita: py.lines.grossRevenue,
+      lucro: py.lines.netProfit,
+      receitaDelta: statDelta(py.deltas.grossRevenue, { note: nota }),
+      lucroDelta: statDelta(py.deltas.netProfit, { note: nota }),
+    };
+  });
   protected regimeLabel = REGIME_LABEL;
   protected fmtMonthLong = fmtMonthLong;
 
@@ -300,8 +323,14 @@ export class ResultadoComponent implements OnInit {
 
   private load(): Promise<void> {
     return this.svc
-      .refresh(this.monthQuery())
+      .refresh(this.monthQuery(), this.mesesHistorico())
       .catch(() => this.toast.error('Não foi possível carregar o resultado do mês.'));
+  }
+
+  setMesesHistorico(n: ResultHistoryMonths): void {
+    if (n === this.mesesHistorico()) return;
+    this.mesesHistorico.set(n);
+    void this.load();
   }
 
   setMonth(m: MonthOpt): void {
@@ -378,7 +407,7 @@ export class ResultadoComponent implements OnInit {
     try {
       await this.restauranteSvc.updateTaxRegime(regime);
       this.regimeOpen.set(false);
-      await this.svc.refresh(this.monthQuery());
+      await this.svc.refresh(this.monthQuery(), this.mesesHistorico());
       this.toast.success(
         trocando ? 'Regime tributário alterado.' : 'Regime tributário configurado.',
       );

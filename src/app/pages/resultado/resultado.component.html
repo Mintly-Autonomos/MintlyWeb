@@ -27,6 +27,7 @@
       >
         <input
           type="month"
+          [max]="mesMaximo"
           [value]="customMonth()"
           (change)="setCustomMonth($any($event.target).value)"
           aria-label="Mês de referência"
@@ -40,6 +41,15 @@
     <!-- 1 — Referência -->
     <div class="flex flex-wrap items-center gap-2">
       <app-chip icon="calendar_month" tone="ocean">{{ fmtMonthLong(d.referenceMonth) }}</app-chip>
+      @if (mesFuturo()) {
+        <app-chip
+          icon="event_upcoming"
+          tone="warning"
+          data-testid="mes-futuro"
+          title="Mês que ainda não começou: aparece só o que já está lançado com competência nele (encomendas, contas fixas, parcelas)."
+          >Mês futuro: só o que já está lançado</app-chip
+        >
+      }
       @if (mesParcial(); as parcial) {
         <app-chip
           icon="hourglass_top"
@@ -166,6 +176,38 @@
         }
       </div>
     </div>
+
+    @if (anoAnterior(); as aa) {
+      <div
+        class="m3-card px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]"
+        data-testid="ano-anterior"
+      >
+        <span class="inline-flex items-center gap-1.5 font-semibold">
+          <app-icon name="history" [style]="{ fontSize: '17px' }" />
+          Mesmo mês do ano passado ({{ aa.mes }})
+        </span>
+        <span class="tabular-nums">
+          Receita {{ fmtBRL(aa.receita) }}
+          @if (aa.receitaDelta; as dl) {
+            <span
+              [class]="dl.flat ? 'text-muted-foreground' : dl.up ? 'text-success' : 'text-error'"
+            >
+              · agora {{ dl.flat ? '' : dl.up ? '▲' : '▼' }} {{ dl.value }}
+            </span>
+          }
+        </span>
+        <span class="tabular-nums">
+          Lucro {{ fmtBRL(aa.lucro) }}
+          @if (aa.lucroDelta; as dl) {
+            <span
+              [class]="dl.flat ? 'text-muted-foreground' : dl.up ? 'text-success' : 'text-error'"
+            >
+              · agora {{ dl.flat ? '' : dl.up ? '▲' : '▼' }} {{ dl.value }}
+            </span>
+          }
+        </span>
+      </div>
+    }
 
     <!-- 3 — KPIs -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
@@ -446,30 +488,51 @@
     <!-- 8 — Histórico -->
     <app-chart-card
       data-tour="historico"
-      title="Seu resultado nos últimos 6 meses"
+      [title]="'Seu resultado em ' + mesesHistorico() + ' meses'"
       description="Barras mostram o lucro do mês; a linha mostra a margem."
       [loading]="loading()"
       [height]="320"
     >
-      <div
-        slot="action"
-        class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
-      >
-        @for (s of ['lucro', 'margem']; track s) {
-          <button
-            type="button"
-            (click)="serie.set($any(s))"
-            [attr.aria-pressed]="serie() === s"
-            [class]="
-              'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer ' +
-              (serie() === s
-                ? 'bg-mint-soft text-ocean'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground')
-            "
-          >
-            {{ s === 'lucro' ? 'Lucro' : 'Margem' }}
-          </button>
-        }
+      <div slot="action" class="flex flex-wrap items-center gap-2">
+        <div
+          class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
+          role="group"
+          aria-label="Meses no gráfico"
+        >
+          @for (n of [6, 12]; track n) {
+            <button
+              type="button"
+              (click)="setMesesHistorico($any(n))"
+              [attr.aria-pressed]="mesesHistorico() === n"
+              [attr.data-testid]="'historico-' + n"
+              [class]="
+                'h-8 px-3 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer ' +
+                (mesesHistorico() === n
+                  ? 'bg-mint-soft text-ocean'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+              "
+            >
+              {{ n }} meses
+            </button>
+          }
+        </div>
+        <div class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card">
+          @for (s of ['lucro', 'margem']; track s) {
+            <button
+              type="button"
+              (click)="serie.set($any(s))"
+              [attr.aria-pressed]="serie() === s"
+              [class]="
+                'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer ' +
+                (serie() === s
+                  ? 'bg-mint-soft text-ocean'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+              "
+            >
+              {{ s === 'lucro' ? 'Lucro' : 'Margem' }}
+            </button>
+          }
+        </div>
       </div>
       @if (serie() === 'lucro') {
         <app-bar-chart
