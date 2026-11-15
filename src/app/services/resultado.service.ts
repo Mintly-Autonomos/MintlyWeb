@@ -1,7 +1,14 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { CategoryBehavior, TaxRegime } from 'mintly-lib';
-import type { ResultReport, ResultQuery, OpexItem, ResultInsight, Headers } from 'mintly-lib';
+import type {
+  ResultReport,
+  ResultQuery,
+  OpexItem,
+  ResultInsight,
+  Headers,
+  ResultHistoryMonths,
+} from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { apiErrorInfo } from '../shared/api-error';
@@ -120,6 +127,7 @@ function buildMockReport(): ResultReport {
     })),
     insights,
     comparison: { kind: 'fullMonth', untilDay: null },
+    previousYear: null,
   };
 }
 
@@ -159,7 +167,7 @@ export class ResultadoService {
     return typeof err === 'object' && err !== null && apiErrorInfo(err).status === 401;
   }
 
-  async refresh(month?: string): Promise<void> {
+  async refresh(month?: string, historyMonths: ResultHistoryMonths = 6): Promise<void> {
     this.loading.set(true);
     try {
       if (environment.useMocks) {
@@ -167,7 +175,7 @@ export class ResultadoService {
         this.data.set(buildMockReport());
         return;
       }
-      const query: ResultQuery = { month };
+      const query: ResultQuery = { month, historyMonths };
       const response = await this.call((headers) => this.reportClient.result(query, headers));
       if (!response.payload) throw new Error('Resposta de /reports/result sem payload.');
       this.data.set(response.payload);
