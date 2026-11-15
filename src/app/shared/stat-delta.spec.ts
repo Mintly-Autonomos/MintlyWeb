@@ -1,4 +1,4 @@
-import { statDelta } from './stat-delta';
+import { comparisonNote, partialMonthLabel, statDelta } from './stat-delta';
 
 describe('statDelta', () => {
   it('sem dado não devolve variação (o card esconde a linha)', () => {
@@ -30,5 +30,29 @@ describe('statDelta', () => {
 
   it('carrega a legenda (nota) quando informada', () => {
     expect(statDelta(0.1, { note: 'vs. ontem' })?.note).toBe('vs. ontem');
+  });
+});
+
+describe('legenda das variações e selo de mês parcial (relatório S2.6)', () => {
+  it('mês em andamento: compara os mesmos dias do mês anterior e diz isso', () => {
+    expect(comparisonNote({ kind: 'samePeriod', untilDay: 4 }, '2026-11')).toBe(
+      'vs. dias 1 a 4 de Outubro/2026',
+    );
+    expect(comparisonNote({ kind: 'samePeriod', untilDay: 1 }, '2026-11')).toBe(
+      'vs. dia 1 de Outubro/2026',
+    );
+  });
+
+  it('mês fechado: compara com o mês anterior inteiro, pelo nome', () => {
+    expect(comparisonNote({ kind: 'fullMonth', untilDay: null }, '2026-10')).toBe(
+      'vs. Setembro/2026',
+    );
+    expect(comparisonNote(undefined, '2026-01')).toBe('vs. Dezembro/2025');
+  });
+
+  it('selo só no mês parcial', () => {
+    expect(partialMonthLabel({ kind: 'samePeriod', untilDay: 4 })).toBe('Mês parcial: até o dia 4');
+    expect(partialMonthLabel({ kind: 'fullMonth', untilDay: null })).toBeNull();
+    expect(partialMonthLabel(undefined)).toBeNull();
   });
 });

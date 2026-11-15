@@ -35,8 +35,16 @@
       </div>
     }
     @if (data(); as d) {
-      <div class="ml-auto text-[12px] text-muted-foreground">
-        Referência: {{ fmtMonthLong(d.referenceMonth) }}
+      <div class="ml-auto flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+        @if (mesParcial(); as parcial) {
+          <span
+            class="inline-flex items-center gap-1 rounded-full bg-warning/10 text-warning px-2.5 py-0.5 text-[11.5px] font-semibold"
+            data-testid="mes-parcial"
+            title="O mês ainda não acabou: os números e as variações contam só os dias que já passaram."
+            >{{ parcial }}</span
+          >
+        }
+        <span>Referência: {{ fmtMonthLong(d.referenceMonth) }}</span>
       </div>
     }
   </div>
@@ -47,7 +55,7 @@
       <app-stat-card
         label="Custos e despesas"
         [value]="fmtBRL(d.total.current)"
-        [delta]="statDelta(d.total.deltaPrevious)"
+        [delta]="statDelta(d.total.deltaPrevious, { note: notaComparacao() })"
         icon="trending_down"
         [status]="(d.total.deltaPrevious ?? 0) > 0 ? 'warning' : 'positive'"
         [spark]="historySpark()"
@@ -93,7 +101,7 @@
       <app-stat-card
         label="Taxa de plataforma"
         [value]="fmtBRL(d.platformFee.amount)"
-        [delta]="statDelta(d.platformFee.deltaPrevious)"
+        [delta]="statDelta(d.platformFee.deltaPrevious, { note: notaComparacao() })"
         icon="delivery_dining"
         status="warning"
       >
@@ -162,7 +170,7 @@
           </h3>
           <p class="text-[12.5px] text-muted-foreground mt-0.5">
             Categorias com seta abrem os itens ·
-            {{ compare() === 'anterior' ? 'vs. mês anterior' : 'vs. média 3 meses' }}
+            {{ compare() === 'anterior' ? notaComparacao() : 'vs. média 3 meses' }}
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">

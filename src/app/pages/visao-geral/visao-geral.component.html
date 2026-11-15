@@ -35,8 +35,16 @@
       </div>
     }
     @if (data(); as d) {
-      <div class="ml-auto text-[12px] text-muted-foreground">
-        Referência: {{ fmtMonthLong(d.referenceMonth) }}
+      <div class="ml-auto flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+        @if (mesParcial(); as parcial) {
+          <span
+            class="inline-flex items-center gap-1 rounded-full bg-warning/10 text-warning px-2.5 py-0.5 text-[11.5px] font-semibold"
+            data-testid="mes-parcial"
+            title="O mês ainda não acabou: os números e as variações contam só os dias que já passaram."
+            >{{ parcial }}</span
+          >
+        }
+        <span>Referência: {{ fmtMonthLong(d.referenceMonth) }}</span>
       </div>
     }
   </div>
@@ -132,7 +140,7 @@
         <app-stat-card
           label="Lucro do mês"
           [value]="fmtBRL(d.cards.netProfit.amount)"
-          [delta]="statDelta(d.cards.netProfit.delta)"
+          [delta]="statDelta(d.cards.netProfit.delta, { note: notaComparacao() })"
           icon="savings"
           status="neutral"
           [spark]="netProfitSpark()"
@@ -169,7 +177,7 @@
         <app-stat-card
           label="CMV"
           [value]="pctFmt((d.cards.cmv.pct ?? 0) * 100)"
-          [delta]="statDelta(d.cards.cmv.deltaPoints, { points: true })"
+          [delta]="statDelta(d.cards.cmv.deltaPoints, { note: notaComparacao(), points: true })"
           icon="restaurant"
           status="warning"
         >
@@ -191,7 +199,9 @@
         <app-stat-card
           label="Custo primário"
           [value]="pctFmt((d.cards.primeCost.pct ?? 0) * 100)"
-          [delta]="statDelta(d.cards.primeCost.deltaPoints, { points: true })"
+          [delta]="
+            statDelta(d.cards.primeCost.deltaPoints, { note: notaComparacao(), points: true })
+          "
           icon="stacked_bar_chart"
           status="warning"
         >
@@ -207,7 +217,7 @@
         <app-stat-card
           label="Receita do mês"
           [value]="fmtBRL(d.cards.revenue.amount)"
-          [delta]="statDelta(d.cards.revenue.delta)"
+          [delta]="statDelta(d.cards.revenue.delta, { note: notaComparacao() })"
           icon="trending_up"
           status="neutral"
           [spark]="revenueSpark()"

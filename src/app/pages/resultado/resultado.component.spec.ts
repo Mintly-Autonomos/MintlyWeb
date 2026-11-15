@@ -11,7 +11,7 @@ function report(
   over: Partial<ResultReport['breakEven']> = {},
   netProfit = -13360.16,
   deltas: Partial<ResultReport['deltas']> = {},
-  extra: { cmv?: number; items?: unknown[] } = {},
+  extra: { cmv?: number; items?: unknown[]; comparison?: unknown } = {},
 ) {
   const current = {
     grossRevenue: 8130,
@@ -50,6 +50,7 @@ function report(
     insights: [],
     operatingExpenseItems: extra.items ?? [],
     history: [],
+    comparison: extra.comparison ?? { kind: 'fullMonth', untilDay: null },
   } as unknown as ResultReport;
 }
 
@@ -147,7 +148,10 @@ describe('ResultadoComponent', () => {
     expect(neutro.text()).toContain('Sem variação vs.');
     TestBed.resetTestingModule();
     const semDado = render(report({}, 1500, { netProfit: null }));
-    expect(semDado.text()).not.toMatch(/vs\. Setembro/);
+    const chips = Array.from(semDado.root.querySelectorAll('app-chip')).map(
+      (c) => c.textContent ?? '',
+    );
+    expect(chips.some((t) => t.includes('vs.'))).toBe(false);
   });
 
   it('margem bruta e despesas também seguem o sinal da variação', () => {
@@ -230,5 +234,24 @@ describe('ResultadoComponent', () => {
     );
     expect(root.querySelector('[role=progressbar]')).toBeNull();
     expect(text()).toContain('custos variáveis consomem toda a venda');
+  });
+
+  describe('mês parcial (relatório S2.6)', () => {
+    it('mês em andamento: selo e variações "vs. dias 1 a N" do mês anterior', () => {
+      const { root, text } = render(
+        report({}, 1500, {}, { comparison: { kind: 'samePeriod', untilDay: 4 } }),
+      );
+      expect(root.querySelector('[data-testid=mes-parcial]')?.textContent).toContain(
+        'Mês parcial: até o dia 4',
+      );
+      expect(text()).toContain('vs. dias 1 a 4 de Setembro/2026');
+      expect(text()).not.toContain('vs. mês anterior');
+    });
+
+    it('mês fechado: sem selo, compara com o mês anterior pelo nome', () => {
+      const { root, text } = render(report({}, 1500));
+      expect(root.querySelector('[data-testid=mes-parcial]')).toBeNull();
+      expect(text()).toContain('vs. Setembro/2026');
+    });
   });
 });

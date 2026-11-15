@@ -15,7 +15,7 @@ import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-ch
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { statDelta } from '../../shared/stat-delta';
+import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
 import { CmvAvisoComponent, DespesaForaDoCmv } from '../../shared/cmv-aviso.component';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
@@ -99,6 +99,12 @@ export class ResultadoComponent implements OnInit {
   protected abrev = formatCompact;
   protected readonly Math = Math;
   protected readonly statDelta = statDelta;
+  /** Legenda das variações: "vs. dias 1 a 4 de Outubro/2026" no mês em andamento. */
+  protected notaComparacao = computed(() => {
+    const d = this.data();
+    return d ? comparisonNote(d.comparison, d.referenceMonth) : undefined;
+  });
+  protected mesParcial = computed(() => partialMonthLabel(this.data()?.comparison));
   protected regimeLabel = REGIME_LABEL;
   protected fmtMonthLong = fmtMonthLong;
 
