@@ -4,7 +4,7 @@ export type MonthOpt = 'esteMes' | 'mesPassado' | 'personalizado';
 export const MONTH_OPTS: { key: MonthOpt; label: string }[] = [
   { key: 'esteMes', label: 'Este mês' },
   { key: 'mesPassado', label: 'Mês passado' },
-  { key: 'personalizado', label: 'Personalizado' },
+  { key: 'personalizado', label: 'Outro mês' },
 ];
 
 /** Até este dia do mês a tela abre no mês passado: o mês corrente mal começou e o que interessa é o mês já fechado. */

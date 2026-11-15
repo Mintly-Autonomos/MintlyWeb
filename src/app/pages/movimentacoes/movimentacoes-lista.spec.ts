@@ -21,7 +21,8 @@ const mov = (i: number, over: Record<string, unknown> = {}) => ({
   type: 'income',
   status: 'received',
   value: 10,
-  date: `2026-${String(1 + (i % 12)).padStart(2, '0')}-10`,
+  // Ano passado: tudo até hoje (lançamento futuro fica escondido na lista, ver movimentacoes-futuros.spec).
+  date: `2025-${String(1 + (i % 12)).padStart(2, '0')}-10`,
   categoryId: 'c-venda',
   accountId: 'a-caixa',
   ...over,
