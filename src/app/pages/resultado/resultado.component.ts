@@ -65,6 +65,7 @@ function iconForExpense(name: string, kind: OpexItem['kind']): string {
 const REGIME_LABEL: Record<TaxRegimeKey, string> = {
   mei: 'MEI',
   simplesNacionalAnexoI: 'Simples Nacional — Anexo I',
+  simplesNacionalAnexoII: 'Simples Nacional — Anexo II',
 };
 
 @Component({
@@ -124,7 +125,9 @@ export class ResultadoComponent implements OnInit {
     if (!d) return [];
     const rev = d.current.grossRevenue || 1;
     const pct = (v: number) => (v / rev) * 100;
-    return [
+    const temNaoOperacional =
+      (d.current.nonOperatingIncome ?? 0) !== 0 || (d.current.nonOperatingExpenses ?? 0) !== 0;
+    const linhas: LinhaDRE[] = [
       {
         label: 'Receita bruta',
         valor: d.current.grossRevenue,
@@ -177,12 +180,46 @@ export class ResultadoComponent implements OnInit {
         deltaFraction: d.deltas.operatingExpenses,
       },
       {
-        label: 'Resultado do mês',
+        label: temNaoOperacional ? 'Resultado operacional (lucro do mês)' : 'Resultado do mês',
         valor: d.current.netProfit,
         tipo: 'resultado',
         pctReceita: pct(d.current.netProfit),
-        explicacao: 'O que sobrou de verdade no fim das contas.',
+        explicacao: temNaoOperacional
+          ? 'O que a operação do restaurante deixou no mês, sem empréstimos, aportes e compras de equipamento.'
+          : 'O que sobrou de verdade no fim das contas.',
         deltaFraction: d.deltas.netProfit,
+      },
+    ];
+    if (!temNaoOperacional) return linhas;
+    // Não operacional fica abaixo do lucro: mexe no dinheiro, mas não diz se o restaurante dá lucro.
+    return [
+      ...linhas,
+      {
+        label: 'Entradas não operacionais',
+        valor: d.current.nonOperatingIncome,
+        tipo: 'receita',
+        pctReceita: pct(d.current.nonOperatingIncome),
+        explicacao:
+          'Dinheiro que entrou sem ser venda: empréstimo recebido, aporte do dono, saldo inicial.',
+        deltaFraction: d.deltas.nonOperatingIncome ?? null,
+      },
+      {
+        label: 'Saídas não operacionais',
+        valor: -d.current.nonOperatingExpenses,
+        tipo: 'deducao',
+        pctReceita: -pct(d.current.nonOperatingExpenses),
+        explicacao:
+          'Gastos fora da operação: compra de equipamento, parcelas e juros de empréstimo.',
+        deltaFraction: d.deltas.nonOperatingExpenses ?? null,
+      },
+      {
+        label: 'Resultado depois do não operacional',
+        valor: d.current.resultAfterNonOperating,
+        tipo: 'subtotal',
+        pctReceita: pct(d.current.resultAfterNonOperating),
+        explicacao:
+          'Lucro do mês mais as entradas e menos as saídas não operacionais: quanto o mês mexeu no seu dinheiro.',
+        deltaFraction: d.deltas.resultAfterNonOperating ?? null,
       },
     ];
   });
@@ -336,12 +373,15 @@ export class ResultadoComponent implements OnInit {
     'Quanto você precisa vender no mês só para pagar as contas, sem lucro nem prejuízo. Ponto de equilíbrio = custos fixos ÷ margem de contribuição, que é a parte de cada real vendido que sobra depois dos impostos e dos custos variáveis.';
 
   async setRegime(regime: TaxRegimeKey): Promise<void> {
+    const trocando = !!this.data()?.tax.regime;
     this.savingRegime.set(true);
     try {
       await this.restauranteSvc.updateTaxRegime(regime);
       this.regimeOpen.set(false);
       await this.svc.refresh(this.monthQuery());
-      this.toast.success('Regime tributário configurado.');
+      this.toast.success(
+        trocando ? 'Regime tributário alterado.' : 'Regime tributário configurado.',
+      );
     } catch {
       this.toast.error('Não foi possível salvar o regime tributário.');
     } finally {
