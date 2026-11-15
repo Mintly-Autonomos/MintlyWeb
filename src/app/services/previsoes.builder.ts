@@ -66,7 +66,13 @@ export interface PrevBase {
   custoVarDia: number;
   custoFixoDia: number;
   /** Lançamentos pendentes (vencimento dentro do horizonte), já com data ajustada (vencidos → amanhã). */
-  pendentes: { date: string; tipo: 'in' | 'out'; valor: number; variavel: number }[];
+  pendentes: {
+    date: string;
+    tipo: 'in' | 'out';
+    valor: number;
+    variavel: number;
+    naoOperacional?: boolean;
+  }[];
   /** Resultado de caixa (entradas − saídas) liquidado em cada um dos últimos 30 dias. */
   realizado: Record<string, number>;
   temDados: boolean;
@@ -114,6 +120,7 @@ export function buildBase(
         tipo: m.tipo,
         valor: m.valor,
         variavel: m.variavel,
+        naoOperacional: m.naoOperacional,
       });
       continue;
     }
@@ -212,6 +219,8 @@ interface DiaSim {
   rec: number;
   cv: number;
   cf: number;
+  /** Entradas − saídas não operacionais do dia (empréstimo, parcelas, equipamento): mexem no caixa, não no lucro. */
+  naoOp: number;
 }
 
 export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase): Simulacao {
@@ -221,11 +230,13 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
 
   // Pendentes agrupados por dia (dentro do horizonte).
   const fim = addDays(base.hoje, horizonte);
-  const porDia = new Map<string, { in: number; outVar: number; outFixo: number }>();
+  const vazio = () => ({ in: 0, outVar: 0, outFixo: 0, naoOp: 0 });
+  const porDia = new Map<string, ReturnType<typeof vazio>>();
   for (const x of base.pendentes) {
     if (x.date > fim) continue;
-    const d = porDia.get(x.date) ?? { in: 0, outVar: 0, outFixo: 0 };
-    if (x.tipo === 'in') d.in += x.valor;
+    const d = porDia.get(x.date) ?? vazio();
+    if (x.naoOperacional) d.naoOp += x.tipo === 'in' ? x.valor : -x.valor;
+    else if (x.tipo === 'in') d.in += x.valor;
     else {
       d.outVar += x.valor * x.variavel;
       d.outFixo += x.valor * (1 - x.variavel);
@@ -257,10 +268,11 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
         rec: 0,
         cv: 0,
         cf: 0,
+        naoOp: 0,
       });
       continue;
     }
-    const pend = porDia.get(date) ?? { in: 0, outVar: 0, outFixo: 0 };
+    const pend = porDia.get(date) ?? vazio();
     const ritmo = ritmoNoDia(fIdx);
     const recBase = ritmo + pend.in;
     const cvBase = base.custoVarDia + pend.outVar;
@@ -278,6 +290,7 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
       rec: recSim,
       cv: cvSim,
       cf: cfBase,
+      naoOp: pend.naoOp,
     });
   }
 
@@ -305,8 +318,9 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
 
   for (let i = 0; i < serie.length; i++) {
     const d = serie[i];
-    caixaSim += d.lucroSim;
-    caixaBase += d.lucroBase;
+    // Caixa = lucro do dia + o que entra/sai fora da operação (parcela de empréstimo, aporte...).
+    caixaSim += d.lucroSim + d.naoOp;
+    caixaBase += d.lucroBase + d.naoOp;
     if (d.futuro) {
       acumSim += d.lucroSim;
       acumBase += d.lucroBase;

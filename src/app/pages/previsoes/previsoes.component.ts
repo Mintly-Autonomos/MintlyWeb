@@ -118,8 +118,18 @@ export class PrevisoesComponent implements OnInit {
   protected base = computed(() => simular(AJUSTES_ZERO, this.horizonte(), this.dados()));
   protected alterado = computed(() => !isDefault(this.ajustes()));
 
-  protected lucroMes = computed(() => simular(this.ajustes(), 30, this.dados()).resultado.lucro);
-  protected lucroMesBase = computed(() => simular(AJUSTES_ZERO, 30, this.dados()).resultado.lucro);
+  // O número grande acompanha o horizonte escolhido (antes ficava sempre em 30 dias).
+  protected lucroMes = computed(() => this.sim().resultado.lucro);
+  protected lucroMesBase = computed(() => this.base().resultado.lucro);
+
+  /**
+   * Base incompleta: o custo variável do ritmo passa da receita (ex.: compras lançadas e vendas ainda não). Aí a
+   * projeção engana (vender mais "piora" o lucro) e a tela avisa em vez de dar o veredito.
+   */
+  protected dadosIncompletos = computed(() => {
+    const d = this.dados();
+    return d.custoVarDia > 0 && d.custoVarDia > d.receitaDia;
+  });
 
   protected pontos = computed(() =>
     this.metric() === 'caixa' ? this.sim().pontos : this.sim().pontosLucro,
@@ -147,9 +157,10 @@ export class PrevisoesComponent implements OnInit {
   });
 
   protected statusMeta = computed(() => {
+    const periodo = this.horizonte() === 30 ? 'Mês' : `Próximos ${this.horizonte()} dias:`;
     const conf = {
       bom: {
-        titulo: 'Mês saudável',
+        titulo: this.horizonte() === 30 ? 'Mês saudável' : `${periodo} saudáveis`,
         icon: 'check_circle',
         text: 'text-success',
         bg: 'bg-mint-soft',
@@ -157,7 +168,7 @@ export class PrevisoesComponent implements OnInit {
         wash: 'bg-mint-soft/40',
       },
       apertado: {
-        titulo: 'Mês apertado',
+        titulo: this.horizonte() === 30 ? 'Mês apertado' : `${periodo} apertados`,
         icon: 'warning',
         text: 'text-warning',
         bg: 'bg-warning/10',
@@ -165,7 +176,7 @@ export class PrevisoesComponent implements OnInit {
         wash: 'bg-warning/5',
       },
       negativo: {
-        titulo: 'Mês no vermelho',
+        titulo: this.horizonte() === 30 ? 'Mês no vermelho' : `${periodo} no vermelho`,
         icon: 'error',
         text: 'text-error',
         bg: 'bg-error/10',
