@@ -38,8 +38,9 @@ interface Internals {
 
 describe('CategoriasComponent — onde a despesa entra no resultado', () => {
   function render(categories: Category[]) {
+    const lista = signal(categories);
     const svc = {
-      categories: signal(categories),
+      categories: lista,
       loading: signal(false),
       refresh: vi.fn(() => Promise.resolve()),
       create: vi.fn(() => Promise.resolve()),

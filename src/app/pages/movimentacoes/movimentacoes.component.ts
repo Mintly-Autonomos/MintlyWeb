@@ -173,7 +173,10 @@ export class MovimentacoesComponent implements OnInit {
   ];
 
   protected allActiveCategories = computed(() =>
-    this.categoriasSvc.categories().filter((c) => c.active),
+    this.categoriasSvc
+      .categories()
+      .filter((c) => !c.system)
+      .filter((c) => c.active),
   );
 
   protected importValidCount = computed(() => this.importRows().filter((r) => r.valid).length);
@@ -218,7 +221,10 @@ export class MovimentacoesComponent implements OnInit {
   // Só categorias ativas do mesmo tipo (receita/despesa) da movimentação — o
   // servidor rejeita a combinação direction×category.type divergente.
   protected categories = computed(() =>
-    this.categoriasSvc.categories().filter((c) => c.active && c.type === this.form().type),
+    this.categoriasSvc
+      .categories()
+      .filter((c) => !c.system)
+      .filter((c) => c.active && c.type === this.form().type),
   );
   protected paymentMethods = PAYMENT_METHODS;
   protected statusMeta = STATUS_META;
@@ -800,10 +806,12 @@ export class MovimentacoesComponent implements OnInit {
         .map((a) => a.name);
       const incomeCategorias = this.categoriasSvc
         .categories()
+        .filter((c) => !c.system)
         .filter((c) => c.active && c.type === 'income')
         .map((c) => c.name);
       const expenseCategorias = this.categoriasSvc
         .categories()
+        .filter((c) => !c.system)
         .filter((c) => c.active && c.type === 'expense')
         .map((c) => c.name);
       const categorias = [...incomeCategorias, ...expenseCategorias];
@@ -1276,6 +1284,7 @@ export class MovimentacoesComponent implements OnInit {
         {
           categories: this.categoriasSvc
             .categories()
+            .filter((c) => !c.system)
             .map((c) => ({ id: c.id, name: c.name, type: c.type })),
           accounts: this.contasSvc.accounts().map((a) => ({ id: a.id, name: a.name })),
         },

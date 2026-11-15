@@ -184,6 +184,7 @@ export class ContasService {
   private auth = inject(AuthService);
   private router = inject(Router);
   private accountClient = inject(MintlyClientService).client.financialAccountClient;
+  private movementClient = inject(MintlyClientService).client.financialMovementClient;
 
   /** Seed do modo mock (`environment.useMocks: true`, só local) — sem efeito quando false. */
   private mockStore: Account[] = (mockAccounts as Account[]).map((a) => ({
@@ -423,6 +424,52 @@ export class ContasService {
     await this.call((headers) =>
       this.accountClient.inactivateUpdate(id, { replacementDefaultId }, headers),
     );
+    await this.refresh();
+  }
+
+  /**
+   * Transferência entre contas (S3.2): tira da origem e põe no destino na mesma data, sem taxa.
+   * Não é venda nem custo: fica fora do lucro, dos custos e das entradas × saídas do caixa.
+   */
+  async transfer(input: {
+    fromId: string;
+    toId: string;
+    amount: number;
+    date: string;
+    description?: string;
+  }): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      const from = this.mockStore.find((a) => a.id === input.fromId);
+      const to = this.mockStore.find((a) => a.id === input.toId);
+      if (from) from.balance -= input.amount;
+      if (to) to.balance += input.amount;
+      await this.refresh();
+      return;
+    }
+    await this.call((headers) =>
+      this.movementClient.transfer(
+        {
+          fromAccountId: input.fromId,
+          toAccountId: input.toId,
+          amount: input.amount,
+          date: input.date,
+          ...(input.description ? { description: input.description } : {}),
+        },
+        headers,
+      ),
+    );
+    await this.refresh();
+  }
+
+  /** Saldo inicial da conta (S3.2): substitui o anterior; 0 remove. Fica fora do lucro e do imposto. */
+  async setOpeningBalance(id: string, amount: number, date: string): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      await this.refresh();
+      return;
+    }
+    await this.call((headers) => this.accountClient.openingBalance(id, { amount, date }, headers));
     await this.refresh();
   }
 }

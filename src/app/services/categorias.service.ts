@@ -46,6 +46,8 @@ export interface Category {
   subcategories: Subcategory[];
   active: boolean;
   protected?: boolean;
+  /** Categoria do sistema (transferência entre contas, saldo inicial): não aparece para escolha (S3.2). */
+  system?: boolean;
   createdBy: string;
   createdAt: string;
   updatedBy: string;
@@ -146,6 +148,7 @@ function toCategory(raw: FinancialCategory): Category {
     subcategories: (raw.subcategories ?? []).map(toSubcategory),
     active: raw.status === RecordStatus.Active,
     protected: raw.isSystem,
+    ...((raw as { systemKey?: string }).systemKey ? { system: true } : {}),
     createdBy: audit?.createdByName ?? audit?.createdBy ?? '—',
     createdAt: toISO(audit?.createdAt),
     updatedBy: audit?.updatedByName ?? audit?.updatedBy ?? '—',
