@@ -349,7 +349,7 @@ describe('SubscriptionService (modo mock)', () => {
     [1, 30],
     [3, 90],
     [6, 180],
-    [12, 360],
+    [12, 365],
   ] as const)('dias fixos: %i mês(es) libera %i dias', async (months, days) => {
     const before = Date.now();
     await svc.mockDecide((await svc.checkout(months)).paymentId, 'approved');

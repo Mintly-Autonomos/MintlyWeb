@@ -116,7 +116,7 @@ describe('AssinaturaComponent', () => {
     expect(three).toContain('90 dias de acesso');
     expect(norm(radios(f)[0].textContent)).toContain('30 dias de acesso');
     expect(norm(radios(f)[2].textContent)).toContain('180 dias de acesso');
-    expect(norm(radios(f)[3].textContent)).toContain('360 dias de acesso');
+    expect(norm(radios(f)[3].textContent)).toContain('365 dias de acesso');
     expect(three).toContain('você economiza R$ 22,48');
   });
 
@@ -369,7 +369,7 @@ describe('AssinaturaComponent', () => {
       const f = await render();
       radios(f)[3].click();
       f.detectChanges();
-      expect(norm(el(f).querySelector('label')?.textContent)).toContain('a cada 360 dias');
+      expect(norm(el(f).querySelector('label')?.textContent)).toContain('a cada 365 dias');
     });
 
     it('marcada: o botão avisa que renova e o checkout leva autoRenew', async () => {
