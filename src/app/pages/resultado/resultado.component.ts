@@ -150,7 +150,7 @@ export class ResultadoComponent implements OnInit {
         valor: -d.current.cmv,
         tipo: 'deducao',
         pctReceita: -pct(d.current.cmv),
-        explicacao: 'Quanto custou o que você vendeu: frango, óleo, molhos, bebidas e embalagens.',
+        explicacao: 'Quanto custou o que você vendeu: ingredientes, bebidas e embalagens.',
         deltaFraction: d.deltas.cmv,
       },
       {

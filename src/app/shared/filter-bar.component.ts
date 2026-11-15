@@ -46,6 +46,7 @@ export class FilterDropdownCoordinator {
             [value]="query"
             (input)="queryChange.emit($any($event.target).value)"
             [placeholder]="placeholder"
+            [attr.aria-label]="placeholder"
             class="bg-transparent outline-none text-[13px] flex-1 min-w-0 placeholder:text-muted-foreground"
           />
           @if (query) {

@@ -43,10 +43,15 @@ import type { SettlementRule } from 'mintly-lib';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
 import { matchName } from '../../shared/import-parse';
 
-// Data de hoje no calendário de quem usa (toISOString é UTC: depois das 21h já seria "amanhã").
 /** Linhas que a tabela mostra de cada vez: com milhares de lançamentos, desenhar todos de uma vez trava a tela. */
 const LINHAS_POR_VEZ = 100;
 
+/** Teto de valor de um lançamento (acima disto quase sempre é zero a mais) e datas aceitas. */
+const VALOR_MAXIMO = 10_000_000;
+const DATA_MINIMA = '2000-01-01';
+const DATA_MAXIMA = '2099-12-31';
+
+// Data de hoje no calendário de quem usa (toISOString é UTC: depois das 21h já seria "amanhã").
 function isoToday(): string {
   return localISODate();
 }
@@ -435,12 +440,47 @@ export class MovimentacoesComponent implements OnInit {
 
   protected get amountError(): string {
     const v = this.form().value;
-    return v.trim() !== '' && !(parseNumberBR(v) > 0) ? 'Informe um valor maior que zero.' : '';
+    if (v.trim() === '') return '';
+    const n = parseNumberBR(v);
+    if (!(n > 0)) return 'Informe um valor maior que zero.';
+    if (n > VALOR_MAXIMO) return 'Valor acima de R$ 10 milhões: confira se não sobrou um zero.';
+    return '';
   }
 
   protected get dateError(): string {
-    return this.form().date ? '' : 'Selecione uma data.';
+    const f = this.form();
+    if (!f.date) return 'Selecione uma data.';
+    if (f.date < DATA_MINIMA) return 'Data muito antiga: confira o ano.';
+    const hoje = isoToday();
+    if (f.date > DATA_MAXIMA) return 'Data muito distante: confira o ano.';
+    if (f.date > hoje && (f.status === 'received' || f.status === 'paid'))
+      return f.type === 'income'
+        ? 'Recebido com data no futuro: marque como Pendente ou corrija a data.'
+        : 'Pago com data no futuro: marque como Pendente ou corrija a data.';
+    return '';
   }
+
+  /** O que falta para registrar (o botão fica desabilitado e a tela diz o porquê). */
+  protected get missingFields(): string[] {
+    const f = this.form();
+    const falta: string[] = [];
+    if (!f.title.trim()) falta.push('título');
+    if (!((parseNumberBR(f.value) || 0) > 0)) falta.push('valor');
+    if (!f.date) falta.push('data');
+    if (!f.accountId) falta.push('conta');
+    if (!f.categoryId) falta.push('categoria');
+    if (!f.paymentMethod) falta.push('forma de pagamento');
+    return falta;
+  }
+
+  /** Algo foi preenchido ou mudado desde que o formulário abriu: fechar pergunta antes de descartar. */
+  protected get formDirty(): boolean {
+    return (
+      (this.creating() || this.editing() !== null) &&
+      JSON.stringify(this.form()) !== this.formInicial
+    );
+  }
+  private formInicial = '';
 
   /** Previsão de repasse: a regra da conta de plataforma aplicada à data do lançamento (só em entradas). */
   protected get settlementDate(): string | null {
@@ -477,15 +517,7 @@ export class MovimentacoesComponent implements OnInit {
   }
 
   get formValid(): boolean {
-    const f = this.form();
-    return (
-      !!f.title.trim() &&
-      (parseNumberBR(f.value) || 0) > 0 &&
-      !!f.date &&
-      !!f.accountId &&
-      !!f.categoryId &&
-      !!f.paymentMethod
-    );
+    return this.missingFields.length === 0 && !this.amountError && !this.dateError;
   }
 
   categoryName(id: string | null): string {
@@ -674,6 +706,7 @@ export class MovimentacoesComponent implements OnInit {
     this.importMode.set(false);
     this.importFile.set(null);
     this.creating.set(true);
+    this.formInicial = JSON.stringify(this.form());
   }
 
   openEdit(m: Movement): void {
@@ -698,6 +731,7 @@ export class MovimentacoesComponent implements OnInit {
     const stored = Math.round(m.value * 100);
     this.valueEdited.set((m.items ?? []).length > 0 && stored !== dishesCents(this.form().items));
     this.editing.set(m);
+    this.formInicial = JSON.stringify(this.form());
   }
 
   closeModal(): void {

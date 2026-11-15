@@ -205,7 +205,11 @@
                   </td>
                 }
                 <td class="px-4 py-3">
-                  <app-toggle [checked]="c.active" (changed)="handleToggle(c, $event)" />
+                  <app-toggle
+                    [checked]="c.active"
+                    [label]="(c.active ? 'Inativar ' : 'Reativar ') + c.name"
+                    (changed)="handleToggle(c, $event)"
+                  />
                 </td>
                 <td class="px-4 py-3">
                   <div
@@ -422,7 +426,11 @@
               Categorias inativas não aparecem ao criar movimentações
             </div>
           </div>
-          <app-toggle [checked]="form().active" (changed)="setField('active', $event)" />
+          <app-toggle
+            [checked]="form().active"
+            label="Categoria ativa"
+            (changed)="setField('active', $event)"
+          />
         </div>
       }
     </div>
