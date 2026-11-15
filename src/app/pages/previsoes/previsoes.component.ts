@@ -87,6 +87,7 @@ export class PrevisoesComponent implements OnInit {
   protected leverAtiva = signal<LeverKey>('volume');
 
   protected loading = this.svc.loading;
+  protected loaded = this.svc.loaded;
   protected fmtBRL = formatBRL;
   protected abrev = formatCompact;
   protected readonly Math = Math;

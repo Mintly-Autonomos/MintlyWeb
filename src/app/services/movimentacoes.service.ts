@@ -356,6 +356,8 @@ export class MovimentacoesService {
 
   readonly movements = signal<Movement[]>([]);
   readonly loading = signal(false);
+  /** Já terminou de carregar ao menos uma vez: antes disso a tela mostra o esqueleto, não um "vazio" falso. */
+  readonly loaded = signal(false);
 
   private get by(): string {
     return this.auth.currentUser()?.nome ?? '—';
@@ -418,6 +420,7 @@ export class MovimentacoesService {
       this.movements.set(all);
     } finally {
       this.loading.set(false);
+      this.loaded.set(true);
     }
   }
 

@@ -88,7 +88,17 @@
   </app-filter-bar>
 
   <!-- List -->
-  @if (movements().length === 0 && !loading()) {
+  @if (movements().length === 0 && (!loaded() || loading())) {
+    <div class="m3-card p-4 space-y-3" aria-busy="true" data-testid="lista-carregando">
+      <span class="sr-only">Carregando…</span>
+      <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+      <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+      <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+      <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+      <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+      <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+    </div>
+  } @else if (movements().length === 0) {
     <div class="m3-card">
       <app-empty-state
         icon="receipt_long"

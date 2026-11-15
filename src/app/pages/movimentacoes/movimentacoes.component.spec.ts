@@ -105,6 +105,7 @@ describe('MovimentacoesComponent', () => {
           useValue: {
             movements: signal([]),
             loading: signal(false),
+            loaded: signal(true),
             refresh: vi.fn().mockResolvedValue(undefined),
             previewImport,
             confirmImport: confirmImport,

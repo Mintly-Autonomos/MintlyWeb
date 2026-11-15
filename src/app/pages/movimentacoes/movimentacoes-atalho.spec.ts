@@ -24,7 +24,12 @@ describe('Movimentações: atalho ?nova= (vindo dos estados vazios)', () => {
         },
         {
           provide: MovimentacoesService,
-          useValue: { ...vazio, movements: signal([]), loading: signal(false) },
+          useValue: {
+            ...vazio,
+            movements: signal([]),
+            loading: signal(false),
+            loaded: signal(true),
+          },
         },
         { provide: ContasService, useValue: { ...vazio, accounts: signal([]) } },
         { provide: CardapioService, useValue: { ...vazio, pratos: signal([]) } },

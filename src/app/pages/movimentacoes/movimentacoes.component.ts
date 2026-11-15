@@ -210,6 +210,7 @@ export class MovimentacoesComponent implements OnInit {
   // ── Data ──────────────────────────────────────────────────────────────
   protected movements = this.svc.movements;
   protected loading = this.svc.loading;
+  protected loaded = this.svc.loaded;
   protected accounts = computed(() => this.contasSvc.accounts().filter((a) => a.active));
   // Só categorias ativas do mesmo tipo (receita/despesa) da movimentação — o
   // servidor rejeita a combinação direction×category.type divergente.

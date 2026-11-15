@@ -35,7 +35,12 @@ describe('Movimentações: lista longa e busca', () => {
         provideRouter([]),
         {
           provide: MovimentacoesService,
-          useValue: { ...vazio, movements: signal(movs), loading: signal(false) },
+          useValue: {
+            ...vazio,
+            movements: signal(movs),
+            loading: signal(false),
+            loaded: signal(true),
+          },
         },
         {
           provide: ContasService,

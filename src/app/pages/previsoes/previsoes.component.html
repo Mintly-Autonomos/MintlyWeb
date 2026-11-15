@@ -55,7 +55,15 @@
   </div>
 
   @if (tab() === 'simular') {
-    @if (!temDados()) {
+    @if (!temDados() && (!loaded() || loading())) {
+      <div class="m3-card p-4 space-y-3" aria-busy="true" data-testid="previsoes-carregando">
+        <span class="sr-only">Carregando…</span>
+        <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+        <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+        <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+        <div class="animate-pulse rounded-xl bg-muted h-10 w-full"></div>
+      </div>
+    } @else if (!temDados()) {
       <div class="rounded-2xl border border-border bg-card">
         <app-empty-state
           icon="auto_graph"
