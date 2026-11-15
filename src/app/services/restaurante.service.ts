@@ -8,7 +8,7 @@ import { apiErrorInfo } from '../shared/api-error';
 import { localISOMonth } from '../shared/format';
 import { MintlyClientService } from './mintly-client.service';
 
-export type TaxRegimeKey = 'mei' | 'simplesNacionalAnexoI';
+export type TaxRegimeKey = 'mei' | 'simplesNacionalAnexoI' | 'simplesNacionalAnexoII';
 
 export interface TaxBracket {
   index: number;
@@ -60,10 +60,12 @@ export interface RestaurantProfile {
 const REGIME_TO_LIB: Record<TaxRegimeKey, TaxRegime> = {
   mei: TaxRegime.Mei,
   simplesNacionalAnexoI: TaxRegime.SimplesNacionalAnexoI,
+  simplesNacionalAnexoII: TaxRegime.SimplesNacionalAnexoII,
 };
 const REGIME_FROM_LIB: Record<TaxRegime, TaxRegimeKey> = {
   [TaxRegime.Mei]: 'mei',
   [TaxRegime.SimplesNacionalAnexoI]: 'simplesNacionalAnexoI',
+  [TaxRegime.SimplesNacionalAnexoII]: 'simplesNacionalAnexoII',
 };
 
 function toProfile(
