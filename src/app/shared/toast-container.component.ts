@@ -18,6 +18,15 @@ import { ToastService, ToastTone } from './toast.service';
             [className]="toastColor(t.tone)"
           />
           <span class="text-sm flex-1">{{ t.message }}</span>
+          @if (t.action; as a) {
+            <button
+              type="button"
+              (click)="toastSvc.dismiss(t.id); a.run()"
+              class="text-sm font-semibold text-mint hover:underline cursor-pointer"
+            >
+              {{ a.label }}
+            </button>
+          }
           <button
             type="button"
             (click)="toastSvc.dismiss(t.id)"

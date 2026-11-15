@@ -202,5 +202,37 @@ describe('MoneyInputDirective', () => {
       expect(event.defaultPrevented).toBe(false);
       expect(input.value).toBe('');
     });
+
+    it('colar "-5000" usa o valor sem sinal e avisa (antes o menos sumia calado)', async () => {
+      const { input, paste } = await setup();
+      const report = vi.spyOn(input, 'reportValidity').mockReturnValue(false);
+      paste('-5000');
+      expect(input.value).toBe('5.000,00');
+      expect(input.validationMessage).toBe(MoneyInputDirective.NEGATIVE_HINT);
+      expect(report).toHaveBeenCalled();
+    });
+  });
+
+  describe('sinal de menos (relatório F.1)', () => {
+    it('digitar "-" não entra no campo e explica que o tipo define o sinal', async () => {
+      const { input } = await setup();
+      const report = vi.spyOn(input, 'reportValidity').mockReturnValue(false);
+      const event = new InputEvent('beforeinput', { bubbles: true, cancelable: true, data: '-' });
+      input.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(input.validationMessage).toBe(MoneyInputDirective.NEGATIVE_HINT);
+      expect(report).toHaveBeenCalled();
+    });
+
+    it('o aviso some quando a pessoa volta a digitar o valor', async () => {
+      const { input, press } = await setup();
+      vi.spyOn(input, 'reportValidity').mockReturnValue(false);
+      input.dispatchEvent(
+        new InputEvent('beforeinput', { bubbles: true, cancelable: true, data: '-' }),
+      );
+      await press('5');
+      expect(input.validationMessage).toBe('');
+      expect(input.value).toBe('0,05');
+    });
   });
 });

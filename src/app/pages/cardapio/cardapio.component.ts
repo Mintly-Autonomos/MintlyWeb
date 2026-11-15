@@ -308,13 +308,24 @@ export class CardapioComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** "Desfazer" do aviso de inativação: o prato volta como estava. */
+  private async reativar(p: Prato): Promise<void> {
+    try {
+      await this.svc.setActive(p.id, true);
+      this.toast.success(`${p.name} voltou ao cardápio.`);
+    } catch (err) {
+      this.toast.error(this.svc.errorMessage(err));
+    }
+  }
+
   async alternarAtivo(p: Prato): Promise<void> {
     this.busyId.set(p.id);
     try {
       await this.svc.setActive(p.id, !p.active);
       if (p.active) {
-        this.toast.success(
+        this.toast.successWithAction(
           `${p.name} foi inativado e saiu da lista. Para reativar, use "Mostrar inativos".`,
+          { label: 'Desfazer', run: () => this.reativar(p) },
         );
       }
     } catch (err) {

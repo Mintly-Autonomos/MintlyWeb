@@ -10,9 +10,27 @@ import { formatMoneyInput, pasteMoneyInput } from './money-input';
 export class MoneyInputDirective {
   private el = inject<ElementRef<HTMLInputElement>>(ElementRef).nativeElement;
 
+  /** O valor é sempre positivo (entrada ou saída diz o sinal): avisa em vez de engolir o "-" calado. */
+  static readonly NEGATIVE_HINT =
+    'Digite só o valor, sem o sinal de menos. Se é um gasto, escolha "Saída" no tipo.';
+
+  private warnNegative(): void {
+    this.el.setCustomValidity(MoneyInputDirective.NEGATIVE_HINT);
+    this.el.reportValidity();
+  }
+
+  @HostListener('beforeinput', ['$event'])
+  onBeforeInput(event: InputEvent): void {
+    if (event.data && /^[-−–]/.test(event.data)) {
+      event.preventDefault();
+      this.warnNegative();
+    }
+  }
+
   @HostListener('input', ['$event'])
   onInput(event: Event): void {
     const input = this.el;
+    if (input.validationMessage === MoneyInputDirective.NEGATIVE_HINT) input.setCustomValidity('');
     const caret = input.selectionStart ?? input.value.length;
     const digitsAfter = input.value.slice(caret).replace(/\D/g, '').length;
     let formatted = formatMoneyInput(input.value);
@@ -41,5 +59,6 @@ export class MoneyInputDirective {
     event.preventDefault();
     this.el.value = pasteMoneyInput(text);
     this.el.dispatchEvent(new Event('input', { bubbles: true }));
+    if (/^\s*(R\$\s*)?[-−–]/.test(text)) this.warnNegative();
   }
 }

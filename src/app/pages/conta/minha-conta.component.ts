@@ -322,6 +322,16 @@ export class MinhaContaComponent {
     }
   }
 
+  /** "Desfazer" do aviso de inativação. */
+  private async reativarMembro(m: Membro): Promise<void> {
+    try {
+      await this.svc.atualizarMembro(m.id, { status: 'active' });
+      this.toast.success(`${m.nome} voltou a ter acesso.`);
+    } catch (err) {
+      this.falha('membro', err, 'Não foi possível reativar o funcionário.');
+    }
+  }
+
   async alternarMembro(m: Membro): Promise<void> {
     this.ocupado.set('membro');
     this.limpar('membro');
@@ -329,9 +339,14 @@ export class MinhaContaComponent {
       await this.svc.atualizarMembro(m.id, {
         status: m.status === 'active' ? 'inactive' : 'active',
       });
-      this.toast.success(
-        m.status === 'active' ? `${m.nome} foi inativado.` : `${m.nome} voltou a ter acesso.`,
-      );
+      if (m.status === 'active') {
+        this.toast.successWithAction(`${m.nome} foi inativado e perdeu o acesso.`, {
+          label: 'Desfazer',
+          run: () => this.reativarMembro(m),
+        });
+      } else {
+        this.toast.success(`${m.nome} voltou a ter acesso.`);
+      }
     } catch (err) {
       this.falha('membro', err, 'Não foi possível atualizar o funcionário.');
     } finally {
