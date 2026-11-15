@@ -286,14 +286,62 @@ const M = { top: 18, right: 24, bottom: 44, left: 64 };
   `,
 })
 export class ScatterChartComponent implements OnInit, OnDestroy {
-  @Input() points: ScatterPoint[] = [];
-  @Input() ghost: { x: number; y: number } | null = null;
-  @Input() selectedId: string | null = null;
-  @Input() mediaX = 0;
-  @Input() mediaY = 0;
-  @Input() xMax = 1;
-  @Input() yMin = 0;
-  @Input() yMax = 100;
+  private readonly _points = signal<ScatterPoint[]>([]);
+  @Input() set points(value: ScatterPoint[]) {
+    this._points.set(value);
+  }
+  get points(): ScatterPoint[] {
+    return this._points();
+  }
+  private readonly _ghost = signal<{ x: number; y: number } | null>(null);
+  @Input() set ghost(value: { x: number; y: number } | null) {
+    this._ghost.set(value);
+  }
+  get ghost(): { x: number; y: number } | null {
+    return this._ghost();
+  }
+  private readonly _selectedId = signal<string | null>(null);
+  @Input() set selectedId(value: string | null) {
+    this._selectedId.set(value);
+  }
+  get selectedId(): string | null {
+    return this._selectedId();
+  }
+  private readonly _mediaX = signal<number>(0);
+  @Input() set mediaX(value: number) {
+    this._mediaX.set(value);
+  }
+  get mediaX(): number {
+    return this._mediaX();
+  }
+  private readonly _mediaY = signal<number>(0);
+  @Input() set mediaY(value: number) {
+    this._mediaY.set(value);
+  }
+  get mediaY(): number {
+    return this._mediaY();
+  }
+  private readonly _xMax = signal<number>(1);
+  @Input() set xMax(value: number) {
+    this._xMax.set(value);
+  }
+  get xMax(): number {
+    return this._xMax();
+  }
+  private readonly _yMin = signal<number>(0);
+  @Input() set yMin(value: number) {
+    this._yMin.set(value);
+  }
+  get yMin(): number {
+    return this._yMin();
+  }
+  private readonly _yMax = signal<number>(100);
+  @Input() set yMax(value: number) {
+    this._yMax.set(value);
+  }
+  get yMax(): number {
+    return this._yMax();
+  }
   @Output() pointClick = new EventEmitter<string>();
 
   protected readonly M = M;

@@ -1,7 +1,6 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Workbook } from 'exceljs';
 import {
   parseNumberBR,
   MovimentacoesService,
@@ -715,6 +714,8 @@ export class MovimentacoesComponent implements OnInit {
       const statusOpts = ['Recebido', 'Pago', 'Pendente', 'Cancelado'];
       const formas = [...this.paymentMethods];
 
+      // Carregada só aqui: a biblioteca de planilha é grande e não deve pesar na abertura do app.
+      const { Workbook } = await import('exceljs');
       const workbook = new Workbook();
 
       // Aba oculta só com as listas — serve de fonte pros dropdowns da aba principal.

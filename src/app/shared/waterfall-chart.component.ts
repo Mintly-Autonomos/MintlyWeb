@@ -166,7 +166,15 @@ export class WaterfallChartComponent implements AfterViewInit, OnDestroy, OnChan
     return this.rows.some((r) => r.value !== 0);
   }
 
-  @Input() rows: WaterfallRow[] = [];
+  private readonly _rows = signal<WaterfallRow[]>([]);
+
+  @Input() set rows(value: WaterfallRow[]) {
+    this._rows.set(value);
+  }
+
+  get rows(): WaterfallRow[] {
+    return this._rows();
+  }
 
   protected readonly padTop = 32;
   protected readonly padBottom = 24;

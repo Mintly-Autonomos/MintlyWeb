@@ -223,15 +223,47 @@ export class BarChartComponent implements AfterViewInit, OnDestroy, OnChanges {
     );
   }
 
-  @Input() data: BarChartDatum[] = [];
-  @Input() categoryKey = '';
-  @Input() series: BarSeries[] = [];
-  @Input() orientation: 'columns' | 'bars' = 'columns';
+  private readonly _data = signal<BarChartDatum[]>([]);
+
+  @Input() set data(value: BarChartDatum[]) {
+    this._data.set(value);
+  }
+
+  get data(): BarChartDatum[] {
+    return this._data();
+  }
+  private readonly _categoryKey = signal<string>('');
+  @Input() set categoryKey(value: string) {
+    this._categoryKey.set(value);
+  }
+  get categoryKey(): string {
+    return this._categoryKey();
+  }
+  private readonly _series = signal<BarSeries[]>([]);
+  @Input() set series(value: BarSeries[]) {
+    this._series.set(value);
+  }
+  get series(): BarSeries[] {
+    return this._series();
+  }
+  private readonly _orientation = signal<'columns' | 'bars'>('columns');
+  @Input() set orientation(value: 'columns' | 'bars') {
+    this._orientation.set(value);
+  }
+  get orientation(): 'columns' | 'bars' {
+    return this._orientation();
+  }
   @Input() valueFormatter: (v: number) => string = (v) => String(v);
   /** Texto do valor no tooltip (ex.: R$ exato); sem ele vale o `valueFormatter`, que no eixo costuma ser curto ("1,2k"). */
   @Input() tooltipFormatter: ((v: number) => string) | null = null;
   @Input() colorFor: ((datum: BarChartDatum, index: number) => string) | null = null;
-  @Input() categoryLabelWidth = 90;
+  private readonly _categoryLabelWidth = signal<number>(90);
+  @Input() set categoryLabelWidth(value: number) {
+    this._categoryLabelWidth.set(value);
+  }
+  get categoryLabelWidth(): number {
+    return this._categoryLabelWidth();
+  }
 
   protected readonly padTop = 16;
   protected readonly radius = 6;
