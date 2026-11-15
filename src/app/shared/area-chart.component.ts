@@ -216,13 +216,51 @@ export class AreaChartComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  @Input() data: AreaChartDatum[] = [];
-  @Input() categoryKey = '';
-  @Input() series: AreaSeries[] = [];
+  private readonly _data = signal<AreaChartDatum[]>([]);
+
+  @Input() set data(value: AreaChartDatum[]) {
+    this._data.set(value);
+  }
+
+  get data(): AreaChartDatum[] {
+    return this._data();
+  }
+  private readonly _categoryKey = signal<string>('');
+  @Input() set categoryKey(value: string) {
+    this._categoryKey.set(value);
+  }
+  get categoryKey(): string {
+    return this._categoryKey();
+  }
+  private readonly _series = signal<AreaSeries[]>([]);
+  @Input() set series(value: AreaSeries[]) {
+    this._series.set(value);
+  }
+  get series(): AreaSeries[] {
+    return this._series();
+  }
   @Input() valueFormatter: (v: number) => string = (v) => String(v);
-  @Input() zeroLine = false;
-  @Input() todayLabel = '';
-  @Input() dots: AreaDot[] = [];
+  private readonly _zeroLine = signal<boolean>(false);
+  @Input() set zeroLine(value: boolean) {
+    this._zeroLine.set(value);
+  }
+  get zeroLine(): boolean {
+    return this._zeroLine();
+  }
+  private readonly _todayLabel = signal<string>('');
+  @Input() set todayLabel(value: string) {
+    this._todayLabel.set(value);
+  }
+  get todayLabel(): string {
+    return this._todayLabel();
+  }
+  private readonly _dots = signal<AreaDot[]>([]);
+  @Input() set dots(value: AreaDot[]) {
+    this._dots.set(value);
+  }
+  get dots(): AreaDot[] {
+    return this._dots();
+  }
 
   protected readonly padTop = 24;
   protected readonly padBottom = 22;

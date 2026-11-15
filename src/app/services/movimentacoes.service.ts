@@ -1,6 +1,5 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { Workbook } from 'exceljs';
 import {
   IMPORT_MOVEMENTS_MAX_ROWS,
   MovementDirection,
@@ -714,6 +713,8 @@ export class MovimentacoesService {
       }
       rows.forEach((cells, i) => grid.push({ row: i + 1, cells }));
     } else {
+      // Carregada só aqui: a biblioteca de planilha é grande e não deve pesar na abertura do app.
+      const { Workbook } = await import('exceljs');
       const workbook = new Workbook();
       try {
         await workbook.xlsx.load(await file.arrayBuffer());

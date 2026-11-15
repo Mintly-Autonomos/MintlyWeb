@@ -140,9 +140,29 @@ export class LineChartComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  @Input() data: LineChartDatum[] = [];
-  @Input() categoryKey = '';
-  @Input() series: LineSeries[] = [];
+  private readonly _data = signal<LineChartDatum[]>([]);
+
+  @Input() set data(value: LineChartDatum[]) {
+    this._data.set(value);
+  }
+
+  get data(): LineChartDatum[] {
+    return this._data();
+  }
+  private readonly _categoryKey = signal<string>('');
+  @Input() set categoryKey(value: string) {
+    this._categoryKey.set(value);
+  }
+  get categoryKey(): string {
+    return this._categoryKey();
+  }
+  private readonly _series = signal<LineSeries[]>([]);
+  @Input() set series(value: LineSeries[]) {
+    this._series.set(value);
+  }
+  get series(): LineSeries[] {
+    return this._series();
+  }
   @Input() valueFormatter: (v: number) => string = (v) => String(v);
 
   protected readonly padTop = 12;

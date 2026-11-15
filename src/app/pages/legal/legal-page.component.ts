@@ -1,7 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LogoComponent } from '../../shared/logo.component';
-import { IconComponent } from '../../shared/icon.component';
 
 export interface LegalSection {
   title: string;
@@ -18,7 +17,7 @@ export interface LegalSection {
 @Component({
   selector: 'app-legal-page',
   standalone: true,
-  imports: [RouterLink, LogoComponent, IconComponent],
+  imports: [RouterLink, LogoComponent],
   template: `
     <div class="min-h-screen w-full bg-background text-foreground">
       <main class="mx-auto w-full max-w-[760px] px-5 py-10 md:py-14">
