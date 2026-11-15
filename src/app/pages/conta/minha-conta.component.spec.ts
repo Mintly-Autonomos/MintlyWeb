@@ -426,7 +426,17 @@ describe('MinhaContaComponent', () => {
       const input = r.q<HTMLInputElement>('arquivo-foto')!;
       Object.defineProperty(input, 'files', { value: [file], configurable: true });
       input.dispatchEvent(new Event('change'));
-      await new Promise((res) => setTimeout(res, 20));
+      // A leitura da imagem (FileReader) é assíncrona e mais lenta no CI: em vez de um tempo fixo, espera até a
+      // foto ser enviada ou o motivo da recusa aparecer (no máximo 2 s), e então mais um ciclo para a tela atualizar.
+      const terminou = () =>
+        r.auth.updateAvatar.mock.calls.length > 0 ||
+        /Formato não aceito|Imagem muito grande|Não foi possível ler/.test(r.text());
+      const inicio = Date.now();
+      while (!terminou() && Date.now() - inicio < 2000) {
+        await new Promise((res) => setTimeout(res, 10));
+        await r.settle();
+      }
+      await new Promise((res) => setTimeout(res, 10));
       await r.settle();
     }
 
