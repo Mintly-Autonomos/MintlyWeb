@@ -233,7 +233,7 @@ const NAV = [
                               class="h-8 w-8 shrink-0 rounded-xl grid place-items-center bg-warning/10 text-warning"
                             >
                               <app-icon
-                                [name]="n.kind === 'subscription' ? 'credit_card' : 'sell'"
+                                [name]="notificationIcon(n)"
                                 [style]="{ fontSize: '16px' }"
                               />
                             </span>
@@ -477,6 +477,19 @@ export class AppLayoutComponent implements OnInit {
     );
   }
 
+  protected notificationIcon(n: AppNotification): string {
+    switch (n.kind) {
+      case 'subscription':
+        return 'credit_card';
+      case 'overdue':
+        return 'event_busy';
+      case 'mei':
+        return 'account_balance';
+      default:
+        return 'sell';
+    }
+  }
+
   goToNotification(n: AppNotification): void {
     this.notificationsOpen.set(false);
     this.router.navigate([n.actionRoute], { queryParams: n.actionQueryParams });
@@ -487,6 +500,11 @@ export class AppLayoutComponent implements OnInit {
     if (n.kind === 'overview') {
       this.notifications.dismissOverviewNotice();
       this.toast.info('Tudo bem. Você encontra as recomendações no topo da Visão Geral.');
+      return;
+    }
+    if (n.kind === 'overdue' || n.kind === 'mei') {
+      this.notifications.dismissNotice(n);
+      this.toast.info('Tudo bem. Lembramos de novo na próxima vez que você entrar.');
       return;
     }
     if (n.kind === 'subscription') {

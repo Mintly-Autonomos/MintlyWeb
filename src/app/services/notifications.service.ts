@@ -1,17 +1,24 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { CardapioService, PratoAlerta } from './cardapio.service';
+import { FluxoCaixaService } from './fluxo-caixa.service';
+import { RestauranteService } from './restaurante.service';
 import { expiryNoticeText } from '../pages/assinatura/assinatura.format';
 import { mesesParado } from './cardapio.builder';
 import { formatBRL } from '../shared/format';
 
 const SUBSCRIPTION_NOTICE_ID = 'subscription-expiring';
 const OVERVIEW_NOTICE_ID = 'overview-pending';
+const OVERDUE_NOTICE_ID = 'overdue-payables';
+const MEI_NOTICE_ID = 'mei-cap-near';
 const DISMISSED_KEY = 'mintly-sub-notice-dismissed';
 
 export interface AppNotification {
-  /** 'price': aviso de preço parado; 'subscription': a assinatura está para vencer; 'overview': há itens em "O que fazer primeiro". */
-  kind: 'price' | 'subscription' | 'overview';
+  /**
+   * 'price': aviso de preço parado; 'subscription': a assinatura está para vencer; 'overview': há itens em
+   * "O que fazer primeiro"; 'overdue': contas a pagar vencidas; 'mei': faturamento do ano perto do teto do MEI.
+   */
+  kind: 'price' | 'subscription' | 'overview' | 'overdue' | 'mei';
   /** Id do prato — o aviso existe enquanto o preço não for revisado. */
   id: string;
   title: string;
@@ -32,6 +39,13 @@ export interface AppNotification {
 export class NotificationsService {
   private cardapio = inject(CardapioService);
   private auth = inject(AuthService);
+  private restaurante = inject(RestauranteService);
+  private fluxo = inject(FluxoCaixaService);
+
+  /** Contas a pagar vencidas hoje (do Fluxo de caixa). null = nada vencido ou não deu para consultar. */
+  private vencidos = signal<{ count: number; payable: number } | null>(null);
+  /** Avisos de "Agora não" neste acesso (vencidos e teto do MEI voltam na próxima vez que a pessoa entrar). */
+  private dispensados = signal<ReadonlySet<string>>(new Set());
 
   /** Data limite cujo aviso a pessoa dispensou nesta sessão (aparece de novo no próximo acesso). */
   private dismissedFor = signal<string | null>(this.readDismissed());
@@ -42,6 +56,8 @@ export class NotificationsService {
   private overviewDispensado = signal(false);
 
   readonly notifications = computed<AppNotification[]>(() => [
+    ...this.overdueNotice(),
+    ...this.meiNotice(),
     ...this.overviewNotice(),
     ...this.subscriptionNotice(),
     ...this.cardapio.alertas().map((a) => this.toNotification(a)),
@@ -55,6 +71,55 @@ export class NotificationsService {
 
   dismissOverviewNotice(): void {
     this.overviewDispensado.set(true);
+  }
+
+  /** "Agora não" dos vencidos e do teto do MEI: some até o próximo acesso. */
+  dismissNotice(n: AppNotification): void {
+    this.dispensados.update((set) => new Set([...set, n.id]));
+  }
+
+  private overdueNotice(): AppNotification[] {
+    const v = this.vencidos();
+    if (!v || this.dispensados().has(OVERDUE_NOTICE_ID)) return [];
+    return [
+      {
+        kind: 'overdue',
+        id: OVERDUE_NOTICE_ID,
+        title: `${formatBRL(v.payable)} em contas a pagar vencidas`,
+        description:
+          'Pague ou marque como pago o que já foi quitado: enquanto isso, o caixa e a Saúde do negócio contam essas contas como em aberto.',
+        itemName: 'Contas vencidas',
+        actionLabel: 'Ver vencimentos',
+        actionRoute: '/fluxo-de-caixa',
+        actionQueryParams: {},
+        dismissLabel: 'Agora não',
+      },
+    ];
+  }
+
+  private meiNotice(): AppNotification[] {
+    const i = this.restaurante.profile()?.tax.insights.find((x) => x.kind === 'meiCapNear');
+    if (!i || i.kind !== 'meiCapNear' || this.dispensados().has(MEI_NOTICE_ID)) return [];
+    const pct = Math.round(i.usedPct * 100);
+    const passou = i.usedPct >= 1;
+    const conselho = passou
+      ? 'Acima do teto, o MEI é desenquadrado: converse com seu contador sobre a mudança para o Simples Nacional.'
+      : 'Se passar do teto, o MEI é desenquadrado: vale planejar com seu contador a mudança para o Simples Nacional.';
+    return [
+      {
+        kind: 'mei',
+        id: MEI_NOTICE_ID,
+        title: passou
+          ? 'O faturamento do ano passou do teto do MEI'
+          : `O faturamento do ano já está em ${pct}% do teto do MEI`,
+        description: `${formatBRL(i.yearToDateRevenue)} de ${formatBRL(i.annualLimit)} no ano. ${conselho}`,
+        itemName: 'Teto do MEI',
+        actionLabel: 'Ver resultado',
+        actionRoute: '/resultado',
+        actionQueryParams: {},
+        dismissLabel: 'Agora não',
+      },
+    ];
   }
 
   private overviewNotice(): AppNotification[] {
@@ -131,7 +196,26 @@ export class NotificationsService {
   }
 
   async refresh(): Promise<void> {
-    await this.cardapio.refreshAlertas();
+    await Promise.all([
+      this.cardapio.refreshAlertas(),
+      this.refreshVencidos(),
+      // O teto do MEI vem do perfil do restaurante; se nenhuma tela carregou ainda, carrega aqui.
+      this.restaurante.profile()
+        ? Promise.resolve()
+        : this.restaurante.refresh().catch(() => undefined),
+    ]);
+  }
+
+  /** Silencioso: sem conseguir consultar, só não mostra o aviso de vencidos. */
+  private async refreshVencidos(): Promise<void> {
+    try {
+      const { overdue } = await this.fluxo.fetchReport(7);
+      this.vencidos.set(
+        overdue.payable > 0 ? { count: overdue.count, payable: overdue.payable } : null,
+      );
+    } catch {
+      this.vencidos.set(null);
+    }
   }
 
   /** "Não quero mudar": mantém o preço e silencia o aviso. */

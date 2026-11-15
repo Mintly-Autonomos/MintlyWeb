@@ -281,17 +281,21 @@ export class FluxoCaixaService {
   async refresh(horizonte: number): Promise<void> {
     this.loading.set(true);
     try {
-      if (environment.useMocks) {
-        await delay();
-        this.data.set(buildMockReport(horizonte));
-        return;
-      }
-      const query: CashFlowQuery = { horizon: horizonte };
-      const response = await this.call((headers) => this.reportClient.cashFlow(query, headers));
-      if (!response.payload) throw new Error('Resposta de /reports/cash-flow sem payload.');
-      this.data.set(response.payload);
+      this.data.set(await this.fetchReport(horizonte));
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /** Busca o relatório sem mexer no que a tela mostra (o sino usa para saber dos vencidos). */
+  async fetchReport(horizonte: number): Promise<CashFlowReport> {
+    if (environment.useMocks) {
+      await delay();
+      return buildMockReport(horizonte);
+    }
+    const query: CashFlowQuery = { horizon: horizonte };
+    const response = await this.call((headers) => this.reportClient.cashFlow(query, headers));
+    if (!response.payload) throw new Error('Resposta de /reports/cash-flow sem payload.');
+    return response.payload;
   }
 }
