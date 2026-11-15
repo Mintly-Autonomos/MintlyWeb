@@ -223,6 +223,16 @@ interface DiaSim {
   naoOp: number;
 }
 
+/**
+ * Ritmo de vendas que já virou dinheiro no dia k do futuro: a parte com prazo P só a partir do dia P+1
+ * (as vendas de antes disso já estão nos repasses pendentes). Sem a separação por prazo, vale o ritmo todo.
+ */
+export function ritmoVendasNoDia(base: PrevBase, k: number): number {
+  return base.receitaPrazos
+    ? base.receitaPrazos.reduce((s, r) => s + (k > r.prazo ? r.porDia : 0), 0)
+    : base.receitaDia;
+}
+
 export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase): Simulacao {
   const p = ajustes.preco / 100;
   const v = ajustes.volume / 100;
@@ -244,12 +254,7 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     porDia.set(x.date, d);
   }
 
-  // Ritmo de vendas que já virou dinheiro no dia k do futuro: a parte com prazo P só a partir do dia P+1
-  // (as vendas de antes disso já estão nos repasses pendentes). Sem a separação por prazo, vale o ritmo todo.
-  const ritmoNoDia = (k: number): number =>
-    base.receitaPrazos
-      ? base.receitaPrazos.reduce((s, r) => s + (k > r.prazo ? r.porDia : 0), 0)
-      : base.receitaDia;
+  const ritmoNoDia = (k: number) => ritmoVendasNoDia(base, k);
 
   const ini = addDays(base.hoje, -(PASSADO - 1));
   const serie: DiaSim[] = [];
@@ -386,4 +391,37 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
   };
 
   return { resultado, pontos, pontosLucro, acumSim: money(acumSim), acumBase: money(acumBase) };
+}
+
+/**
+ * Da projeção do Fluxo de caixa (só o que já está lançado) até o caixa das Previsões (relatório S2.2).
+ * `lancado` é o saldo do Fluxo no fim do horizonte; o resto é o que as Previsões somam a ele:
+ * vendas e custos no ritmo dos últimos 30 dias e o imposto sobre as vendas do período. `ajustes` fecha a
+ * conta (vencidos contados para amanhã, diferença no caixa de hoje) e costuma ser pequeno.
+ */
+export interface Conciliacao {
+  lancado: number;
+  ritmoVendas: number;
+  ritmoCustos: number;
+  imposto: number;
+  ajustes: number;
+  previsao: number;
+}
+
+export function conciliar(base: PrevBase, horizonte: Horizonte, lancado: number): Conciliacao {
+  const { resultado } = simular(AJUSTES_ZERO, horizonte, base);
+  let ritmoVendas = 0;
+  for (let k = 1; k <= horizonte; k++) ritmoVendas += ritmoVendasNoDia(base, k);
+  const ritmoCustos = (base.custoVarDia + base.custoFixoDia) * horizonte;
+  const imposto = resultado.impostos;
+  const previsao = resultado.caixaFim;
+  const ajustes = previsao - (lancado + ritmoVendas - ritmoCustos - imposto);
+  return {
+    lancado: money(lancado),
+    ritmoVendas: money(ritmoVendas),
+    ritmoCustos: money(ritmoCustos),
+    imposto: money(imposto),
+    ajustes: money(ajustes),
+    previsao: money(previsao),
+  };
 }
