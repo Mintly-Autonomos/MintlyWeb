@@ -125,19 +125,44 @@ const cardapio = PROTOTIPO.map(([name, category, soldPerMonth, price, cost]) =>
 );
 const nomes = (xs: { nome: string }[]) => xs.map((x) => x.nome).sort();
 
-describe('analisar (menu engineering, igual ao protótipo)', () => {
-  it('classifica o cardápio do protótipo nos mesmos quatro grupos', () => {
+describe('analisar (menu engineering de Kasavana & Smith)', () => {
+  it('popular = pelo menos 70% da média de vendidos; lucrativo = margem em R$ acima da média ponderada', () => {
     const a = analisar(cardapio);
     expect(a.mediaQtd).toBeCloseTo(170.71, 2);
-    expect(a.mediaMargemPct).toBeCloseTo(56.21, 2);
+    expect(a.limiarQtd).toBeCloseTo(119.5, 2); // 70% de 170,71
+    // Σ (preço − custo) × vendidos ÷ Σ vendidos
+    expect(a.margemMedia).toBeCloseTo(56_570 / 2_390, 6);
     expect(nomes(a.grupos.estrela)).toEqual(
-      ['Batata Coreana', 'Frango Soy Garlic', 'Frango Yangnyeom', 'Refrigerante lata'].sort(),
+      [
+        'Frango Yangnyeom',
+        'Frango Soy Garlic',
+        'Frango Honey Butter',
+        'Frango ao Alho Crocante',
+      ].sort(),
     );
-    expect(nomes(a.grupos.cavalo)).toEqual(['Frango Honey Butter']);
-    expect(nomes(a.grupos.quebraCabeca)).toEqual(
-      ['Cerveja long neck', 'Chá gelado de cevada', 'Soju'].sort(),
+    // Bebidas e acompanhamentos baratos: margem % alta, mas pouco R$ por unidade → Populares, não Melhores.
+    expect(nomes(a.grupos.cavalo)).toEqual(
+      ['Batata Coreana', 'Tteokbokki', 'Cerveja long neck', 'Refrigerante lata'].sort(),
     );
-    expect(a.grupos.repensar).toHaveLength(6);
+    expect(nomes(a.grupos.quebraCabeca)).toEqual(['Frango Cheese Powder']);
+    expect(a.grupos.repensar).toHaveLength(5);
+  });
+
+  it('a margem que conta é em R$, não em %: 62,5% num refrigerante de R$ 8 não vence R$ 38 de um frango', () => {
+    const a = analisar(cardapio);
+    const refri = a.itens.find((i) => i.nome === 'Refrigerante lata')!;
+    const frango = a.itens.find((i) => i.nome === 'Frango Yangnyeom')!;
+    expect(refri.margemPct).toBeGreaterThan(frango.margemPct);
+    expect(a.grupos.estrela.map((i) => i.nome)).toContain('Frango Yangnyeom');
+    expect(a.grupos.estrela.map((i) => i.nome)).not.toContain('Refrigerante lata');
+  });
+
+  it('prato abaixo da média de vendidos mas acima dos 70% ainda é popular', () => {
+    const a = analisar(cardapio);
+    const frango = a.itens.find((i) => i.nome === 'Frango ao Alho Crocante')!;
+    expect(frango.qtd).toBeLessThan(a.mediaQtd); // 132 < 170,71
+    expect(frango.qtd).toBeGreaterThanOrEqual(a.limiarQtd); // 132 ≥ 119,5
+    expect(a.grupos.estrela.map((i) => i.nome)).toContain('Frango ao Alho Crocante');
   });
 
   it('ordena cada grupo por vendidos × margem, do maior para o menor', () => {
@@ -147,18 +172,20 @@ describe('analisar (menu engineering, igual ao protótipo)', () => {
     expect(valores).toEqual([...valores].sort((x, y) => y - x));
   });
 
-  it('simular o preço recalcula margem e médias, e o prato pode mudar de grupo', () => {
+  it('simular o preço recalcula margem e média, e o prato pode mudar de grupo', () => {
     const base = analisar(cardapio);
-    expect(base.grupos.estrela.map((i) => i.nome)).toContain('Refrigerante lata');
-    // Refrigerante de R$ 8 para R$ 12: margem de 62,5% para 75%
-    const sim = analisar(cardapio, { 'Refrigerante lata': 12 });
-    const refri = sim.itens.find((i) => i.nome === 'Refrigerante lata')!;
-    expect(refri.margemPct).toBeCloseTo(75, 1);
-    expect(refri.alterado).toBe(true);
-    expect(sim.mediaMargemPct).toBeCloseTo(57.1, 1); // a média sobe com o preço simulado
-    // um preço bem baixo derruba a margem % e tira o Refrigerante dos Melhores
-    const baixo = analisar(cardapio, { 'Refrigerante lata': 3.5 });
-    expect(baixo.grupos.estrela.map((i) => i.nome)).not.toContain('Refrigerante lata');
+    expect(base.grupos.cavalo.map((i) => i.nome)).toContain('Tteokbokki');
+    // Tteokbokki de R$ 34 para R$ 40: margem de R$ 19 para R$ 25
+    const sim = analisar(cardapio, { Tteokbokki: 40 });
+    const t = sim.itens.find((i) => i.nome === 'Tteokbokki')!;
+    expect(t.margem).toBe(25);
+    expect(t.alterado).toBe(true);
+    // a média ponderada sobe com o preço simulado (+ R$ 6 × 164 vendidos)
+    expect(sim.margemMedia).toBeCloseTo((56_570 + 6 * 164) / 2_390, 6);
+    expect(sim.grupos.estrela.map((i) => i.nome)).toContain('Tteokbokki');
+    // um preço bem baixo tira o Frango Yangnyeom dos Melhores
+    const baixo = analisar(cardapio, { 'Frango Yangnyeom': 40 });
+    expect(baixo.grupos.estrela.map((i) => i.nome)).not.toContain('Frango Yangnyeom');
   });
 
   it('impacto no mês = diferença de margem × vendidos', () => {
@@ -189,6 +216,7 @@ describe('analisar (menu engineering, igual ao protótipo)', () => {
     const a = analisar([]);
     expect(a.itens).toEqual([]);
     expect(a.grupos.estrela).toEqual([]);
+    expect([a.mediaQtd, a.limiarQtd, a.margemMedia]).toEqual([0, 0, 0]);
   });
 });
 
