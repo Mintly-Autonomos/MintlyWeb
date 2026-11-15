@@ -49,7 +49,7 @@ const NAV = [
       <!-- Sidebar -->
       <aside
         data-tour="menu-lateral"
-        class="w-[260px] shrink-0 hidden md:flex flex-col border-r border-border bg-sidebar sticky top-0 h-screen"
+        class="w-[260px] shrink-0 hidden lg:flex flex-col border-r border-border bg-sidebar sticky top-0 h-screen"
       >
         <div class="px-6 py-5">
           <app-logo [size]="30" tagline="Gestão para o seu negócio" to="/" />
@@ -106,7 +106,7 @@ const NAV = [
 
       <!-- Menu no celular: o mesmo menu da barra lateral, em uma gaveta -->
       @if (menuOpen()) {
-        <div class="fixed inset-0 z-50 md:hidden">
+        <div class="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
             aria-label="Fechar menu"
@@ -158,7 +158,7 @@ const NAV = [
             aria-label="Abrir menu"
             data-tour="menu-celular"
             [attr.aria-expanded]="menuOpen()"
-            class="md:hidden h-10 w-10 -ml-1 shrink-0 rounded-full border border-border grid place-items-center hover:bg-muted cursor-pointer"
+            class="lg:hidden h-10 w-10 -ml-1 shrink-0 rounded-full border border-border grid place-items-center hover:bg-muted cursor-pointer"
           >
             <app-icon name="menu" [style]="{ fontSize: '22px' }" />
           </button>
@@ -396,7 +396,7 @@ export class AppLayoutComponent implements OnInit {
   protected navItems = NAV;
   private toast = inject(ToastService);
   protected notificationsOpen = signal(false);
-  /** Gaveta do menu no celular (abaixo de 768 px a barra lateral não aparece). */
+  /** Gaveta do menu no celular (abaixo de 1024 px a barra lateral não aparece: no tablet ela comia um terço da tela). */
   protected menuOpen = signal(false);
   protected userMenuOpen = signal(false);
   /** Modal "Minha conta" (dados do usuário e do restaurante). */
@@ -413,7 +413,7 @@ export class AppLayoutComponent implements OnInit {
   }
 
   protected closeMenuOnDesktop(): void {
-    if (window.innerWidth >= 768) this.menuOpen.set(false);
+    if (window.innerWidth >= 1024) this.menuOpen.set(false);
   }
 
   ngOnInit(): void {
