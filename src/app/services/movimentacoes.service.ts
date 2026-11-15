@@ -30,6 +30,7 @@ import type { ImportField } from '../shared/import-parse';
 import { localISODate } from '../shared/format';
 import { MintlyClientService } from './mintly-client.service';
 import mockMovements from '../mocks/mock_movements.json';
+import { loadWorkbook } from '../shared/exceljs-loader';
 
 export type MovType = 'income' | 'expense';
 export type MovStatus = 'received' | 'paid' | 'pending' | 'cancelled';
@@ -717,7 +718,7 @@ export class MovimentacoesService {
       rows.forEach((cells, i) => grid.push({ row: i + 1, cells }));
     } else {
       // Carregada só aqui: a biblioteca de planilha é grande e não deve pesar na abertura do app.
-      const { Workbook } = await import('exceljs');
+      const Workbook = await loadWorkbook();
       const workbook = new Workbook();
       try {
         await workbook.xlsx.load(await file.arrayBuffer());

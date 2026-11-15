@@ -42,6 +42,7 @@ import { describeSettlementRule, resolveSettlementRule, settlementDueDate } from
 import type { SettlementRule } from 'mintly-lib';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
 import { matchName, avisosImportacao } from '../../shared/import-parse';
+import { loadWorkbook } from '../../shared/exceljs-loader';
 
 /** Linhas que a tabela mostra de cada vez: com milhares de lançamentos, desenhar todos de uma vez trava a tela. */
 const LINHAS_POR_VEZ = 100;
@@ -811,7 +812,7 @@ export class MovimentacoesComponent implements OnInit {
       const formas = [...this.paymentMethods];
 
       // Carregada só aqui: a biblioteca de planilha é grande e não deve pesar na abertura do app.
-      const { Workbook } = await import('exceljs');
+      const Workbook = await loadWorkbook();
       const workbook = new Workbook();
 
       // Aba oculta só com as listas — serve de fonte pros dropdowns da aba principal.
