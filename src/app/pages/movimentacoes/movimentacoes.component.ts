@@ -292,10 +292,37 @@ export class MovimentacoesComponent implements OnInit {
       .sort((a, b) => b.date.localeCompare(a.date));
   });
 
+  /**
+   * Lançamentos com data depois de hoje (agendados, parcelas, boletos futuros). Em "Todos" ficam
+   * escondidos atrás da faixa "N lançamentos futuros": a lista abre em hoje, não em dezembro.
+   */
+  protected futuros = computed(() => {
+    const hoje = isoToday();
+    return this.filtered().filter((m) => m.date > hoje);
+  });
+  /** O mais próximo dos futuros (a lista é do mais novo para o mais antigo). */
+  protected proximoFuturo = computed(() => this.futuros().at(-1) ?? null);
+  /** Só no período "Todos" (no personalizado a pessoa escolheu as datas; os outros já param em hoje). */
+  protected escondeFuturos = computed(() => this.period() === 'all' && this.futuros().length > 0);
+  protected mostrarFuturos = signal(false);
+  /** O que a tabela lista: sem os futuros, a não ser que a pessoa peça. */
+  protected lista = computed(() =>
+    this.escondeFuturos() && !this.mostrarFuturos()
+      ? this.filtered().filter((m) => m.date <= isoToday())
+      : this.filtered(),
+  );
+  /** Com os futuros à mostra, o divisor "Hoje" entra antes da primeira linha de hoje ou do passado. */
+  protected primeiraAteHoje = computed(() => {
+    if (!this.escondeFuturos() || !this.mostrarFuturos()) return null;
+    const hoje = isoToday();
+    return this.lista().find((m) => m.date <= hoje)?.id ?? null;
+  });
+  protected readonly hojeCurto = fmtShortDate(isoToday());
+
   /** Quantas linhas a tabela mostra (cresce com "Mostrar mais"; volta a 100 quando o filtro muda). */
   protected readonly Math = Math;
   protected limite = signal(LINHAS_POR_VEZ);
-  protected visiveis = computed(() => this.filtered().slice(0, this.limite()));
+  protected visiveis = computed(() => this.lista().slice(0, this.limite()));
   private resetLimite = effect(() => {
     this.query();
     this.typeFilter();
@@ -303,8 +330,13 @@ export class MovimentacoesComponent implements OnInit {
     this.period();
     this.dateFrom();
     this.dateTo();
+    this.mostrarFuturos();
     this.limite.set(LINHAS_POR_VEZ);
   });
+
+  alternarFuturos(): void {
+    this.mostrarFuturos.update((v) => !v);
+  }
 
   mostrarMais(): void {
     this.limite.update((n) => n + LINHAS_POR_VEZ);

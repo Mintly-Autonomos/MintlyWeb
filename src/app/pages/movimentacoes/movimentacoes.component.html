@@ -132,6 +132,30 @@
     />
   } @else {
     <div class="m3-card overflow-hidden" data-tour="tabela">
+      @if (escondeFuturos()) {
+        <div
+          class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-border bg-muted/30 text-[12.5px]"
+          data-testid="faixa-futuros"
+        >
+          <span class="inline-flex items-center gap-1.5 text-muted-foreground">
+            <app-icon name="event_upcoming" [style]="{ fontSize: '16px' }" />
+            {{ futuros().length }}
+            {{ futuros().length === 1 ? 'lançamento futuro' : 'lançamentos futuros' }}
+            @if (proximoFuturo(); as p) {
+              <span>· o próximo em {{ fmtShort(p.date) }}</span>
+            }
+          </span>
+          <button
+            type="button"
+            (click)="alternarFuturos()"
+            class="h-7 px-2.5 rounded-lg font-semibold text-ocean hover:bg-muted cursor-pointer"
+            [attr.aria-expanded]="mostrarFuturos()"
+            data-testid="alternar-futuros"
+          >
+            {{ mostrarFuturos() ? 'Esconder futuros' : 'Mostrar futuros' }}
+          </button>
+        </div>
+      }
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="max-sm:hidden">
@@ -148,6 +172,16 @@
           </thead>
           <tbody>
             @for (m of visiveis(); track m.id) {
+              @if (m.id === primeiraAteHoje()) {
+                <tr class="bg-mint-soft/40 max-sm:block" data-testid="divisor-hoje">
+                  <td
+                    colspan="6"
+                    class="px-4 py-1.5 text-[11.5px] font-semibold uppercase tracking-wide text-ocean max-sm:block"
+                  >
+                    Hoje · {{ hojeCurto }}
+                  </td>
+                </tr>
+              }
               <tr
                 class="border-b border-border/50 hover:bg-muted/30 transition group max-sm:grid max-sm:grid-cols-[1fr_auto] max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-1 max-sm:px-4 max-sm:py-3"
               >
@@ -222,6 +256,17 @@
                 </td>
               </tr>
             }
+            @if (visiveis().length === 0) {
+              <tr class="max-sm:block">
+                <td
+                  colspan="6"
+                  class="px-4 py-6 text-center text-[13px] text-muted-foreground max-sm:block"
+                  data-testid="nada-ate-hoje"
+                >
+                  Nada lançado até hoje com esses filtros. Os lançamentos futuros estão acima.
+                </td>
+              </tr>
+            }
           </tbody>
         </table>
       </div>
@@ -229,17 +274,17 @@
         class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-border text-[12.5px] text-muted-foreground"
       >
         <span data-testid="contagem-lista"
-          >Mostrando {{ visiveis().length }} de {{ filtered().length }}
-          {{ filtered().length === 1 ? 'movimentação' : 'movimentações' }}</span
+          >Mostrando {{ visiveis().length }} de {{ lista().length }}
+          {{ lista().length === 1 ? 'movimentação' : 'movimentações' }}</span
         >
-        @if (visiveis().length < filtered().length) {
+        @if (visiveis().length < lista().length) {
           <button
             type="button"
             (click)="mostrarMais()"
             class="h-8 px-3 rounded-lg text-[12.5px] font-semibold text-ocean hover:bg-muted cursor-pointer"
             data-testid="mostrar-mais"
           >
-            Mostrar mais {{ Math.min(100, filtered().length - visiveis().length) }}
+            Mostrar mais {{ Math.min(100, lista().length - visiveis().length) }}
           </button>
         }
       </div>
