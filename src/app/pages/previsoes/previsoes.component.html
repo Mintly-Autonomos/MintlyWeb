@@ -316,10 +316,21 @@
                 </p>
               }
 
+              @if (dadosIncompletos()) {
+                <p
+                  class="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-[12.5px] text-warning leading-relaxed"
+                  role="status"
+                  data-testid="dados-incompletos"
+                >
+                  Dados incompletos: nos últimos 30 dias o custo dos ingredientes passou das vendas.
+                  Confira se todas as vendas foram lançadas antes de confiar nesta projeção.
+                </p>
+              }
+
               <!-- Resposta em destaque -->
               <div class="rounded-2xl border border-mint/30 bg-mint-soft/50 p-5">
                 <div class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Lucro no mês
+                  Lucro previsto em {{ horizonte() }} dias
                 </div>
                 <div
                   class="mt-1 text-[34px] md:text-[40px] leading-none font-bold tracking-tight tabular-nums"

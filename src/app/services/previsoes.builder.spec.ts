@@ -123,6 +123,35 @@ describe('simular: vendas com repasse', () => {
   });
 });
 
+describe('simular: lucro sem o não operacional', () => {
+  it('parcela de empréstimo pendente mexe no caixa, mas não no lucro previsto', () => {
+    const base = buildBase(
+      [
+        mov({ valor: 3000 }),
+        mov({
+          pendente: true,
+          tipo: 'out',
+          date: addDays(HOJE, 5),
+          valor: 1500,
+          naoOperacional: true,
+          lancamento: addDays(HOJE, -40),
+        }),
+      ],
+      10_000,
+      0,
+      HOJE,
+    );
+    const sem = simular(
+      AJUSTES_ZERO,
+      30,
+      buildBase([mov({ valor: 3000 })], 10_000, 0, HOJE),
+    ).resultado;
+    const com = simular(AJUSTES_ZERO, 30, base).resultado;
+    expect(com.lucro).toBe(sem.lucro);
+    expect(com.caixaFim).toBe(sem.caixaFim - 1500);
+  });
+});
+
 describe('simular', () => {
   const base = buildBase(
     [
