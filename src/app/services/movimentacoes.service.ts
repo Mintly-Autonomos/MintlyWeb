@@ -305,6 +305,9 @@ const normalizeName = (name: string): string => name.trim().toLowerCase();
 export const MOVEMENT_TITLE_MAX = 120;
 
 /** Tamanho máximo das observações (os detalhes do pedido vão aqui, não no título). */
+/** Tamanho de cada página pedida à API ao carregar TODAS as movimentações. */
+export const MOVEMENTS_PAGE_SIZE = 500;
+
 export const MOVEMENT_NOTES_MAX = 500;
 
 /**
@@ -395,10 +398,25 @@ export class MovimentacoesService {
         this.movements.set(this.mockStore.map((m) => ({ ...m })));
         return;
       }
-      const response = await this.call((headers) =>
-        this.movementClient.list({ page: 1, size: 500 }, headers),
+      // Todas as páginas: a lista, a busca, os totais, Receitas, Previsões e o Cardápio leem daqui. Antes era só
+      // a 1ª página (500 linhas) e tudo o que vinha antes sumia.
+      const first = await this.call((headers) =>
+        this.movementClient.list({ page: 1, size: MOVEMENTS_PAGE_SIZE }, headers),
       );
-      this.movements.set((response.payload ?? []).map(toMovement));
+      const totalPages = Math.max(1, first.pagination?.totalPages ?? 1);
+      const rest = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) =>
+          this.call((headers) =>
+            this.movementClient.list({ page: i + 2, size: MOVEMENTS_PAGE_SIZE }, headers),
+          ),
+        ),
+      );
+      const seen = new Set<string>();
+      const all = [first, ...rest]
+        .flatMap((r) => r.payload ?? [])
+        .map(toMovement)
+        .filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true)));
+      this.movements.set(all);
     } finally {
       this.loading.set(false);
     }

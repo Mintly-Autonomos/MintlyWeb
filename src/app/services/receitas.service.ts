@@ -96,6 +96,12 @@ export class ReceitasService {
     };
   }
 
+  private naoOperacional(categoryId: string | null): boolean {
+    return (
+      this.categorias.categories().find((c) => c.id === categoryId)?.nature === 'non-operational'
+    );
+  }
+
   async refresh(period: PeriodKey, from?: string, to?: string): Promise<void> {
     this.loading.set(true);
     try {
@@ -104,7 +110,11 @@ export class ReceitasService {
       const win = resolveWindow(period, from, to, today);
       const movs = this.movimentacoes
         .movements()
-        .filter((m) => m.type === 'income' && m.status === 'received')
+        // Empréstimo, aporte e saldo inicial (categoria 'Não operacional') não são venda.
+        .filter(
+          (m) =>
+            m.type === 'income' && m.status === 'received' && !this.naoOperacional(m.categoryId),
+        )
         .map((m) => this.toReceita(m));
       const ratio = await this.taxRatio(win.end.slice(0, 7));
       this.data.set(buildReceitas(movs, win, ratio));
