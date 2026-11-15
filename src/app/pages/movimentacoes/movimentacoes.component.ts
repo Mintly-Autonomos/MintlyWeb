@@ -41,7 +41,7 @@ import { moneyToInput } from '../../shared/money-input';
 import { describeSettlementRule, resolveSettlementRule, settlementDueDate } from 'mintly-lib';
 import type { SettlementRule } from 'mintly-lib';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
-import { matchName } from '../../shared/import-parse';
+import { matchName, avisosImportacao } from '../../shared/import-parse';
 
 /** Linhas que a tabela mostra de cada vez: com milhares de lançamentos, desenhar todos de uma vez trava a tela. */
 const LINHAS_POR_VEZ = 100;
@@ -87,6 +87,8 @@ interface EditableImportRow {
   error: string | null;
   /** Parece já lançada (mesma conta, título, valor e data): vem desmarcada, mas dá para incluir. */
   possibleDuplicate?: boolean;
+  /** Possível erro do dono (linha repetida na planilha, valor em centavos): só avisa. */
+  warning?: string | null;
 }
 
 interface MovForm {
@@ -949,33 +951,32 @@ export class MovimentacoesComponent implements OnInit {
       const preview = await this.svc.previewImport(file);
       this.creating.set(false);
       this.importFileName.set(preview.fileName);
-      this.importRows.set(
-        preview.items.map((item) => {
-          // Categoria e conta da planilha viram o nome EXATO do cadastro ("Venda delivery" ->
-          // "Venda Delivery"): a lista da tela só marca a opção com o nome idêntico, e sem isso a
-          // categoria já preenchida na planilha aparecia como se estivesse em branco.
-          const category = this.canonicalCategory(item.categoryName, item.type);
-          const account = matchName(item.accountName, this.accounts());
-          const revalidated = this.revalidateRow({
-            row: item.row,
-            type: item.type,
-            title: item.title,
-            value: item.value,
-            valueText: item.value > 0 ? moneyToInput(item.value) : '',
-            date: item.date,
-            dateRaw: item.dateRaw,
-            categoryName: category?.name ?? item.categoryName,
-            accountName: account?.name ?? item.accountName,
-            paymentMethod: item.paymentMethod,
-            status: item.status,
-            notes: item.notes,
-            included: true,
-            valid: true,
-            error: null,
-          });
-          return this.flagPossibleDuplicate(revalidated);
-        }),
-      );
+      const linhas = preview.items.map((item) => {
+        // Categoria e conta da planilha viram o nome EXATO do cadastro ("Venda delivery" ->
+        // "Venda Delivery"): a lista da tela só marca a opção com o nome idêntico, e sem isso a
+        // categoria já preenchida na planilha aparecia como se estivesse em branco.
+        const category = this.canonicalCategory(item.categoryName, item.type);
+        const account = matchName(item.accountName, this.accounts());
+        const revalidated = this.revalidateRow({
+          row: item.row,
+          type: item.type,
+          title: item.title,
+          value: item.value,
+          valueText: item.value > 0 ? moneyToInput(item.value) : '',
+          date: item.date,
+          dateRaw: item.dateRaw,
+          categoryName: category?.name ?? item.categoryName,
+          accountName: account?.name ?? item.accountName,
+          paymentMethod: item.paymentMethod,
+          status: item.status,
+          notes: item.notes,
+          included: true,
+          valid: true,
+          error: null,
+        });
+        return this.flagPossibleDuplicate(revalidated);
+      });
+      this.importRows.set(this.comAvisos(linhas));
       this.importPreviewOpen.set(true);
     } catch (err) {
       // Erros de leitura da planilha já vêm com texto próprio (sem resposta da API).
@@ -1003,6 +1004,12 @@ export class MovimentacoesComponent implements OnInit {
           )
         : null) ?? matchName(name, active)
     );
+  }
+
+  /** Avisos de erro do dono (linha repetida, valor em centavos), refeitos a cada edição. */
+  private comAvisos(rows: EditableImportRow[]): EditableImportRow[] {
+    const avisos = avisosImportacao(rows);
+    return rows.map((r, i) => ({ ...r, warning: avisos.get(i) ?? null }));
   }
 
   /** Categorias que podem ser escolhidas numa linha: as do tipo dela (todas, se ainda sem tipo). */
@@ -1108,12 +1115,14 @@ export class MovimentacoesComponent implements OnInit {
     value: EditableImportRow[K],
   ): void {
     this.importRows.update((rows) =>
-      rows.map((r, i) => {
-        if (i !== index) return r;
-        // Escolheu a data na tela: o texto que a planilha trazia deixa de valer.
-        const next = field === 'date' ? { ...r, dateRaw: undefined } : r;
-        return this.revalidateRow({ ...next, [field]: value });
-      }),
+      this.comAvisos(
+        rows.map((r, i) => {
+          if (i !== index) return r;
+          // Escolheu a data na tela: o texto que a planilha trazia deixa de valer.
+          const next = field === 'date' ? { ...r, dateRaw: undefined } : r;
+          return this.revalidateRow({ ...next, [field]: value });
+        }),
+      ),
     );
   }
 

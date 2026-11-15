@@ -271,3 +271,66 @@ export function matchName<T extends { name: string }>(name: string, list: T[]): 
   if (!k) return null;
   return list.find((item) => normalizeKey(item.name) === k) ?? null;
 }
+
+/** O mínimo de uma linha da importação que os avisos de erro do dono precisam. */
+export interface LinhaParaAviso {
+  row: number;
+  type: ImportMovType | null;
+  title: string;
+  value: number;
+  date: string;
+  accountName: string;
+}
+
+/** Valor tantas vezes acima da mediana da planilha (do mesmo tipo) parece digitado em centavos. */
+export const FATOR_VALOR_SUSPEITO = 20;
+/** Abaixo disso nem olha (R$ 300 contra mediana de R$ 10 é normal num cardápio). */
+export const VALOR_SUSPEITO_MINIMO = 1000;
+/** Com menos linhas do mesmo tipo, a mediana não diz o que é "normal". */
+export const LINHAS_PARA_MEDIANA = 5;
+
+function mediana(xs: number[]): number {
+  const v = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+}
+
+const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/**
+ * Erros comuns do dono na planilha (relatório Sweetie Bel, S3.10). Só avisa; não tira a linha:
+ * - **linha repetida** na mesma planilha (mesmo tipo, título, valor, data e conta): pagamento ou Pix em dobro;
+ * - **valor fora do normal**: 20× a mediana das linhas do mesmo tipo (e ≥ R$ 1.000) — "150000" que era R$ 1.500,00.
+ * Devolve o aviso por índice da linha.
+ */
+export function avisosImportacao(linhas: LinhaParaAviso[]): Map<number, string> {
+  const avisos = new Map<number, string>();
+  const norm = (t: string) => normalizeKey(t);
+  const vistas = new Map<string, number>();
+  linhas.forEach((l, i) => {
+    if (!l.type || !(l.value > 0) || !l.date) return;
+    const chave = [l.type, norm(l.title), l.value.toFixed(2), l.date, norm(l.accountName)].join(
+      '|',
+    );
+    const primeira = vistas.get(chave);
+    if (primeira === undefined) vistas.set(chave, l.row);
+    else
+      avisos.set(
+        i,
+        `Igual à linha ${primeira - 1} desta planilha (mesmo título, valor, data e conta). Se foi pago uma vez só, desmarque esta.`,
+      );
+  });
+  for (const tipo of ['income', 'expense'] as const) {
+    const doTipo = linhas
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => l.type === tipo && l.value > 0);
+    if (doTipo.length < LINHAS_PARA_MEDIANA) continue;
+    const med = mediana(doTipo.map(({ l }) => l.value));
+    for (const { l, i } of doTipo) {
+      if (l.value < VALOR_SUSPEITO_MINIMO || l.value < med * FATOR_VALOR_SUSPEITO) continue;
+      const texto = `Valor bem acima do normal desta planilha (a maioria fica perto de ${brl(med)}). Se veio em centavos, o certo seria ${brl(l.value / 100)}.`;
+      avisos.set(i, avisos.has(i) ? `${avisos.get(i)} ${texto}` : texto);
+    }
+  }
+  return avisos;
+}

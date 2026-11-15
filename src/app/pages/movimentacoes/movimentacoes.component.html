@@ -1287,6 +1287,26 @@
                     </button>
                   </td>
                 </tr>
+                @if (row.valid && row.possibleDuplicate && !row.included) {
+                  <tr class="bg-muted/40" data-testid="duplicada-linha">
+                    <td></td>
+                    <td
+                      colspan="10"
+                      class="px-2 pb-2 text-muted-foreground text-[12px] leading-snug"
+                    >
+                      Parece já lançada: há uma movimentação com a mesma conta, título, valor e
+                      data. Por isso veio desmarcada; marque para importar mesmo assim.
+                    </td>
+                  </tr>
+                }
+                @if (row.warning) {
+                  <tr class="bg-warning/10" data-testid="aviso-linha">
+                    <td></td>
+                    <td colspan="10" class="px-2 pb-2 text-warning text-[12px] leading-snug">
+                      {{ row.warning }}
+                    </td>
+                  </tr>
+                }
                 @if (!row.valid && row.error) {
                   <!-- O que está errado e o que corrigir, na própria linha (antes só aparecia ao passar o mouse). -->
                   <tr class="bg-error/5" data-testid="erro-linha">
