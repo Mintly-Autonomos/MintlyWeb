@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { apiErrorInfo } from '../shared/api-error';
 import { CategoriasService } from './categorias.service';
 import { ContasService } from './contas.service';
+import { FluxoCaixaService } from './fluxo-caixa.service';
 import { MintlyClientService } from './mintly-client.service';
 import { MovimentacoesService, Movement } from './movimentacoes.service';
 import { PrevBase, PrevMov, buildBase, PASSADO } from './previsoes.builder';
@@ -35,12 +36,18 @@ export class PrevisoesService {
   private movimentacoes = inject(MovimentacoesService);
   private categorias = inject(CategoriasService);
   private contas = inject(ContasService);
+  private fluxo = inject(FluxoCaixaService);
   private reportClient = inject(MintlyClientService).client.reportClient;
 
   readonly base = signal<PrevBase>(baseVazia());
   readonly loading = signal(false);
   /** Já terminou de carregar ao menos uma vez: antes disso a tela mostra o esqueleto, não um "vazio" falso. */
   readonly loaded = signal(false);
+  /**
+   * Saldo do Fluxo de caixa (só o que já está lançado) no fim de cada dia, de hoje (índice 0) a 90 dias.
+   * É a mesma conta do Fluxo e da Visão Geral; null = não deu para consultar.
+   */
+  readonly saldoLancado = signal<number[] | null>(null);
 
   private get headers(): Headers {
     return { env: environment.mintlyEnv, authorization: `Bearer ${this.auth.getAccessToken()}` };
@@ -109,16 +116,21 @@ export class PrevisoesService {
   async refresh(): Promise<void> {
     this.loading.set(true);
     try {
-      await Promise.all([
+      const [, , , fluxo] = await Promise.all([
         this.movimentacoes.refresh(),
         this.categorias.refresh(),
         this.contas.refresh(),
+        this.fluxo.fetchReport(90).catch(() => null),
       ]);
+      this.saldoLancado.set(fluxo ? fluxo.projection.map((p) => p.balance) : null);
       const hoje = hojeIso();
-      const caixaHoje = this.contas
-        .accounts()
-        .filter((a) => a.active)
-        .reduce((s, a) => s + a.balance, 0);
+      // Mesmo caixa de hoje do Fluxo e da Visão Geral; sem o relatório, a soma dos saldos das contas.
+      const caixaHoje =
+        fluxo?.cashToday ??
+        this.contas
+          .accounts()
+          .filter((a) => a.active)
+          .reduce((s, a) => s + a.balance, 0);
       const movs = this.movimentacoes
         .movements()
         .filter((m) => m.status !== 'cancelled')

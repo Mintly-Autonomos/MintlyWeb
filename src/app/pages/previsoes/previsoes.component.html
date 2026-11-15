@@ -661,6 +661,50 @@
           </div>
         </section>
 
+        @if (conciliacao(); as c) {
+          <section class="m3-card p-5 space-y-3" data-testid="conciliacao">
+            <div>
+              <h3 class="text-[15px] font-semibold">Por que é diferente do Fluxo de caixa?</h3>
+              <p class="text-[12.5px] text-muted-foreground mt-0.5">
+                O Fluxo de caixa e a Visão Geral só contam o que já está lançado. Aqui entram também
+                as vendas e os custos que ainda vão acontecer, no ritmo dos últimos 30 dias.
+              </p>
+            </div>
+            <dl class="text-[13px] tabular-nums divide-y divide-border/60">
+              <div class="flex justify-between gap-3 py-1.5">
+                <dt>Fluxo de caixa em {{ horizonte() }} dias (só o lançado)</dt>
+                <dd class="font-semibold" data-testid="conc-lancado">{{ fmtBRL(c.lancado) }}</dd>
+              </div>
+              <div class="flex justify-between gap-3 py-1.5">
+                <dt>+ vendas no ritmo atual</dt>
+                <dd class="text-success">+{{ fmtBRL(c.ritmoVendas) }}</dd>
+              </div>
+              <div class="flex justify-between gap-3 py-1.5">
+                <dt>− custos no ritmo atual</dt>
+                <dd class="text-error">−{{ fmtBRL(c.ritmoCustos) }}</dd>
+              </div>
+              <div class="flex justify-between gap-3 py-1.5">
+                <dt>− imposto sobre as vendas do período</dt>
+                <dd class="text-error">−{{ fmtBRL(c.imposto) }}</dd>
+              </div>
+              @if (abs(c.ajustes) >= 1) {
+                <div class="flex justify-between gap-3 py-1.5" data-testid="conc-ajustes">
+                  <dt class="text-muted-foreground">
+                    Outros ajustes (contas vencidas contadas para amanhã)
+                  </dt>
+                  <dd class="text-muted-foreground">
+                    {{ c.ajustes >= 0 ? '+' : '−' }}{{ fmtBRL(abs(c.ajustes)) }}
+                  </dd>
+                </div>
+              }
+              <div class="flex justify-between gap-3 py-1.5 font-semibold">
+                <dt>= caixa previsto aqui</dt>
+                <dd data-testid="conc-previsao">{{ fmtBRL(c.previsao) }}</dd>
+              </div>
+            </dl>
+          </section>
+        }
+
         <p class="text-[11.5px] text-muted-foreground leading-relaxed pb-2">
           As previsões usam o que você já lançou e o ritmo recente para estimar o futuro. São
           estimativas, não garantias. Caixa de hoje considerado: {{ fmtBRL(caixaHoje()) }}.

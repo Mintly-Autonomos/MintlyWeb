@@ -14,6 +14,7 @@ import {
   alavancaNoNormal,
   isDefault,
   simular,
+  conciliar,
 } from '../../services/previsoes.service';
 import { CardapioService } from '../../services/cardapio.service';
 import { CardapioInterativoComponent } from './cardapio-interativo.component';
@@ -93,6 +94,14 @@ export class PrevisoesComponent implements OnInit {
   protected readonly Math = Math;
   protected dados = this.svc.base;
   protected caixaHoje = computed(() => this.dados().caixaHoje);
+  /** Do saldo do Fluxo de caixa (só o lançado) até o caixa projetado aqui (sem as alavancas do simulador). */
+  protected conciliacao = computed(() => {
+    const saldos = this.svc.saldoLancado();
+    const h = this.horizonte();
+    const lancado = saldos?.[h];
+    return lancado === undefined ? null : conciliar(this.dados(), h, lancado);
+  });
+  protected readonly abs = Math.abs;
   protected temDados = computed(() => this.dados().temDados);
   /** Sem venda à vista recente não há ritmo para o simulador escalar. */
   protected semRitmo = computed(
