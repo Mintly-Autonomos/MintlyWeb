@@ -100,6 +100,7 @@ function buildMockReport(): OverviewReport {
     },
     health: {
       score,
+      cap: null,
       label: score >= 70 ? 'healthy' : score >= 40 ? 'attention' : 'risk',
       basisMonth: '2026-07',
       pillars: [

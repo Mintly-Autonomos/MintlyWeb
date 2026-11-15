@@ -1,6 +1,6 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import type { AiInsightText } from 'mintly-lib';
+import type { AiInsightText, HealthCapReason } from 'mintly-lib';
 import { AiService, textoDaIa } from '../../services/ai.service';
 import { NotificationsService } from '../../services/notifications.service';
 import { DashboardService, OverviewInsight } from '../../services/dashboard.service';
@@ -138,6 +138,35 @@ export class VisaoGeralComponent implements OnInit {
   protected scoreDashoffset = computed(() => {
     const score = this.data()?.health.score ?? 0;
     return this.circumference * (1 - score / 100);
+  });
+
+  /**
+   * Por que a nota travou (relatório S2.3): prejuízo, conta vencida ou caixa negativo não convivem
+   * com "saudável", mesmo com os pilares bons. null = nada trava.
+   */
+  protected travaSaude = computed(() => {
+    const h = this.data()?.health;
+    if (!h?.cap) return null;
+    const mes = fmtMonthLong(h.basisMonth);
+    const motivo: Record<HealthCapReason, string> = {
+      negativeCash: 'o caixa de hoje está negativo',
+      loss: `${mes} fechou no prejuízo`,
+      overduePayables: 'há contas a pagar vencidas',
+    };
+    const lista = h.cap.reasons.map((r) => motivo[r]);
+    const motivos =
+      lista.length > 1 ? `${lista.slice(0, -1).join(', ')} e ${lista.at(-1)}` : lista[0];
+    return `Nota limitada a ${h.cap.maxScore}: ${motivos}.`;
+  });
+
+  /** Mês dos pilares: no mês atual é o último mês fechado (o fôlego é de hoje). */
+  protected baseSaude = computed(() => {
+    const d = this.data();
+    if (!d) return null;
+    const mes = fmtMonthLong(d.health.basisMonth);
+    return d.health.basisMonth === d.referenceMonth
+      ? `Base: ${mes}`
+      : `Base: ${mes} (último mês fechado) e o caixa de hoje`;
   });
 
   protected scoreResumo = computed(() => {
