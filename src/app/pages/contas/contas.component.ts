@@ -215,7 +215,17 @@ export class ContasComponent implements OnInit {
         return true;
     }
     if (this.isPlatform && this.settlementError) return true;
+    if (this.isPlatform && this.taxError) return true;
     return false;
+  }
+
+  /** Taxa da plataforma: um percentual entre 0 e 100 (vazio = 0). */
+  get taxError(): string {
+    const raw = this.form().taxPct.trim();
+    if (raw === '') return '';
+    const n = Number(raw.replace(',', '.'));
+    if (!Number.isFinite(n) || n < 0 || n > 100) return 'Informe uma taxa entre 0% e 100%.';
+    return '';
   }
 
   get deactivateReason(): string {

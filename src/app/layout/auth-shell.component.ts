@@ -13,6 +13,7 @@ import { IconComponent } from '../shared/icon.component';
     <div class="min-h-screen w-full bg-background text-foreground">
       <div class="absolute top-4 right-4 z-50">
         <button
+          type="button"
           (click)="theme.toggleTheme()"
           class="h-10 w-10 rounded-full border border-border grid place-items-center hover:bg-muted bg-card/80 backdrop-blur cursor-pointer"
           [attr.aria-label]="theme.isDark() ? 'Ativar modo claro' : 'Ativar modo escuro'"

@@ -178,12 +178,25 @@ export class CardapioComponent implements OnInit, OnDestroy {
     this.f.set({ ...FORM_VAZIO });
   }
 
+  /** Nome e preço maior que zero: sem isso o botão "Adicionar" fica desabilitado. */
+  protected podeAdicionar(): boolean {
+    const v = this.f();
+    return !!v.nome.trim() && v.preco.trim() !== '' && this.num(v.preco) > 0;
+  }
+
+  /** Custo maior que o preço: cada venda dá prejuízo. Avisa, mas deixa cadastrar (pode ser promoção). */
+  protected margemNegativa(): boolean {
+    const v = this.f();
+    if (v.preco.trim() === '' || v.custo.trim() === '') return false;
+    return this.num(v.custo) > this.num(v.preco);
+  }
+
   async adicionar(): Promise<void> {
     const v = this.f();
     const preco = this.num(v.preco);
     const custo = v.custo.trim() === '' ? 0 : this.num(v.custo);
-    if (!v.nome.trim() || v.preco.trim() === '' || !(preco >= 0)) {
-      this.toast.error('Informe o nome e o preço do prato.');
+    if (!this.podeAdicionar()) {
+      this.toast.error('Informe o nome e um preço maior que zero.');
       return;
     }
     if (!(custo >= 0)) {

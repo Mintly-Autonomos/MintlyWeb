@@ -232,11 +232,14 @@
     [subtitle]="
       importMode()
         ? ''
-        : form().type === 'income'
-          ? 'Registre uma venda, recebimento ou crédito na sua operação.'
-          : 'Registre uma compra, despesa ou pagamento.'
+        : editing()
+          ? 'Altere o que precisar e salve. O histórico registra quem mudou e quando.'
+          : form().type === 'income'
+            ? 'Registre uma venda, recebimento ou crédito na sua operação.'
+            : 'Registre uma compra, despesa ou pagamento.'
     "
     size="lg"
+    [dirty]="!importMode() && formDirty"
     (closed)="closeModal()"
   >
     @if (!editing()) {
@@ -700,6 +703,11 @@
               <app-icon name="download" [style]="{ fontSize: '16px' }" />Baixar modelo
             </button>
           </div>
+        }
+        @if (!importMode() && missingFields.length > 0) {
+          <p class="text-[12px] text-muted-foreground sm:mr-auto" data-testid="falta-preencher">
+            Falta preencher: {{ missingFields.join(', ') }}.
+          </p>
         }
         <div class="flex gap-3 sm:ml-auto [&>button]:flex-1 sm:[&>button]:flex-none">
           <button

@@ -6,6 +6,10 @@ import {
   HostListener,
   OnChanges,
   OnDestroy,
+  ElementRef,
+  SimpleChanges,
+  inject,
+  signal,
 } from '@angular/core';
 import { IconComponent } from './icon.component';
 
@@ -44,13 +48,41 @@ let modalSeq = 0;
             </div>
             <button
               type="button"
-              (click)="closed.emit()"
+              (click)="requestClose()"
               class="h-9 w-9 rounded-full hover:bg-muted grid place-items-center text-muted-foreground cursor-pointer"
               aria-label="Fechar"
             >
               <app-icon name="close" [style]="{ fontSize: '20px' }" />
             </button>
           </div>
+          @if (confirmingClose()) {
+            <div
+              role="alertdialog"
+              aria-live="assertive"
+              class="mx-6 mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-[13px]"
+              data-testid="confirmar-descartar"
+            >
+              <span>Descartar o que você preencheu?</span>
+              <span class="flex gap-2">
+                <button
+                  type="button"
+                  (click)="confirmingClose.set(false)"
+                  class="h-8 px-3 rounded-lg font-medium hover:bg-muted cursor-pointer"
+                  data-testid="continuar-editando"
+                >
+                  Continuar editando
+                </button>
+                <button
+                  type="button"
+                  (click)="discard()"
+                  class="h-8 px-3 rounded-lg bg-error text-white font-semibold hover:brightness-95 cursor-pointer"
+                  data-testid="descartar"
+                >
+                  Descartar
+                </button>
+              </span>
+            </div>
+          }
           <!-- xl: o conteúdo ocupa a altura toda e rola por conta própria (cabeçalho e rodapé ficam sempre à vista). -->
           <div
             [class]="
@@ -79,17 +111,50 @@ export class ModalComponent implements OnChanges, OnDestroy {
   @Input() subtitle = '';
   @Input() size: 'md' | 'lg' | 'xl' = 'md';
   @Input() hasFooter = true;
+  /** Formulário com algo preenchido: fechar (Esc, fora do modal ou "X") pergunta antes de descartar. */
+  @Input() dirty = false;
   @Output() closed = new EventEmitter<void>();
 
   protected readonly titleId = `modal-title-${modalSeq++}`;
+  protected confirmingClose = signal(false);
+  private host = inject(ElementRef<HTMLElement>);
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    if (this.open) this.closed.emit();
+    if (this.open) this.requestClose();
   }
 
-  ngOnChanges(): void {
+  /** Fecha na hora; com algo preenchido, primeiro pergunta. */
+  requestClose(): void {
+    if (this.dirty && !this.confirmingClose()) {
+      this.confirmingClose.set(true);
+      return;
+    }
+    this.discard();
+  }
+
+  discard(): void {
+    this.confirmingClose.set(false);
+    this.closed.emit();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
     this.lockScroll(this.open);
+    if (changes['open'] && this.open) {
+      this.confirmingClose.set(false);
+      this.focusFirstField();
+    }
+  }
+
+  /** Ao abrir, o foco vai para o primeiro campo do formulário (e não fica na página atrás). */
+  private focusFirstField(): void {
+    setTimeout(() => {
+      const root = (this.host.nativeElement as HTMLElement).querySelector('[role="dialog"]');
+      const field = root?.querySelector<HTMLElement>(
+        'input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])',
+      );
+      field?.focus();
+    });
   }
 
   ngOnDestroy(): void {
@@ -97,7 +162,7 @@ export class ModalComponent implements OnChanges, OnDestroy {
   }
 
   onBackdrop(event: MouseEvent): void {
-    if (event.target === event.currentTarget) this.closed.emit();
+    if (event.target === event.currentTarget) this.requestClose();
   }
 
   /** Trava o scroll do body enquanto o modal está aberto. */

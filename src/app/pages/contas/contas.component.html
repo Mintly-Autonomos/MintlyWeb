@@ -189,6 +189,7 @@
               <app-toggle
                 [checked]="a.active"
                 [disabled]="toggleDisabled(a)"
+                [label]="(a.active ? 'Inativar ' : 'Reativar ') + a.name"
                 (changed)="handleToggle(a, $event)"
               />
             </div>
@@ -281,7 +282,15 @@
             placeholder="Ex.: 12.5"
             class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
           />
-          <p class="text-[12px] text-muted-foreground mt-1">Quanto a plataforma cobra por venda.</p>
+          @if (taxError) {
+            <p class="text-[12px] text-error mt-1" role="alert" data-testid="erro-taxa">
+              {{ taxError }}
+            </p>
+          } @else {
+            <p class="text-[12px] text-muted-foreground mt-1">
+              Quanto a plataforma cobra por venda.
+            </p>
+          }
         </label>
 
         <fieldset class="space-y-3" data-testid="repasse">
@@ -418,6 +427,7 @@
           </div>
           <app-toggle
             [checked]="form().isDefault"
+            label="Conta padrão"
             [disabled]="editing()?.isDefault ?? false"
             (changed)="setFormDefault($event)"
           />
@@ -436,6 +446,7 @@
           <app-toggle
             [checked]="form().active"
             [disabled]="!!deactivateReason"
+            label="Conta ativa"
             (changed)="setFormActive($event)"
           />
         </div>
