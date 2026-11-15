@@ -82,6 +82,12 @@ export class PrevisoesService {
     return behavior === 'variable' ? 1 : behavior === 'mixed' ? 0.5 : 0;
   }
 
+  private naoOperacional(m: Movement): boolean {
+    return (
+      this.categorias.categories().find((c) => c.id === m.categoryId)?.nature === 'non-operational'
+    );
+  }
+
   private toPrev(m: Movement): PrevMov {
     const pendente = m.status === 'pending';
     const entrada = m.type === 'income';
@@ -92,6 +98,9 @@ export class PrevisoesService {
       pendente,
       variavel: entrada ? 0 : this.variavelDe(m),
       aVista: !pendente && (m.dueDate === null || m.dueDate <= m.date),
+      lancamento: m.date,
+      prazo: m.dueDate && m.dueDate > m.date ? diasEntre(m.date, m.dueDate) : 0,
+      naoOperacional: this.naoOperacional(m),
     };
   }
 
@@ -121,3 +130,9 @@ export class PrevisoesService {
 }
 
 export { PASSADO };
+
+/** Dias entre duas datas "AAAA-MM-DD" (sem fuso). */
+function diasEntre(de: string, ate: string): number {
+  const utc = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  return Math.round((utc(ate) - utc(de)) / 86_400_000);
+}

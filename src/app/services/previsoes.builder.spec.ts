@@ -18,29 +18,68 @@ const mov = (over: Partial<PrevMov>): PrevMov => ({
   pendente: false,
   variavel: 0,
   aVista: true,
+  lancamento: HOJE,
+  prazo: 0,
+  naoOperacional: false,
   ...over,
 });
 
 describe('buildBase', () => {
-  it('tira o ritmo diário só do que foi liquidado à vista nos últimos 30 dias', () => {
+  it('o ritmo de vendas conta TUDO o que foi vendido nos últimos 30 dias, inclusive cartão e iFood', () => {
     const base = buildBase(
       [
         mov({ valor: 3000 }),
         mov({ tipo: 'out', valor: 600, variavel: 1 }),
         mov({ tipo: 'out', valor: 300, variavel: 0 }),
-        // liquidado mas com prazo: não entra no ritmo
-        mov({ valor: 9999, aVista: false }),
-        // fora da janela
-        mov({ valor: 9999, date: addDays(HOJE, -PASSADO) }),
+        // venda no cartão (repasse em 30 dias), já recebida: entra no ritmo pela data da venda
+        mov({
+          valor: 600,
+          aVista: false,
+          prazo: 30,
+          date: addDays(HOJE, -1),
+          lancamento: addDays(HOJE, -20),
+        }),
+        // venda no iFood ainda pendente (repasse em 7 dias): também é venda do período
+        mov({
+          valor: 300,
+          pendente: true,
+          prazo: 7,
+          date: addDays(HOJE, 5),
+          lancamento: addDays(HOJE, -2),
+        }),
+        // vendida antes da janela: fora
+        mov({ valor: 9999, date: addDays(HOJE, -PASSADO), lancamento: addDays(HOJE, -PASSADO) }),
       ],
       1000,
       0,
       HOJE,
     );
-    expect(base.receitaDia).toBe(100);
+    expect(base.receitaDia).toBe((3000 + 600 + 300) / PASSADO);
+    expect(base.receitaPrazos).toEqual([
+      { prazo: 0, porDia: 100 },
+      { prazo: 7, porDia: 10 },
+      { prazo: 30, porDia: 20 },
+    ]);
     expect(base.custoVarDia).toBe(20);
     expect(base.custoFixoDia).toBe(10);
     expect(base.temDados).toBe(true);
+  });
+
+  it('empréstimo, aporte e equipamento (não operacional) não entram no ritmo de vendas nem de custos', () => {
+    const base = buildBase(
+      [
+        mov({ valor: 3000 }),
+        mov({ valor: 15000, naoOperacional: true }),
+        mov({ tipo: 'out', valor: 3850, variavel: 0, naoOperacional: true }),
+      ],
+      0,
+      0,
+      HOJE,
+    );
+    expect(base.receitaDia).toBe(100);
+    expect(base.custoFixoDia).toBe(0);
+    // mas o dinheiro entrou e saiu de verdade: o caixa realizado continua com eles
+    expect(base.realizado[HOJE]).toBe(3000 + 15000 - 3850);
   });
 
   it('pendente vencido vira amanhã; pendente futuro mantém a data', () => {
@@ -61,13 +100,43 @@ describe('buildBase', () => {
   });
 });
 
+describe('simular: vendas com repasse', () => {
+  it('a venda com repasse em 30 dias só vira dinheiro depois do prazo (antes disso estão os repasses pendentes)', () => {
+    const base = buildBase([mov({ valor: 3000, aVista: false, prazo: 30 })], 0, 0, HOJE);
+    expect(simular(AJUSTES_ZERO, 30, base).resultado.receita).toBe(0);
+    expect(simular(AJUSTES_ZERO, 60, base).resultado.receita).toBeCloseTo(3000, 6);
+    expect(simular(AJUSTES_ZERO, 90, base).resultado.receita).toBeCloseTo(6000, 6);
+  });
+
+  it('à vista entra todo dia; o simulador de preço e volume vale para as duas partes', () => {
+    const base = buildBase(
+      [mov({ valor: 3000 }), mov({ valor: 3000, aVista: false, prazo: 1 })],
+      0,
+      0,
+      HOJE,
+    );
+    expect(simular(AJUSTES_ZERO, 30, base).resultado.receita).toBeCloseTo(3000 + 2900, 6);
+    expect(simular({ ...AJUSTES_ZERO, volume: 10 }, 30, base).resultado.receita).toBeCloseTo(
+      (3000 + 2900) * 1.1,
+      6,
+    );
+  });
+});
+
 describe('simular', () => {
   const base = buildBase(
     [
       mov({ valor: 3000 }),
       mov({ tipo: 'out', valor: 600, variavel: 1 }),
-      mov({ pendente: true, date: addDays(HOJE, 10), valor: 1000 }),
-      mov({ pendente: true, tipo: 'out', date: addDays(HOJE, 100), valor: 5000 }),
+      // lançados antes da janela, com vencimento no futuro: só contam como pendentes
+      mov({ pendente: true, date: addDays(HOJE, 10), valor: 1000, lancamento: addDays(HOJE, -40) }),
+      mov({
+        pendente: true,
+        tipo: 'out',
+        date: addDays(HOJE, 100),
+        valor: 5000,
+        lancamento: addDays(HOJE, -40),
+      }),
     ],
     2000,
     0,
@@ -103,7 +172,7 @@ describe('simular', () => {
 
   it('o caixa final parte do saldo de hoje', () => {
     const vazia = buildBase(
-      [mov({ pendente: true, date: addDays(HOJE, 5), valor: 500 })],
+      [mov({ pendente: true, date: addDays(HOJE, 5), valor: 500, lancamento: addDays(HOJE, -40) })],
       1000,
       0,
       HOJE,

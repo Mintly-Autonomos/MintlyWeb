@@ -5,7 +5,11 @@
  * Modelo (datas "AAAA-MM-DD", dinheiro em reais):
  *  - Já lançado e ainda não liquidado (pendente) entra no dia do vencimento — é o "dinheiro que
  *    está em Movimentações" (ex.: venda do iFood que cai em 30 dias).
- *  - O que costuma acontecer à vista (liquidado sem prazo) segue o ritmo médio dos últimos 30 dias.
+ *  - Vendas: o ritmo é tudo o que foi VENDIDO nos últimos 30 dias (pela data do lançamento), à vista ou com
+ *    repasse (cartão, iFood). Na projeção, a venda com repasse só vira dinheiro depois do prazo dela; antes
+ *    disso o caixa já tem os repasses pendentes, então nada conta em dobro.
+ *  - Custos: o que costuma sair à vista (liquidado sem prazo) segue o ritmo médio dos últimos 30 dias.
+ *  - Não operacional (empréstimo, aporte, equipamento) não entra no ritmo: não se repete todo mês.
  *  - O simulador mexe só no ritmo (vendas, preço, custo); o que já está lançado não muda.
  */
 
@@ -40,8 +44,14 @@ export interface PrevMov {
   pendente: boolean;
   /** Só saídas: fração que varia com as vendas (CMV = 1, fixa = 0, mista = 0,5). */
   variavel: number;
-  /** Liquidado sem prazo (entrou/saiu no dia do lançamento): compõe o ritmo diário. */
+  /** Liquidado sem prazo (entrou/saiu no dia do lançamento): compõe o ritmo diário dos custos. */
   aVista: boolean;
+  /** Data do lançamento (o dia da venda), "AAAA-MM-DD": é por ela que o ritmo de vendas é medido. */
+  lancamento: string;
+  /** Dias entre o lançamento e o dinheiro (repasse do cartão/iFood). 0 = à vista. */
+  prazo: number;
+  /** Categoria "Não operacional" (empréstimo, aporte, equipamento): fica fora do ritmo. */
+  naoOperacional: boolean;
 }
 
 export interface PrevBase {
@@ -49,7 +59,10 @@ export interface PrevBase {
   caixaHoje: number;
   /** Imposto sobre venda (fração da receita). */
   aliquota: number;
+  /** Ritmo de vendas por dia (todas as formas de pagamento). */
   receitaDia: number;
+  /** O mesmo ritmo separado pelo prazo do repasse: a parte com prazo P só vira dinheiro a partir do dia P+1. */
+  receitaPrazos?: { prazo: number; porDia: number }[];
   custoVarDia: number;
   custoFixoDia: number;
   /** Lançamentos pendentes (vencimento dentro do horizonte), já com data ajustada (vencidos → amanhã). */
@@ -86,8 +99,14 @@ export function buildBase(
   let custoFixo = 0;
   const realizado: Record<string, number> = {};
   const pendentes: PrevBase['pendentes'] = [];
+  const vendasPorPrazo = new Map<number, number>();
 
   for (const m of movs) {
+    // Ritmo de vendas pela data da venda, pendente ou já recebida (cartão e iFood ficam pendentes até o repasse).
+    if (m.tipo === 'in' && !m.naoOperacional && m.lancamento >= ini && m.lancamento <= hoje) {
+      const prazo = Math.max(0, Math.round(m.prazo));
+      vendasPorPrazo.set(prazo, (vendasPorPrazo.get(prazo) ?? 0) + m.valor);
+    }
     if (m.pendente) {
       pendentes.push({
         // Vencido e ainda pendente: o dinheiro deve mexer logo — amanhã.
@@ -100,19 +119,21 @@ export function buildBase(
     }
     if (m.date < ini || m.date > hoje) continue;
     realizado[m.date] = (realizado[m.date] ?? 0) + (m.tipo === 'in' ? m.valor : -m.valor);
-    if (!m.aVista) continue;
-    if (m.tipo === 'in') receita += m.valor;
-    else {
-      custoVar += m.valor * m.variavel;
-      custoFixo += m.valor * (1 - m.variavel);
-    }
+    if (!m.aVista || m.tipo === 'in' || m.naoOperacional) continue;
+    custoVar += m.valor * m.variavel;
+    custoFixo += m.valor * (1 - m.variavel);
   }
+  for (const total of vendasPorPrazo.values()) receita += total;
+  const receitaPrazos = [...vendasPorPrazo.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([prazo, total]) => ({ prazo, porDia: total / PASSADO }));
 
   return {
     hoje,
     caixaHoje,
     aliquota,
     receitaDia: receita / PASSADO,
+    receitaPrazos,
     custoVarDia: custoVar / PASSADO,
     custoFixoDia: custoFixo / PASSADO,
     pendentes,
@@ -212,6 +233,13 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     porDia.set(x.date, d);
   }
 
+  // Ritmo de vendas que já virou dinheiro no dia k do futuro: a parte com prazo P só a partir do dia P+1
+  // (as vendas de antes disso já estão nos repasses pendentes). Sem a separação por prazo, vale o ritmo todo.
+  const ritmoNoDia = (k: number): number =>
+    base.receitaPrazos
+      ? base.receitaPrazos.reduce((s, r) => s + (k > r.prazo ? r.porDia : 0), 0)
+      : base.receitaDia;
+
   const ini = addDays(base.hoje, -(PASSADO - 1));
   const serie: DiaSim[] = [];
   for (let i = 0; i < PASSADO + horizonte; i++) {
@@ -233,10 +261,11 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
       continue;
     }
     const pend = porDia.get(date) ?? { in: 0, outVar: 0, outFixo: 0 };
-    const recBase = base.receitaDia + pend.in;
+    const ritmo = ritmoNoDia(fIdx);
+    const recBase = ritmo + pend.in;
     const cvBase = base.custoVarDia + pend.outVar;
     const cfBase = base.custoFixoDia + pend.outFixo;
-    const recSim = base.receitaDia * (1 + p) * (1 + v) + pend.in;
+    const recSim = ritmo * (1 + p) * (1 + v) + pend.in;
     const cvSim = base.custoVarDia * (1 + v) * (1 + c) + pend.outVar;
     const lucroBase = recBase - cvBase - cfBase - recBase * base.aliquota;
     const lucroSim = recSim - cvSim - cfBase - recSim * base.aliquota;
