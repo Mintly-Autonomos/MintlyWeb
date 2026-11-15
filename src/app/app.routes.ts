@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard, sessionExpiredGuard } from './guards/auth.guard';
 import { subscriptionGuard } from './guards/subscription.guard';
 import { onboardingGuard } from './guards/onboarding.guard';
+import { environment } from '../environments/environment';
 
 export const routes: Routes = [
   // Auth routes (wrapped in AuthShell)
@@ -72,6 +73,8 @@ export const routes: Routes = [
   // Dev showcase (navbar/popup/dev-test + Material) — preserva o trabalho anterior da staging
   {
     path: 'dev',
+    // Vitrine de componentes: só em desenvolvimento (em produção cai na página "não encontrada").
+    canMatch: [() => !environment.production],
     loadComponent: () => import('./pages/dev/dev-home.component').then((m) => m.DevHomeComponent),
   },
   // Assinatura: exige login, mas NÃO a assinatura (é por aqui que quem não tem assina).

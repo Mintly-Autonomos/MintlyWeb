@@ -1,7 +1,6 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Workbook } from 'exceljs';
 import {
   parseNumberBR,
   MovimentacoesService,
@@ -44,12 +43,15 @@ import type { SettlementRule } from 'mintly-lib';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
 import { matchName } from '../../shared/import-parse';
 
-// Data de hoje no calendário de quem usa (toISOString é UTC: depois das 21h já seria "amanhã").
+/** Linhas que a tabela mostra de cada vez: com milhares de lançamentos, desenhar todos de uma vez trava a tela. */
+const LINHAS_POR_VEZ = 100;
+
 /** Teto de valor de um lançamento (acima disto quase sempre é zero a mais) e datas aceitas. */
 const VALOR_MAXIMO = 10_000_000;
 const DATA_MINIMA = '2000-01-01';
 const DATA_MAXIMA = '2099-12-31';
 
+// Data de hoje no calendário de quem usa (toISOString é UTC: depois das 21h já seria "amanhã").
 function isoToday(): string {
   return localISODate();
 }
@@ -277,11 +279,35 @@ export class MovimentacoesComponent implements OnInit {
         if (this.statusFilter() !== 'all' && m.status !== this.statusFilter()) return false;
         if (from && m.date < from) return false;
         if (to && m.date > to) return false;
-        if (q && !m.title.toLowerCase().includes(q)) return false;
+        if (
+          q &&
+          !m.title.toLowerCase().includes(q) &&
+          !this.categoryName(m.categoryId).toLowerCase().includes(q) &&
+          !this.accountName(m.accountId).toLowerCase().includes(q)
+        )
+          return false;
         return true;
       })
       .sort((a, b) => b.date.localeCompare(a.date));
   });
+
+  /** Quantas linhas a tabela mostra (cresce com "Mostrar mais"; volta a 100 quando o filtro muda). */
+  protected readonly Math = Math;
+  protected limite = signal(LINHAS_POR_VEZ);
+  protected visiveis = computed(() => this.filtered().slice(0, this.limite()));
+  private resetLimite = effect(() => {
+    this.query();
+    this.typeFilter();
+    this.statusFilter();
+    this.period();
+    this.dateFrom();
+    this.dateTo();
+    this.limite.set(LINHAS_POR_VEZ);
+  });
+
+  mostrarMais(): void {
+    this.limite.update((n) => n + LINHAS_POR_VEZ);
+  }
 
   protected totalIn = computed(() =>
     this.filtered()
@@ -749,6 +775,8 @@ export class MovimentacoesComponent implements OnInit {
       const statusOpts = ['Recebido', 'Pago', 'Pendente', 'Cancelado'];
       const formas = [...this.paymentMethods];
 
+      // Carregada só aqui: a biblioteca de planilha é grande e não deve pesar na abertura do app.
+      const { Workbook } = await import('exceljs');
       const workbook = new Workbook();
 
       // Aba oculta só com as listas — serve de fonte pros dropdowns da aba principal.

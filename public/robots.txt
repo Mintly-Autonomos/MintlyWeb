@@ -1,0 +1,6 @@
+# O Mintly é um app privado: só as páginas públicas podem aparecer em buscadores.
+User-agent: *
+Allow: /auth/login
+Allow: /termos
+Allow: /privacidade
+Disallow: /
