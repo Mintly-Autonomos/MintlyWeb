@@ -124,9 +124,23 @@
               <app-icon name="monitor_heart" [style]="{ fontSize: '16px' }" />
               {{ scoreMeta().label }}
             </div>
+            @if (travaSaude(); as trava) {
+              <p
+                class="mt-3 inline-flex items-start gap-1.5 text-left text-[12.5px] font-semibold leading-snug text-warning max-w-[280px]"
+                data-testid="saude-trava"
+              >
+                <app-icon name="lock" [style]="{ fontSize: '16px' }" />
+                <span>{{ trava }}</span>
+              </p>
+            }
             <p class="mt-3 text-[13px] leading-relaxed text-muted-foreground max-w-[280px]">
               {{ scoreResumo() }}
             </p>
+            @if (baseSaude(); as base) {
+              <p class="mt-1.5 text-[11.5px] text-muted-foreground" data-testid="saude-base">
+                {{ base }}
+              </p>
+            }
             <div class="mt-3 inline-flex items-center gap-0.5 text-[13px] font-semibold text-ocean">
               Ver como calculamos
               <app-icon name="chevron_right" [style]="{ fontSize: '18px' }" />
@@ -316,6 +330,15 @@
       [subtitle]="'Nota ' + (d.health.score ?? '—') + '/100 — média ponderada de 4 pilares.'"
     >
       <div class="space-y-5">
+        @if (travaSaude(); as trava) {
+          <div
+            class="rounded-xl border border-warning/40 bg-warning/10 p-3 text-[12.5px] leading-relaxed"
+            data-testid="saude-trava-modal"
+          >
+            <strong>{{ trava }}</strong>
+            A média dos pilares daria mais, mas com esse problema a nota não passa desse teto.
+          </div>
+        }
         @for (p of d.health.pillars; track p.key) {
           <div>
             <div class="flex items-center justify-between text-[13px]">
