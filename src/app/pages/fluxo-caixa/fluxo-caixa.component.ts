@@ -20,7 +20,7 @@ import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { AreaChartComponent, AreaSeries, AreaDot } from '../../shared/area-chart.component';
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { formatBRL, formatCompact } from '../../shared/format';
+import { formatBRL, formatCompact, shortDateRange } from '../../shared/format';
 
 const HORIZONS = [30, 60, 90];
 
@@ -195,8 +195,8 @@ export class FluxoCaixaComponent implements OnInit {
   protected blocos = computed(() => {
     const d = this.data();
     if (!d) return [];
-    return d.weeks.map((w, i) => ({
-      semana: `Sem ${i + 1}`,
+    return d.weeks.map((w) => ({
+      semana: shortDateRange(w.from, w.to),
       periodo: `${formatDia(w.from)} – ${formatDia(w.to)}`,
       entradas: w.inflows,
       saidas: w.outflows,

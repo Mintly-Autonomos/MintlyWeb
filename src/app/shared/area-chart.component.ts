@@ -250,6 +250,17 @@ export class AreaChartComponent implements AfterViewInit, OnDestroy {
   get zeroLine(): boolean {
     return this._zeroLine();
   }
+  /**
+   * Eixo sempre a partir do zero. Use quando a área mede tamanho (receita, custos): começar em 30 mil
+   * exagera a diferença. Saldo de caixa fica sem isto, para uma variação pequena não virar linha reta.
+   */
+  private readonly _zeroBaseline = signal<boolean>(false);
+  @Input() set zeroBaseline(value: boolean) {
+    this._zeroBaseline.set(value);
+  }
+  get zeroBaseline(): boolean {
+    return this._zeroBaseline();
+  }
   private readonly _todayLabel = signal<string>('');
   @Input() set todayLabel(value: string) {
     this._todayLabel.set(value);
@@ -296,7 +307,7 @@ export class AreaChartComponent implements AfterViewInit, OnDestroy {
         if (raw !== null && raw !== undefined) values.push(Number(raw));
       }
     }
-    return chartScale(values, 'auto');
+    return chartScale(values, this._zeroBaseline() ? 'always' : 'auto');
   });
 
   private domain = computed<[number, number]>(() => [this.scale().min, this.scale().max]);

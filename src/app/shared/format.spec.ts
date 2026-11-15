@@ -1,4 +1,11 @@
-import { fmtShortDate, localISODate, localISOMonth, maskPhoneBR, formatCompact } from './format';
+import {
+  fmtShortDate,
+  localISODate,
+  localISOMonth,
+  maskPhoneBR,
+  formatCompact,
+  shortDateRange,
+} from './format';
 
 // O runner dos testes é Node; o tsconfig.spec não carrega @types/node.
 declare const process: { env: Record<string, string | undefined> };
@@ -84,5 +91,15 @@ describe('formatCompact (eixo de gráfico)', () => {
 
   it('número inválido vira texto vazio', () => {
     expect(formatCompact(NaN)).toBe('');
+  });
+});
+
+describe('shortDateRange (eixo semanal com datas, relatório U.5)', () => {
+  it.each([
+    ['2026-11-01', '2026-11-07', '01–07/11'],
+    ['2026-10-29', '2026-11-04', '29/10–04/11'],
+    ['2026-11-07', '2026-11-07', '07/11'],
+  ])('%s a %s -> %s', (a, b, esperado) => {
+    expect(shortDateRange(a, b)).toBe(esperado);
   });
 });

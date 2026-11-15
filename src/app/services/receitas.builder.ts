@@ -3,6 +3,7 @@
  * Aqui só há funções puras: recebem os lançamentos e devolvem o dataset que a tela consome.
  * Datas são "AAAA-MM-DD" (calendário, sem fuso).
  */
+import { shortDateRange } from '../shared/format';
 
 export type PeriodKey = 'Hoje' | '7 dias' | 'Este mês' | 'Mês passado' | 'Personalizado';
 export type Canal = 'salao' | 'delivery';
@@ -367,7 +368,7 @@ export function buildReceitas(
     }
     tendenciaDescricao = 'Dia a dia no período';
   } else {
-    buckets(win.start, win.end).forEach(([a, b], i) => parte(a, b, `Sem ${i + 1}`));
+    buckets(win.start, win.end).forEach(([a, b]) => parte(a, b, shortDateRange(a, b)));
     tendenciaDescricao = 'Semana a semana no período';
   }
 
