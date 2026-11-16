@@ -210,9 +210,20 @@
                     </div>
                     <div>
                       <div class="font-medium leading-tight">{{ m.title }}</div>
-                      <div class="text-[12px] text-muted-foreground">
-                        {{ categoryName(m.categoryId) }}
-                      </div>
+                      @if (m.transfer) {
+                        <span
+                          class="inline-flex items-center gap-1 text-[11px] font-semibold text-ocean"
+                          data-testid="chip-transferencia"
+                          ><app-icon
+                            name="swap_horiz"
+                            [style]="{ fontSize: '14px' }"
+                          />Transferência entre contas</span
+                        >
+                      } @else {
+                        <div class="text-[12px] text-muted-foreground">
+                          {{ categoryName(m.categoryId) }}
+                        </div>
+                      }
                     </div>
                   </button>
                 </td>
@@ -238,13 +249,15 @@
                   <div
                     class="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition"
                   >
-                    <button
-                      (click)="openEdit(m)"
-                      class="h-7 w-7 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
-                      title="Editar"
-                    >
-                      <app-icon name="edit" [style]="{ fontSize: '15px' }" />
-                    </button>
+                    @if (!m.transfer) {
+                      <button
+                        (click)="openEdit(m)"
+                        class="h-7 w-7 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
+                        title="Editar"
+                      >
+                        <app-icon name="edit" [style]="{ fontSize: '15px' }" />
+                      </button>
+                    }
                     <button
                       (click)="details.set(m)"
                       class="h-7 w-7 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"

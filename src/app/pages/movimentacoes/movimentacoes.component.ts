@@ -173,7 +173,10 @@ export class MovimentacoesComponent implements OnInit {
   ];
 
   protected allActiveCategories = computed(() =>
-    this.categoriasSvc.categories().filter((c) => c.active),
+    this.categoriasSvc
+      .categories()
+      .filter((c) => !c.system)
+      .filter((c) => c.active),
   );
 
   protected importValidCount = computed(() => this.importRows().filter((r) => r.valid).length);
@@ -218,7 +221,10 @@ export class MovimentacoesComponent implements OnInit {
   // Só categorias ativas do mesmo tipo (receita/despesa) da movimentação — o
   // servidor rejeita a combinação direction×category.type divergente.
   protected categories = computed(() =>
-    this.categoriasSvc.categories().filter((c) => c.active && c.type === this.form().type),
+    this.categoriasSvc
+      .categories()
+      .filter((c) => !c.system)
+      .filter((c) => c.active && c.type === this.form().type),
   );
   protected paymentMethods = PAYMENT_METHODS;
   protected statusMeta = STATUS_META;
@@ -345,18 +351,36 @@ export class MovimentacoesComponent implements OnInit {
     this.limite.update((n) => n + LINHAS_POR_VEZ);
   }
 
+  /** Categorias do sistema (transferência entre contas, saldo inicial): não são entrada nem saída do negócio. */
+  private categoriasDoSistema = computed(
+    () =>
+      new Set(
+        this.categoriasSvc
+          .categories()
+          .filter((c) => c.system)
+          .map((c) => c.id),
+      ),
+  );
+  /** Base dos cartões do topo: sem transferências e saldo inicial (S3.2), que só mexem no saldo das contas. */
+  private doNegocio = computed(() => {
+    const sistema = this.categoriasDoSistema();
+    return this.filtered().filter(
+      (m) => !m.transfer && !(m.categoryId && sistema.has(m.categoryId)),
+    );
+  });
+
   protected totalIn = computed(() =>
-    this.filtered()
+    this.doNegocio()
       .filter((m) => m.type === 'income' && m.status === 'received')
       .reduce((s, m) => s + m.value, 0),
   );
   protected totalOut = computed(() =>
-    this.filtered()
+    this.doNegocio()
       .filter((m) => m.type === 'expense' && m.status === 'paid')
       .reduce((s, m) => s + m.value, 0),
   );
   protected totalPending = computed(() =>
-    this.filtered()
+    this.doNegocio()
       .filter((m) => m.status === 'pending')
       .reduce((s, m) => s + (m.type === 'income' ? m.value : -m.value), 0),
   );
@@ -800,10 +824,12 @@ export class MovimentacoesComponent implements OnInit {
         .map((a) => a.name);
       const incomeCategorias = this.categoriasSvc
         .categories()
+        .filter((c) => !c.system)
         .filter((c) => c.active && c.type === 'income')
         .map((c) => c.name);
       const expenseCategorias = this.categoriasSvc
         .categories()
+        .filter((c) => !c.system)
         .filter((c) => c.active && c.type === 'expense')
         .map((c) => c.name);
       const categorias = [...incomeCategorias, ...expenseCategorias];
@@ -1276,6 +1302,7 @@ export class MovimentacoesComponent implements OnInit {
         {
           categories: this.categoriasSvc
             .categories()
+            .filter((c) => !c.system)
             .map((c) => ({ id: c.id, name: c.name, type: c.type })),
           accounts: this.contasSvc.accounts().map((a) => ({ id: a.id, name: a.name })),
         },

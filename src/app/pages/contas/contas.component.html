@@ -7,14 +7,27 @@
         Gerencie suas contas bancárias, caixas e carteiras digitais.
       </p>
     </div>
-    <button
-      data-tour="nova-conta"
-      (click)="openCreate()"
-      class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0"
-    >
-      <app-icon name="add" [style]="{ fontSize: '20px' }" />
-      <span>Nova conta</span>
-    </button>
+    <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
+      @if (contasAtivas().length >= 2) {
+        <button
+          type="button"
+          (click)="openTransfer()"
+          data-testid="abrir-transferencia"
+          class="flex items-center gap-2 h-10 px-4 rounded-xl border border-border bg-card text-sm font-medium hover:bg-muted transition cursor-pointer"
+        >
+          <app-icon name="swap_horiz" [style]="{ fontSize: '20px' }" />
+          <span>Transferir entre contas</span>
+        </button>
+      }
+      <button
+        data-tour="nova-conta"
+        (click)="openCreate()"
+        class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0"
+      >
+        <app-icon name="add" [style]="{ fontSize: '20px' }" />
+        <span>Nova conta</span>
+      </button>
+    </div>
   </div>
 
   <!-- Summary -->
@@ -123,6 +136,17 @@
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0">
+              @if (a.active) {
+                <button
+                  type="button"
+                  (click)="openOpening(a)"
+                  class="h-8 w-8 rounded-xl grid place-items-center text-muted-foreground hover:bg-muted transition cursor-pointer"
+                  title="Saldo inicial"
+                  [attr.aria-label]="'Saldo inicial de ' + a.name"
+                >
+                  <app-icon name="savings" [style]="{ fontSize: '17px' }" />
+                </button>
+              }
               <button
                 (click)="openEdit(a)"
                 class="h-8 w-8 rounded-xl grid place-items-center text-muted-foreground hover:bg-muted transition cursor-pointer"
@@ -476,6 +500,165 @@
 }
 
 <!-- ─── Blocked modal (has balance) ─── -->
+@if (transferOpen()) {
+  <app-modal
+    title="Transferir entre contas"
+    subtitle="Ex.: o repasse que caiu no iFood e foi para o banco. Não é venda nem custo: o lucro não muda."
+    (closed)="transferOpen.set(false)"
+  >
+    <div class="space-y-4" data-testid="modal-transferencia">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">De (sai daqui)</span>
+          <select
+            [value]="transferForm().fromId"
+            (change)="setTransfer('fromId', inputText($event))"
+            class="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
+            data-testid="transf-de"
+          >
+            @for (c of contasAtivas(); track c.id) {
+              <option [value]="c.id" [selected]="c.id === transferForm().fromId">
+                {{ c.name }} · {{ fmtBRL(c.balance) }}
+              </option>
+            }
+          </select>
+        </label>
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">Para (entra aqui)</span>
+          <select
+            [value]="transferForm().toId"
+            (change)="setTransfer('toId', inputText($event))"
+            class="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
+            data-testid="transf-para"
+          >
+            @for (c of contasAtivas(); track c.id) {
+              <option [value]="c.id" [selected]="c.id === transferForm().toId">
+                {{ c.name }} · {{ fmtBRL(c.balance) }}
+              </option>
+            }
+          </select>
+        </label>
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">Valor (R$)</span>
+          <input
+            appMoneyInput
+            type="text"
+            inputmode="decimal"
+            placeholder="0,00"
+            [value]="transferForm().valor"
+            (input)="setTransfer('valor', inputText($event))"
+            class="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
+            data-testid="transf-valor"
+          />
+        </label>
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">Data</span>
+          <input
+            type="date"
+            [max]="hoje"
+            [value]="transferForm().data"
+            (change)="setTransfer('data', inputText($event))"
+            class="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
+          />
+        </label>
+      </div>
+      <label class="block">
+        <span class="text-[12px] font-medium block mb-1">Observação (opcional)</span>
+        <input
+          type="text"
+          maxlength="500"
+          [value]="transferForm().descricao"
+          (input)="setTransfer('descricao', inputText($event))"
+          class="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
+        />
+      </label>
+      @if (transferProblema(); as p) {
+        <p class="text-[12px] text-muted-foreground" data-testid="transf-problema">{{ p }}</p>
+      }
+    </div>
+    <ng-container ngProjectAs="[slot=footer]">
+      <div class="flex justify-end gap-2 w-full">
+        <button
+          type="button"
+          (click)="transferOpen.set(false)"
+          class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted cursor-pointer"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          (click)="confirmTransfer()"
+          [disabled]="!!transferProblema() || transferSaving()"
+          data-testid="transf-confirmar"
+          class="h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 disabled:opacity-50 cursor-pointer"
+        >
+          {{ transferSaving() ? 'Transferindo…' : 'Transferir' }}
+        </button>
+      </div>
+    </ng-container>
+  </app-modal>
+}
+
+@if (openingFor(); as conta) {
+  <app-modal
+    [title]="'Saldo inicial · ' + conta.name"
+    subtitle="Quanto havia na conta quando você começou a usar o Mintly. Não conta como venda."
+    (closed)="openingFor.set(null)"
+  >
+    <div class="space-y-4" data-testid="modal-saldo-inicial">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">Saldo inicial (R$)</span>
+          <input
+            appMoneyInput
+            type="text"
+            inputmode="decimal"
+            placeholder="0,00"
+            [value]="openingForm().valor"
+            (input)="setOpening('valor', inputText($event))"
+            class="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
+            data-testid="saldo-inicial-valor"
+          />
+        </label>
+        <label class="block">
+          <span class="text-[12px] font-medium block mb-1">Em que dia</span>
+          <input
+            type="date"
+            [max]="hoje"
+            [value]="openingForm().data"
+            (change)="setOpening('data', inputText($event))"
+            class="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
+          />
+        </label>
+      </div>
+      <p class="text-[12px] text-muted-foreground leading-relaxed">
+        Substitui o saldo inicial anterior desta conta, se houver (não duplica). Deixe 0,00 para
+        remover.
+      </p>
+    </div>
+    <ng-container ngProjectAs="[slot=footer]">
+      <div class="flex justify-end gap-2 w-full">
+        <button
+          type="button"
+          (click)="openingFor.set(null)"
+          class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted cursor-pointer"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          (click)="confirmOpening()"
+          [disabled]="openingSaving() || !openingForm().data || openingForm().data > hoje"
+          data-testid="saldo-inicial-salvar"
+          class="h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 disabled:opacity-50 cursor-pointer"
+        >
+          {{ openingSaving() ? 'Salvando…' : 'Salvar saldo inicial' }}
+        </button>
+      </div>
+    </ng-container>
+  </app-modal>
+}
+
 @if (blocked()) {
   <app-modal
     title="Não é possível desativar"

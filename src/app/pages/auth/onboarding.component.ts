@@ -209,7 +209,7 @@ export class OnboardingComponent {
   private nomesCategorias = computed(() =>
     this.categorias
       .categories()
-      .filter((c) => c.active)
+      .filter((c) => c.active && !c.system)
       .map((c) => c.name),
   );
 

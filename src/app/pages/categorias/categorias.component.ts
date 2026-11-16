@@ -72,7 +72,8 @@ export class CategoriasComponent implements OnInit {
     active: true,
   });
 
-  protected categories = this.svc.categories;
+  /** Sem as categorias do sistema (transferência entre contas, saldo inicial): o dono não as edita. */
+  protected categories = computed(() => this.svc.categories().filter((c) => !c.system));
   protected loading = this.svc.loading;
   protected fmtDate = fmtDateTime;
 

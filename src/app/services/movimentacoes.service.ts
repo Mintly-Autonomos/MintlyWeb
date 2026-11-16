@@ -75,6 +75,8 @@ export interface Movement {
   notes: string | null;
   /** Pratos vendidos (só vendas que informaram). Base do ranking de mais vendidos. */
   items?: SaleItem[];
+  /** Transferência entre contas (S3.2): a conta do outro lado. Não se edita; cancelar cancela os dois lados. */
+  transfer?: { id: string; counterpartName: string };
   createdBy: string;
   createdAt: string;
   updatedBy: string;
@@ -191,6 +193,8 @@ function toMovement(raw: FinancialMovement): Movement {
     paymentMethod: LibPaymentMethod;
     description?: string;
     items?: SaleItem[];
+    transferId?: string;
+    transferCounterpart?: { name: string };
     audit?: {
       createdAt?: unknown;
       updatedAt?: unknown;
@@ -218,6 +222,9 @@ function toMovement(raw: FinancialMovement): Movement {
     channel: r.channel ? CHANNEL_FROM_LIB[r.channel] : null,
     notes: r.description ?? null,
     ...(r.items?.length ? { items: r.items.map((i) => ({ ...i })) } : {}),
+    ...(r.transferId
+      ? { transfer: { id: r.transferId, counterpartName: r.transferCounterpart?.name ?? '' } }
+      : {}),
     createdBy: r.audit?.createdByName ?? r.audit?.createdBy ?? '—',
     createdAt: toISO(r.audit?.createdAt),
     updatedBy: r.audit?.updatedByName ?? r.audit?.updatedBy ?? '—',

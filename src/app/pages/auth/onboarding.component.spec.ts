@@ -27,12 +27,13 @@ describe('OnboardingComponent', () => {
     accounts: signal([{ name: 'Caixa', active: true, isDefault: true }]),
     refresh: vi.fn().mockResolvedValue(undefined),
   };
+  const lista = signal([
+    { name: 'Venda Balcão', active: true },
+    { name: 'Aluguel', active: true },
+    { name: 'Antiga', active: false },
+  ]);
   const categorias = {
-    categories: signal([
-      { name: 'Venda Balcão', active: true },
-      { name: 'Aluguel', active: true },
-      { name: 'Antiga', active: false },
-    ]),
+    categories: lista,
     refresh: vi.fn().mockResolvedValue(undefined),
   };
   const toast = { error: vi.fn() };

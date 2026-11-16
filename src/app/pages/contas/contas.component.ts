@@ -27,6 +27,8 @@ import {
   settlementFormFromAccount,
   settlementRuleFromForm,
 } from './settlement-form';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
+import { localISODate } from '../../shared/format';
 
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -45,12 +47,28 @@ function normalize(s: string): string {
     FilterBarComponent,
     FilterSelectComponent,
     AuditTimelineComponent,
+    MoneyInputDirective,
   ],
   templateUrl: './contas.component.html',
 })
 export class ContasComponent implements OnInit {
   private svc = inject(ContasService);
   private toast = inject(ToastService);
+
+  // Transferência entre contas e saldo inicial (S3.2)
+  protected transferOpen = signal(false);
+  protected transferForm = signal({
+    fromId: '',
+    toId: '',
+    valor: '',
+    data: localISODate(),
+    descricao: '',
+  });
+  protected transferSaving = signal(false);
+  protected openingFor = signal<Account | null>(null);
+  protected openingForm = signal({ valor: '', data: localISODate() });
+  protected openingSaving = signal(false);
+  protected readonly hoje = localISODate();
 
   // State
   protected editing = signal<Account | null>(null);
@@ -151,6 +169,107 @@ export class ContasComponent implements OnInit {
   clearFilters(): void {
     this.typeFilter.set('all');
     this.statusFilter.set('all');
+  }
+
+  /** "1.234,56" (campo de dinheiro) → 1234.56; vazio → 0. */
+  protected moneyNumber(texto: string): number {
+    const n = Number(texto.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  protected inputText(e: Event): string {
+    return (e.target as HTMLInputElement).value;
+  }
+
+  protected contasAtivas = computed(() => this.accounts().filter((a) => a.active));
+
+  openTransfer(): void {
+    const ativas = this.contasAtivas();
+    // Origem sugerida: a plataforma com mais saldo (é de onde o repasse costuma sair); destino: a padrão.
+    const origem =
+      [...ativas]
+        .filter((a) => a.type === 'Financial Platform')
+        .sort((a, b) => b.balance - a.balance)[0] ??
+      ativas.find((a) => !a.isDefault) ??
+      ativas[0];
+    const destino =
+      ativas.find((a) => a.isDefault && a.id !== origem?.id) ??
+      ativas.find((a) => a.id !== origem?.id);
+    this.transferForm.set({
+      fromId: origem?.id ?? '',
+      toId: destino?.id ?? '',
+      valor: '',
+      data: localISODate(),
+      descricao: '',
+    });
+    this.transferOpen.set(true);
+  }
+
+  setTransfer(campo: 'fromId' | 'toId' | 'valor' | 'data' | 'descricao', valor: string): void {
+    this.transferForm.update((f) => ({ ...f, [campo]: valor }));
+  }
+
+  /** O que falta para transferir (null = pode). */
+  protected transferProblema = computed(() => {
+    const f = this.transferForm();
+    if (!f.fromId || !f.toId) return 'Escolha as duas contas.';
+    if (f.fromId === f.toId) return 'A origem e o destino precisam ser contas diferentes.';
+    if (!(this.moneyNumber(f.valor) > 0)) return 'Informe o valor.';
+    if (!f.data) return 'Informe a data.';
+    if (f.data > this.hoje) return 'A data não pode estar no futuro.';
+    return null;
+  });
+
+  async confirmTransfer(): Promise<void> {
+    if (this.transferProblema() || this.transferSaving()) return;
+    const f = this.transferForm();
+    this.transferSaving.set(true);
+    try {
+      await this.svc.transfer({
+        fromId: f.fromId,
+        toId: f.toId,
+        amount: this.moneyNumber(f.valor),
+        date: f.data,
+        description: f.descricao.trim() || undefined,
+      });
+      const nome = (id: string) => this.accounts().find((a) => a.id === id)?.name ?? '';
+      this.toast.success(
+        `Transferência de ${fmtTransfer(this.moneyNumber(f.valor))} de ${nome(f.fromId)} para ${nome(f.toId)} registrada.`,
+      );
+      this.transferOpen.set(false);
+    } catch (err) {
+      this.toast.error(this.errMsg(err));
+    } finally {
+      this.transferSaving.set(false);
+    }
+  }
+
+  openOpening(a: Account): void {
+    this.openingForm.set({ valor: '', data: localISODate() });
+    this.openingFor.set(a);
+  }
+
+  setOpening(campo: 'valor' | 'data', valor: string): void {
+    this.openingForm.update((f) => ({ ...f, [campo]: valor }));
+  }
+
+  async confirmOpening(): Promise<void> {
+    const a = this.openingFor();
+    const f = this.openingForm();
+    if (!a || !f.data || f.data > this.hoje || this.openingSaving()) return;
+    this.openingSaving.set(true);
+    try {
+      const valor = this.moneyNumber(f.valor);
+      await this.svc.setOpeningBalance(a.id, valor, f.data);
+      this.toast.success(
+        valor > 0 ? `Saldo inicial de ${a.name} definido.` : `Saldo inicial de ${a.name} removido.`,
+      );
+      this.openingFor.set(null);
+    } catch (err) {
+      this.toast.error(this.errMsg(err));
+    } finally {
+      this.openingSaving.set(false);
+    }
   }
 
   // Open create/edit modal
@@ -468,4 +587,8 @@ export class ContasComponent implements OnInit {
   reassignCandidates(): Account[] {
     return this.accounts().filter((a) => a.active && !a.isDefault);
   }
+}
+
+function fmtTransfer(n: number): string {
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
