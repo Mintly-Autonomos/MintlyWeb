@@ -17,7 +17,13 @@ import { AuditTimelineComponent } from '../../shared/audit-timeline.component';
 import { ToastService } from '../../shared/toast.service';
 import { apiErrorMessage } from '../../shared/api-error-message';
 import { formatBRL, fmtDateTime } from '../../shared/format';
-import { describeSettlementRule, resolveSettlementRule, settlementDueDate } from 'mintly-lib';
+import {
+  describeSettlementRule,
+  resolveSettlementRule,
+  settlementDueDate,
+  PlatformKind,
+} from 'mintly-lib';
+import type { FeeByMethod } from 'mintly-lib';
 import {
   SETTLEMENT_KIND_OPTS,
   SettlementFormState,
@@ -33,6 +39,41 @@ import { localISODate } from '../../shared/format';
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ');
 }
+
+/** Formas de pagamento com taxa própria numa plataforma (S3.3). */
+const FEE_METHOD_OPTS = [
+  { key: 'debit', label: 'Débito' },
+  { key: 'credit', label: 'Crédito' },
+  { key: 'pix', label: 'Pix' },
+  { key: 'digitalWallet', label: 'Carteira digital' },
+] as const satisfies readonly { key: keyof FeeByMethod; label: string }[];
+
+type FeeForm = Record<keyof FeeByMethod, string>;
+
+const emptyFeeForm = (): FeeForm => ({ debit: '', credit: '', pix: '', digitalWallet: '' });
+
+/** "" → null (usa a padrão); "3,1" → 3.1; texto inválido → NaN. */
+function parsePct(raw: string): number | null {
+  const t = raw.trim();
+  return t === '' ? null : Number(t.replace(',', '.'));
+}
+
+function feeFormFromAccount(fees: FeeByMethod | undefined): FeeForm {
+  const f = emptyFeeForm();
+  for (const m of FEE_METHOD_OPTS) if (fees?.[m.key] != null) f[m.key] = String(fees[m.key]);
+  return f;
+}
+
+function feeByMethodFromForm(form: FeeForm): FeeByMethod {
+  const out: FeeByMethod = {};
+  for (const m of FEE_METHOD_OPTS) {
+    const n = parsePct(form[m.key]);
+    if (n !== null && Number.isFinite(n)) out[m.key] = n;
+  }
+  return out;
+}
+
+const fmtPct = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
 @Component({
   selector: 'app-contas',
@@ -94,6 +135,8 @@ export class ContasComponent implements OnInit {
     active: boolean;
     isDefault: boolean;
     taxPct: string;
+    platformKind: PlatformKind;
+    feeByMethod: FeeForm;
     settlement: SettlementFormState;
   }>({
     name: '',
@@ -101,8 +144,13 @@ export class ContasComponent implements OnInit {
     active: true,
     isDefault: false,
     taxPct: '',
+    platformKind: PlatformKind.Marketplace,
+    feeByMethod: emptyFeeForm(),
     settlement: emptySettlementForm(),
   });
+
+  protected readonly PlatformKind = PlatformKind;
+  protected readonly feeMethods = FEE_METHOD_OPTS;
 
   protected readonly settlementKinds = SETTLEMENT_KIND_OPTS;
   protected readonly weekdays = WEEKDAY_BUTTONS;
@@ -280,6 +328,8 @@ export class ContasComponent implements OnInit {
       active: true,
       isDefault: false,
       taxPct: '',
+      platformKind: PlatformKind.Marketplace,
+      feeByMethod: emptyFeeForm(),
       settlement: emptySettlementForm(),
     });
     this.creating.set(true);
@@ -292,6 +342,8 @@ export class ContasComponent implements OnInit {
       active: a.active,
       isDefault: a.isDefault,
       taxPct: a.taxPct != null ? String(a.taxPct) : '',
+      platformKind: a.platformKind ?? PlatformKind.Marketplace,
+      feeByMethod: feeFormFromAccount(a.feeByMethod),
       settlement: settlementFormFromAccount(a),
     });
     this.editing.set(a);
@@ -335,6 +387,7 @@ export class ContasComponent implements OnInit {
     }
     if (this.isPlatform && this.settlementError) return true;
     if (this.isPlatform && this.taxError) return true;
+    if (this.isPlatform && this.feeByMethodError) return true;
     return false;
   }
 
@@ -345,6 +398,35 @@ export class ContasComponent implements OnInit {
     const n = Number(raw.replace(',', '.'));
     if (!Number.isFinite(n) || n < 0 || n > 100) return 'Informe uma taxa entre 0% e 100%.';
     return '';
+  }
+
+  /** Taxas por forma de pagamento: cada uma vazia (usa a padrão) ou entre 0 e 100. */
+  get feeByMethodError(): string {
+    const fora = FEE_METHOD_OPTS.find((m) => {
+      const n = parsePct(this.form().feeByMethod[m.key]);
+      return n !== null && (Number.isNaN(n) || n < 0 || n > 100);
+    });
+    return fora ? `Taxa do ${fora.label.toLowerCase()}: informe entre 0% e 100%.` : '';
+  }
+
+  setFormPlatformKind(kind: PlatformKind): void {
+    this.form.update((f) => ({ ...f, platformKind: kind }));
+  }
+  setFormFeeByMethod(method: keyof FeeForm, v: string): void {
+    this.form.update((f) => ({ ...f, feeByMethod: { ...f.feeByMethod, [method]: v } }));
+  }
+
+  /** "Maquininha" ou "App de delivery" (só plataforma). */
+  platformLabel(a: Pick<Account, 'type' | 'platformKind'>): string {
+    if (a.type !== 'Financial Platform') return '';
+    return a.platformKind === PlatformKind.CardMachine ? 'Maquininha' : 'App de delivery';
+  }
+
+  /** "Débito 1% · Crédito 3,1%" (só as formas com taxa própria). */
+  feeByMethodLabel(a: Pick<Account, 'feeByMethod'>): string {
+    return FEE_METHOD_OPTS.filter((m) => a.feeByMethod?.[m.key] != null)
+      .map((m) => `${m.label} ${fmtPct(a.feeByMethod![m.key]!)}%`)
+      .join(' · ');
   }
 
   get deactivateReason(): string {
@@ -446,6 +528,8 @@ export class ContasComponent implements OnInit {
           name: f.name.trim(),
           type: f.type,
           taxPct: this.isPlatform ? Number(f.taxPct) || 0 : undefined,
+          platformKind: this.isPlatform ? f.platformKind : undefined,
+          feeByMethod: this.isPlatform ? feeByMethodFromForm(f.feeByMethod) : undefined,
           settlementRule: this.isPlatform
             ? (settlementRuleFromForm(f.settlement) ?? undefined)
             : undefined,
@@ -492,6 +576,8 @@ export class ContasComponent implements OnInit {
       active: boolean;
       isDefault: boolean;
       taxPct: string;
+      platformKind: PlatformKind;
+      feeByMethod: FeeForm;
       settlement: SettlementFormState;
     },
   ): Promise<void> {
@@ -499,6 +585,8 @@ export class ContasComponent implements OnInit {
       name: f.name.trim(),
       type: f.type,
       taxPct: this.isPlatform ? Number(f.taxPct) || 0 : undefined,
+      platformKind: this.isPlatform ? f.platformKind : undefined,
+      feeByMethod: this.isPlatform ? feeByMethodFromForm(f.feeByMethod) : undefined,
       settlementRule: this.isPlatform
         ? (settlementRuleFromForm(f.settlement) ?? undefined)
         : undefined,

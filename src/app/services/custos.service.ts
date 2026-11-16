@@ -158,6 +158,13 @@ function buildMockReport(month?: string): ExpensesReport {
       deliveryRevenue: mockCustos.receitaDeliveryMes,
       pctOfDelivery: ifoodItem.amount / mockCustos.receitaDeliveryMes,
     },
+    cardFee: {
+      amount: 0,
+      previous: 0,
+      deltaPrevious: null,
+      cardRevenue: 0,
+      pctOfCardRevenue: null,
+    },
     byBehavior: {
       fixed: items
         .filter((i) => i.behavior === CategoryBehavior.Fixed)

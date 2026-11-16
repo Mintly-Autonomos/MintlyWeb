@@ -220,8 +220,20 @@ export class CustosComponent implements OnInit {
     return sub.anomaly;
   }
 
+  /** S3.3: a taxa da maquininha não soma com a comissão dos apps; aparece embaixo, separada. */
+  protected taxaMaquininhaTexto = computed(() => {
+    const c = this.data()?.cardFee;
+    if (!c || c.amount <= 0) return '';
+    const pct =
+      c.pctOfCardRevenue != null
+        ? ` (${this.pctFmt(c.pctOfCardRevenue * 100)} das vendas nela)`
+        : '';
+    return `Maquininha: ${this.fmtBRL(c.amount)}${pct}`;
+  });
+
   iconForExpense(item: ExpenseItem): string {
     const n = item.name.toLowerCase();
+    if (item.kind === 'cardFee') return 'credit_card';
     if (
       item.kind === 'platformFee' ||
       n.includes('taxa') ||

@@ -187,7 +187,15 @@
               a.settlementDays !== undefined ||
               a.settlementRule !== undefined)
           ) {
-            <div class="flex gap-3 text-[12px] text-muted-foreground">
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
+              <span class="flex items-center gap-1" data-testid="tipo-plataforma-card"
+                ><app-icon
+                  [name]="
+                    a.platformKind === PlatformKind.CardMachine ? 'credit_card' : 'delivery_dining'
+                  "
+                  [style]="{ fontSize: '14px' }"
+                />{{ platformLabel(a) }}</span
+              >
               @if (a.taxPct !== undefined) {
                 <span class="flex items-center gap-1"
                   ><app-icon name="percent" [style]="{ fontSize: '14px' }" />{{ a.taxPct }}% de
@@ -200,6 +208,11 @@
                     repasseLabel(a)
                   }}</span
                 >
+              }
+              @if (feeByMethodLabel(a)) {
+                <span class="basis-full" data-testid="taxa-por-forma-card">{{
+                  feeByMethodLabel(a)
+                }}</span>
               }
             </div>
           }
@@ -294,8 +307,57 @@
 
       <!-- Platform fields -->
       @if (isPlatform) {
+        <fieldset data-testid="tipo-plataforma">
+          <legend class="text-[13px] font-medium mb-1.5">Que plataforma é</legend>
+          <div class="grid grid-cols-2 gap-2">
+            @for (
+              k of [
+                {
+                  kind: PlatformKind.Marketplace,
+                  label: 'App de delivery',
+                  hint: 'iFood, Keeta, 99…',
+                  icon: 'delivery_dining',
+                },
+                {
+                  kind: PlatformKind.CardMachine,
+                  label: 'Maquininha',
+                  hint: 'Stone, PagSeguro, Cielo…',
+                  icon: 'credit_card',
+                },
+              ];
+              track k.kind
+            ) {
+              <button
+                type="button"
+                (click)="setFormPlatformKind(k.kind)"
+                [attr.aria-pressed]="form().platformKind === k.kind"
+                [attr.data-testid]="'tipo-' + k.kind"
+                class="flex items-center gap-2.5 p-3 rounded-xl border text-left cursor-pointer transition"
+                [class]="
+                  form().platformKind === k.kind
+                    ? 'border-mint bg-mint-soft/60'
+                    : 'border-border hover:bg-muted'
+                "
+              >
+                <app-icon [name]="k.icon" [style]="{ fontSize: '20px' }" />
+                <span class="flex flex-col">
+                  <span class="text-sm font-medium">{{ k.label }}</span>
+                  <span class="text-[11.5px] text-muted-foreground">{{ k.hint }}</span>
+                </span>
+              </button>
+            }
+          </div>
+          <p class="text-[12px] text-muted-foreground mt-1">
+            {{
+              form().platformKind === PlatformKind.CardMachine
+                ? 'Venda na maquininha conta como salão, e a taxa aparece como "Taxa da maquininha".'
+                : 'Venda no app conta como delivery, e a taxa aparece como comissão do app.'
+            }}
+          </p>
+        </fieldset>
+
         <label class="block">
-          <span class="text-[13px] font-medium block mb-1.5">Taxa cobrada (%)</span>
+          <span class="text-[13px] font-medium block mb-1.5">Taxa padrão (%)</span>
           <input
             [value]="form().taxPct"
             (input)="setFormTaxPct($any($event.target).value)"
@@ -312,10 +374,44 @@
             </p>
           } @else {
             <p class="text-[12px] text-muted-foreground mt-1">
-              Quanto a plataforma cobra por venda.
+              Quanto a plataforma cobra por venda quando a forma de pagamento não tem taxa própria.
             </p>
           }
         </label>
+
+        <fieldset data-testid="taxa-por-forma">
+          <legend class="text-[13px] font-medium mb-1.5">
+            Taxa por forma de pagamento
+            <span class="text-muted-foreground font-normal">(opcional)</span>
+          </legend>
+          <div class="grid grid-cols-2 gap-2">
+            @for (m of feeMethods; track m.key) {
+              <label class="block">
+                <span class="text-[12px] text-muted-foreground block mb-1">{{ m.label }} (%)</span>
+                <input
+                  [value]="form().feeByMethod[m.key]"
+                  (input)="setFormFeeByMethod(m.key, $any($event.target).value)"
+                  [attr.data-testid]="'taxa-' + m.key"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  [placeholder]="form().taxPct || '0'"
+                  class="w-full h-10 rounded-xl border border-border bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition placeholder:text-muted-foreground"
+                />
+              </label>
+            }
+          </div>
+          @if (feeByMethodError) {
+            <p class="text-[12px] text-error mt-1" role="alert" data-testid="erro-taxa-forma">
+              {{ feeByMethodError }}
+            </p>
+          } @else {
+            <p class="text-[12px] text-muted-foreground mt-1">
+              Ex.: na maquininha, débito 1,2% e crédito 3,1%. Em branco, vale a taxa padrão.
+            </p>
+          }
+        </fieldset>
 
         <fieldset class="space-y-3" data-testid="repasse">
           <legend class="text-[13px] font-medium mb-1.5">Quando a plataforma repassa</legend>
@@ -890,8 +986,17 @@
         </div>
         @if (details()!.type === 'Financial Platform') {
           <div class="p-3 rounded-xl bg-muted/60">
+            <span class="text-muted-foreground block">Plataforma</span>
+            <span class="font-medium">{{ platformLabel(details()!) }}</span>
+          </div>
+          <div class="p-3 rounded-xl bg-muted/60">
             <span class="text-muted-foreground block">Taxa</span>
             <span class="font-medium">{{ details()!.taxPct ?? 0 }}%</span>
+            @if (feeByMethodLabel(details()!)) {
+              <span class="block text-[12px] text-muted-foreground">{{
+                feeByMethodLabel(details()!)
+              }}</span>
+            }
           </div>
           <div class="p-3 rounded-xl bg-muted/60">
             <span class="text-muted-foreground block">Repasse</span>
