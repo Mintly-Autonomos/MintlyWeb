@@ -1,7 +1,7 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { FinancialAccountType, RecordStatus } from 'mintly-lib';
-import type { FinancialAccount, Headers, SettlementRule } from 'mintly-lib';
+import { FinancialAccountType, PlatformKind, RecordStatus } from 'mintly-lib';
+import type { FeeByMethod, FinancialAccount, Headers, SettlementRule } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { apiErrorInfo } from '../shared/api-error';
@@ -31,6 +31,10 @@ export interface Account {
   settlementDays?: number;
   /** Quando a plataforma repassa (semana, quinzena, mês ou N dias). Contas antigas só têm `settlementDays`. */
   settlementRule?: SettlementRule;
+  /** S3.3: app de delivery ou maquininha (só plataforma; sem o campo, app). */
+  platformKind?: PlatformKind;
+  /** S3.3: taxa por forma de pagamento, por cima de `taxPct`. */
+  feeByMethod?: FeeByMethod;
   createdBy: string;
   createdAt: string;
   updatedBy: string;
@@ -140,6 +144,13 @@ function toAccount(raw: FinancialAccount): Account {
       'settlementRule' in raw
         ? ((raw as { settlementRule?: SettlementRule | null }).settlementRule ?? undefined)
         : undefined,
+    ...(raw.type === FinancialAccountType.Platform
+      ? {
+          platformKind:
+            (raw as { platformKind?: PlatformKind }).platformKind ?? PlatformKind.Marketplace,
+          feeByMethod: { ...((raw as { feeByMethod?: FeeByMethod }).feeByMethod ?? {}) },
+        }
+      : {}),
     createdBy: audit?.createdByName ?? audit?.createdBy ?? '—',
     createdAt: toISO(audit?.createdAt),
     updatedBy: audit?.updatedByName ?? audit?.updatedBy ?? '—',
@@ -161,6 +172,8 @@ function toAccount(raw: FinancialAccount): Account {
 export interface CreateAccountInput {
   name: string;
   type: AccType;
+  platformKind?: PlatformKind;
+  feeByMethod?: FeeByMethod;
   taxPct?: number;
   settlementDays?: number;
   settlementRule?: SettlementRule;
@@ -169,6 +182,8 @@ export interface CreateAccountInput {
 export interface UpdateAccountInput {
   name?: string;
   type?: AccType;
+  platformKind?: PlatformKind;
+  feeByMethod?: FeeByMethod;
   taxPct?: number;
   settlementDays?: number;
   settlementRule?: SettlementRule;
@@ -266,6 +281,8 @@ export class ContasService {
               taxPct: input.taxPct ?? 0,
               settlementDays: input.settlementDays ?? 0,
               settlementRule: input.settlementRule,
+              platformKind: input.platformKind ?? PlatformKind.Marketplace,
+              feeByMethod: { ...(input.feeByMethod ?? {}) },
             }
           : {}),
         createdBy: this.by,
@@ -291,6 +308,10 @@ export class ContasService {
       ...(isPlatform
         ? {
             feePercent: input.taxPct ?? 0,
+            platformKind: input.platformKind ?? PlatformKind.Marketplace,
+            ...(input.feeByMethod && Object.keys(input.feeByMethod).length > 0
+              ? { feeByMethod: input.feeByMethod }
+              : {}),
             // A API também aceita só o prazo antigo; a regra sempre vence quando vem.
             settlementRule: input.settlementRule ?? {
               kind: 'afterDays',
@@ -320,6 +341,8 @@ export class ContasService {
         if (input.taxPct !== undefined) acc.taxPct = input.taxPct;
         if (input.settlementDays !== undefined) acc.settlementDays = input.settlementDays;
         if (input.settlementRule !== undefined) acc.settlementRule = input.settlementRule;
+        if (input.platformKind !== undefined) acc.platformKind = input.platformKind;
+        if (input.feeByMethod !== undefined) acc.feeByMethod = { ...input.feeByMethod };
       }
       acc.updatedBy = this.by;
       acc.updatedAt = now;
@@ -341,6 +364,9 @@ export class ContasService {
       ...(isPlatform
         ? {
             feePercent: input.taxPct ?? 0,
+            ...(input.platformKind !== undefined ? { platformKind: input.platformKind } : {}),
+            // {} limpa as taxas por forma (todas voltam à taxa padrão).
+            ...(input.feeByMethod !== undefined ? { feeByMethod: input.feeByMethod } : {}),
             settlementRule: input.settlementRule ?? {
               kind: 'afterDays',
               days: input.settlementDays ?? 0,

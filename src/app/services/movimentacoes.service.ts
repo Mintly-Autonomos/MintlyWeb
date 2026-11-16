@@ -127,7 +127,7 @@ const CHANNEL_FROM_LIB: Record<MovementChannel, Channel> = {
   [MovementChannel.Shared]: 'shared',
 };
 
-const PAYMENT_TO_LIB: Record<PaymentMethod, LibPaymentMethod> = {
+export const PAYMENT_TO_LIB: Record<PaymentMethod, LibPaymentMethod> = {
   Dinheiro: LibPaymentMethod.Cash,
   PIX: LibPaymentMethod.Pix,
   Débito: LibPaymentMethod.Debit,

@@ -50,6 +50,7 @@ interface DespesaView {
 
 function iconForExpense(name: string, kind: OpexItem['kind']): string {
   const n = name.toLowerCase();
+  if (kind === 'cardFee') return 'credit_card';
   if (kind === 'platformFee' || n.includes('taxa') || n.includes('ifood') || n.includes('delivery'))
     return 'delivery_dining';
   if (kind === 'labor' || n.includes('pró-labore') || n.includes('salári')) return 'badge';

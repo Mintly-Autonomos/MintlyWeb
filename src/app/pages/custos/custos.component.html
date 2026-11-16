@@ -104,10 +104,11 @@
         [delta]="statDelta(d.platformFee.deltaPrevious, { note: notaComparacao() })"
         icon="delivery_dining"
         status="warning"
+        [subtext]="taxaMaquininhaTexto()"
       >
         <app-hint
           slot="hint"
-          text="Comissão que as plataformas (iFood, Rappi...) cobram sobre as vendas por delivery."
+          text="Comissão que os apps de delivery (iFood, Rappi...) cobram sobre as vendas deles. A taxa da maquininha fica separada, embaixo do valor."
         />
         @if (d.platformFee.pctOfDelivery; as pct) {
           <app-chip slot="badge" tone="warning" icon="percent"

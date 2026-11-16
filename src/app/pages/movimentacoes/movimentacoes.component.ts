@@ -43,6 +43,10 @@ import type { SettlementRule } from 'mintly-lib';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
 import { matchName, avisosImportacao } from '../../shared/import-parse';
 import { loadWorkbook } from '../../shared/exceljs-loader';
+import { PAYMENT_TO_LIB } from '../../services/movimentacoes.service';
+import type { FeeByMethod } from 'mintly-lib';
+
+type FeeMethodKey = keyof FeeByMethod;
 
 /** Linhas que a tabela mostra de cada vez: com milhares de lançamentos, desenhar todos de uma vez trava a tela. */
 const LINHAS_POR_VEZ = 100;
@@ -438,9 +442,7 @@ export class MovimentacoesComponent implements OnInit {
     const val = parseNumberBR(this.form().value) || 0;
     const id = this.form().accountId;
     if (!id || !this.isPlatformAccount) return 0;
-    const acc = this.contasSvc.accounts().find((x) => x.id === id);
-    const rate = acc?.taxPct ?? FEE_RATES[acc?.name ?? ''] ?? 0;
-    return val * (rate / 100);
+    return val * (this.platformRate / 100);
   }
 
   protected readonly TITLE_MAX = 120;
@@ -567,9 +569,14 @@ export class MovimentacoesComponent implements OnInit {
       : describeSettlementRule(rule).toLowerCase();
   }
 
+  /** Taxa da conta para a forma escolhida (S3.3): a da forma, se a conta tiver; senão a padrão. */
   protected get platformRate(): number {
     const acc = this.contasSvc.accounts().find((x) => x.id === this.form().accountId);
-    return acc?.taxPct ?? FEE_RATES[acc?.name ?? ''] ?? 0;
+    const method = this.form().paymentMethod;
+    const byMethod = method
+      ? acc?.feeByMethod?.[PAYMENT_TO_LIB[method] as FeeMethodKey]
+      : undefined;
+    return byMethod ?? acc?.taxPct ?? FEE_RATES[acc?.name ?? ''] ?? 0;
   }
 
   get netValue(): number {
