@@ -19,6 +19,7 @@ describe('Movimentações: transferência entre contas na lista (relatório S3.2
         active: true,
         system: true,
       },
+      { id: 'c-ob', name: 'Saldo inicial', type: 'income', active: true, system: true },
     ]);
     const movs = [
       {
@@ -41,6 +42,27 @@ describe('Movimentações: transferência entre contas na lista (relatório S3.2
         date: '2025-10-09',
         categoryId: 'c-venda',
         accountId: 'a-nu',
+      },
+      {
+        id: 'o1',
+        title: 'Saldo inicial · Nubank',
+        type: 'income',
+        status: 'received',
+        value: 12_000,
+        date: '2025-10-01',
+        categoryId: 'c-ob',
+        accountId: 'a-nu',
+      },
+      {
+        id: 't2',
+        title: 'Transferência para Caixa',
+        type: 'expense',
+        status: 'paid',
+        value: 80,
+        date: '2025-10-11',
+        categoryId: 'c-tin',
+        accountId: 'a-nu',
+        transfer: { id: 'ty', counterpartName: 'Caixa' },
       },
     ];
     TestBed.configureTestingModule({
@@ -76,6 +98,8 @@ describe('Movimentações: transferência entre contas na lista (relatório S3.2
       c: fixture.componentInstance as unknown as {
         allActiveCategories(): { id: string }[];
         categoryName(id: string): string;
+        totalIn(): number;
+        totalOut(): number;
       },
     };
   }
@@ -94,5 +118,19 @@ describe('Movimentações: transferência entre contas na lista (relatório S3.2
     const { c } = montar();
     expect(c.allActiveCategories().map((x) => x.id)).toEqual(['c-venda']);
     expect(c.categoryName('c-tin')).toBe('Transferência entre contas (entrada)');
+  });
+
+  it('os cartões do topo não contam transferência nem saldo inicial (só mexem no saldo das contas)', () => {
+    const { c } = montar();
+    expect(c.totalIn()).toBe(50);
+    expect(c.totalOut()).toBe(0);
+  });
+
+  it('na linha da transferência o selo substitui o nome da categoria', () => {
+    const { root } = montar();
+    const transf = [...root.querySelectorAll('tbody tr')].find((tr) =>
+      tr.textContent!.includes('Transferência de iFood'),
+    )!;
+    expect(transf.textContent).not.toContain('Transferência entre contas (entrada)');
   });
 });

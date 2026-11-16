@@ -219,10 +219,11 @@
                             [style]="{ fontSize: '14px' }"
                           />Transferência entre contas</span
                         >
+                      } @else {
+                        <div class="text-[12px] text-muted-foreground">
+                          {{ categoryName(m.categoryId) }}
+                        </div>
                       }
-                      <div class="text-[12px] text-muted-foreground">
-                        {{ categoryName(m.categoryId) }}
-                      </div>
                     </div>
                   </button>
                 </td>
