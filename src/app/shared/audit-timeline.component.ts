@@ -23,6 +23,7 @@ const ACTION_LABELS: Record<string, string> = {
   update: 'Dados atualizados',
   'update-name': 'Nome alterado',
   'update-fee': 'Taxa alterada',
+  'update-platform-kind': 'Tipo de plataforma alterado',
   'update-settlement': 'Prazo de repasse alterado',
   inactivate: 'Inativada',
   reactivate: 'Reativada',
