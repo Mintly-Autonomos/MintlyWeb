@@ -319,6 +319,25 @@
       </div>
     </div>
 
+    <!-- Venda acumulada × ponto de equilíbrio (P.9) -->
+    @if (acumulada(); as a) {
+      <app-chart-card
+        data-tour="venda-acumulada"
+        title="Venda acumulada × ponto de equilíbrio"
+        [description]="acumuladaTexto()"
+        [loading]="loading()"
+        [height]="280"
+      >
+        <span slot="title-extra"><app-hint [text]="h.vendaAcumulada" /></span>
+        <app-line-chart
+          [data]="a.pontos"
+          categoryKey="dia"
+          [series]="acumuladaSeries"
+          [valueFormatter]="abrev"
+        />
+      </app-chart-card>
+    }
+
     <!-- 5 — Cascata -->
     <app-chart-card
       data-tour="cascata"
@@ -549,6 +568,7 @@
           [series]="lucroSeries"
           orientation="columns"
           [valueFormatter]="abrev"
+          [colorFor]="lucroCor"
         />
       } @else {
         <app-line-chart

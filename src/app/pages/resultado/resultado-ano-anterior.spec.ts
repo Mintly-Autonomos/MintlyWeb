@@ -1,4 +1,6 @@
 import { signal } from '@angular/core';
+import { MovimentacoesService } from '../../services/movimentacoes.service';
+import { CategoriasService } from '../../services/categorias.service';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ResultadoComponent } from './resultado.component';
@@ -58,6 +60,15 @@ describe('Resultado: meses futuros, 6/12 meses e o mesmo mês do ano anterior (r
     const refresh = vi.fn(() => Promise.resolve());
     TestBed.configureTestingModule({
       providers: [
+        // Venda acumulada (P.9): sem movimentações, o gráfico não aparece.
+        {
+          provide: MovimentacoesService,
+          useValue: { refresh: vi.fn().mockResolvedValue(undefined), movements: signal([]) },
+        },
+        {
+          provide: CategoriasService,
+          useValue: { refresh: vi.fn().mockResolvedValue(undefined), categories: signal([]) },
+        },
         provideRouter([]),
         {
           provide: ResultadoService,
@@ -103,12 +114,13 @@ describe('Resultado: meses futuros, 6/12 meses e o mesmo mês do ano anterior (r
     expect(render(report('2026-10')).q('ano-anterior')).toBeNull();
   });
 
-  it('"12 meses" recarrega com historyMonths 12 e muda o título', () => {
+  it('abre em 12 meses (P.9); "6 meses" recarrega com historyMonths 6 e muda o título', () => {
     const { fixture, q, root, refresh } = render(report('2026-10'));
-    expect((refresh.mock.calls.at(-1) as unknown[])[1]).toBe(6);
-    q('historico-12')!.click();
-    fixture.detectChanges();
     expect((refresh.mock.calls.at(-1) as unknown[])[1]).toBe(12);
     expect(root.textContent).toContain('Seu resultado em 12 meses');
+    q('historico-6')!.click();
+    fixture.detectChanges();
+    expect((refresh.mock.calls.at(-1) as unknown[])[1]).toBe(6);
+    expect(root.textContent).toContain('Seu resultado em 6 meses');
   });
 });
