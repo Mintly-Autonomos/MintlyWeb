@@ -196,9 +196,10 @@ export class NotificationsService {
   }
 
   async refresh(): Promise<void> {
+    // E.3: o perfil Operação não muda o cardápio nem vê o Fluxo de caixa: esses avisos não são para ele.
     await Promise.all([
-      this.cardapio.refreshAlertas(),
-      this.refreshVencidos(),
+      this.auth.podeMudarCadastros() ? this.cardapio.refreshAlertas() : Promise.resolve(),
+      this.auth.podeVerRelatorios() ? this.refreshVencidos() : Promise.resolve(),
       // O teto do MEI vem do perfil do restaurante; se nenhuma tela carregou ainda, carrega aqui.
       this.restaurante.profile()
         ? Promise.resolve()

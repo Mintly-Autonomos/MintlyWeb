@@ -338,12 +338,14 @@
           <div>
             <h4 class="text-[14px] font-bold">Funcionários</h4>
             <p class="text-[13px] text-muted-foreground">
-              Pessoas que entram no Mintly com o próprio e-mail e senha. Elas veem e lançam os dados
-              do restaurante, mas não gerenciam funcionários, o nome do restaurante nem a exclusão.
-              Cada um tem a própria foto de perfil, que ele mesmo troca em "Minha conta".
+              Cada funcionário entra no Mintly com o próprio e-mail e senha. Você convida, ele
+              recebe um link por e-mail e cria a senha. O perfil decide o que ele vê:
+              <b>Operação</b> lança e vê movimentações (sem salários e pró-labore), consulta
+              cardápio e contas, e não vê relatórios; <b>Gerente</b> vê e faz tudo, menos
+              assinatura, funcionários e exclusão do restaurante.
             </p>
             <p class="text-[12.5px] font-medium mt-1.5" data-testid="vagas-funcionarios">
-              {{ ativos() }} de {{ limiteFuncionarios() }} funcionários ativos · plano
+              {{ ativos() }} de {{ limiteFuncionarios() }} vagas de funcionário usadas · plano
               {{ nomePlano() }}
             </p>
           </div>
@@ -375,57 +377,173 @@
                     <div class="min-w-0 flex-1">
                       <div class="text-[13.5px] font-semibold truncate">{{ m.nome }}</div>
                       <div class="text-[12.5px] text-muted-foreground truncate">{{ m.email }}</div>
+                      @if (m.status === 'invited' && m.conviteVenceEm) {
+                        <div
+                          class="text-[12px] text-muted-foreground"
+                          [attr.data-testid]="'convite-vence-' + m.id"
+                        >
+                          Link vale até {{ venceEm(m.conviteVenceEm) }}
+                        </div>
+                      }
                     </div>
-                    <app-chip [tone]="m.status === 'active' ? 'success' : 'neutral'">{{
-                      m.status === 'active' ? 'Ativo' : 'Inativo'
+                    <app-chip tone="ocean" [attr.data-testid]="'perfil-' + m.id">{{
+                      nomePerfil(m.perfil)
                     }}</app-chip>
-                    <button
-                      type="button"
-                      (click)="membroSenhaId.set(membroSenhaId() === m.id ? null : m.id)"
-                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
-                    >
-                      Nova senha
-                    </button>
+                    <app-chip [tone]="tomStatus(m)" [attr.data-testid]="'status-' + m.id">{{
+                      rotuloStatus(m)
+                    }}</app-chip>
                     <span
                       class="inline-flex items-center"
                       [title]="
-                        m.status !== 'active' && limiteDeFuncionarios()
+                        m.status === 'inactive' && limiteDeFuncionarios()
                           ? 'Sem vaga no plano: inative outro funcionário antes.'
                           : ''
                       "
                     >
                       <app-toggle
-                        [checked]="m.status === 'active'"
+                        [checked]="m.status !== 'inactive'"
                         [disabled]="
                           ocupado() === 'membro' ||
-                          (m.status !== 'active' && limiteDeFuncionarios())
+                          (m.status === 'inactive' && limiteDeFuncionarios())
                         "
-                        [label]="(m.status === 'active' ? 'Inativar ' : 'Reativar ') + m.nome"
+                        [label]="(m.status !== 'inactive' ? 'Inativar ' : 'Reativar ') + m.nome"
                         [testId]="'alternar-' + m.id"
                         (changed)="alternarMembro(m)"
                       />
                     </span>
                   </div>
-                  @if (membroSenhaId() === m.id) {
-                    <div class="flex flex-wrap items-center gap-2">
-                      <input
-                        type="password"
-                        [value]="membroNovaSenha()"
-                        (input)="membroNovaSenha.set(valor($event))"
-                        autocomplete="new-password"
-                        placeholder="Senha nova (8+, maiúscula, minúscula e número)"
-                        [class]="inputClass + ' sm:max-w-[340px]'"
-                        [attr.data-testid]="'senha-membro-' + m.id"
-                      />
+                  <div class="flex flex-wrap items-center gap-1">
+                    <button
+                      type="button"
+                      (click)="abrirEdicao(m)"
+                      [attr.aria-expanded]="membroEditId() === m.id"
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                      [attr.data-testid]="'editar-membro-' + m.id"
+                    >
+                      Editar
+                    </button>
+                    @if (m.status === 'invited') {
                       <button
                         type="button"
-                        (click)="definirSenhaMembro(m)"
-                        [disabled]="membroNovaSenha().length < 8 || ocupado() === 'membro'"
-                        class="h-9 px-4 rounded-full text-[13px] font-semibold bg-mint text-primary-foreground cursor-pointer disabled:opacity-50"
-                        [attr.data-testid]="'salvar-senha-membro-' + m.id"
+                        (click)="reenviarConvite(m)"
+                        [disabled]="ocupado() === 'membro'"
+                        class="h-8 px-3 rounded-lg text-[12px] font-medium text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50"
+                        [attr.data-testid]="'reenviar-convite-' + m.id"
                       >
-                        Salvar senha
+                        Reenviar convite
                       </button>
+                    }
+                    <button
+                      type="button"
+                      (click)="pedirExclusaoMembro(m)"
+                      [attr.aria-expanded]="membroExcluirId() === m.id"
+                      class="h-8 px-3 rounded-lg text-[12px] font-medium text-error hover:bg-error/10 cursor-pointer"
+                      [attr.data-testid]="'excluir-membro-' + m.id"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                  @if (membroEditId() === m.id) {
+                    <div
+                      class="rounded-xl bg-muted/50 p-3 space-y-3"
+                      [attr.data-testid]="'edicao-membro-' + m.id"
+                    >
+                      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <label class="block">
+                          <span class="text-[12px] font-medium block mb-1">Nome</span>
+                          <input
+                            type="text"
+                            maxlength="80"
+                            [value]="edicao().nome"
+                            (input)="setEdicao('nome', valor($event))"
+                            [class]="inputClass"
+                            [attr.data-testid]="'edicao-nome-' + m.id"
+                          />
+                        </label>
+                        <label class="block">
+                          <span class="text-[12px] font-medium block mb-1">E-mail</span>
+                          <input
+                            type="email"
+                            [value]="edicao().email"
+                            (input)="setEdicao('email', valor($event))"
+                            autocomplete="off"
+                            [class]="inputClass"
+                            [attr.data-testid]="'edicao-email-' + m.id"
+                          />
+                        </label>
+                        <label class="block">
+                          <span class="text-[12px] font-medium block mb-1">Perfil</span>
+                          <select
+                            (change)="setEdicao('perfil', valor($event))"
+                            [class]="inputClass + ' cursor-pointer'"
+                            [attr.data-testid]="'edicao-perfil-' + m.id"
+                          >
+                            @for (p of perfis; track p.valor) {
+                              <option [value]="p.valor" [selected]="edicao().perfil === p.valor">
+                                {{ p.nome }}
+                              </option>
+                            }
+                          </select>
+                        </label>
+                      </div>
+                      <p class="text-[12px] text-muted-foreground">
+                        @if (m.status === 'invited') {
+                          Trocar o e-mail manda o convite para o endereço novo.
+                        } @else {
+                          Trocar o e-mail encerra as sessões dele: ele entra de novo com o e-mail
+                          novo e a mesma senha.
+                        }
+                      </p>
+                      <div class="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          (click)="salvarEdicao(m)"
+                          [disabled]="!edicaoValida() || ocupado() === 'membro'"
+                          class="h-9 px-4 rounded-full text-[13px] font-semibold bg-mint text-primary-foreground cursor-pointer disabled:opacity-50"
+                          [attr.data-testid]="'salvar-membro-' + m.id"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          (click)="membroEditId.set(null)"
+                          class="h-9 px-4 rounded-full text-[13px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  }
+                  @if (membroExcluirId() === m.id) {
+                    <div
+                      class="rounded-xl border border-error/40 bg-error/5 p-3 space-y-2"
+                      role="alert"
+                      [attr.data-testid]="'confirmar-exclusao-membro-' + m.id"
+                    >
+                      <p class="text-[13px]">
+                        Excluir <b>{{ m.nome }}</b
+                        >? Ele perde o acesso na hora e sai da lista. Os lançamentos que ele fez
+                        continuam com o nome dele no histórico. Para só tirar o acesso por um tempo,
+                        use o botão de inativar.
+                      </p>
+                      <div class="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          (click)="excluirMembro(m)"
+                          [disabled]="ocupado() === 'membro'"
+                          class="h-9 px-4 rounded-full text-[13px] font-semibold bg-error text-white cursor-pointer disabled:opacity-50"
+                          [attr.data-testid]="'confirmar-excluir-' + m.id"
+                        >
+                          Excluir funcionário
+                        </button>
+                        <button
+                          type="button"
+                          (click)="membroExcluirId.set(null)"
+                          class="h-9 px-4 rounded-full text-[13px] font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
                   }
                 </li>
@@ -436,15 +554,15 @@
           @if (limiteDeFuncionarios()) {
             <p class="text-[12.5px] text-muted-foreground" data-testid="limite-funcionarios">
               Você usa as {{ limiteFuncionarios() }} vagas de funcionário do plano
-              {{ nomePlano() }}. Inative alguém
+              {{ nomePlano() }}. Inative ou exclua alguém
               @if (plano() === 'basic') {
                 ou mude para o plano Pro (até {{ limitePro }})
               }
-              para adicionar outro.
+              para convidar outro.
             </p>
           } @else {
             <div class="rounded-xl bg-muted/50 p-3 space-y-3">
-              <div class="text-[13px] font-semibold">Adicionar funcionário</div>
+              <div class="text-[13px] font-semibold">Convidar funcionário</div>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <label class="block">
                   <span class="text-[12px] font-medium block mb-1">Nome</span>
@@ -469,20 +587,23 @@
                   />
                 </label>
                 <label class="block">
-                  <span class="text-[12px] font-medium block mb-1">Senha</span>
-                  <input
-                    type="password"
-                    [value]="novoMembro().senha"
-                    (input)="setMembro('senha', valor($event))"
-                    autocomplete="new-password"
-                    [class]="inputClass"
-                    data-testid="membro-senha"
-                  />
+                  <span class="text-[12px] font-medium block mb-1">Perfil</span>
+                  <select
+                    (change)="setMembro('perfil', valor($event))"
+                    [class]="inputClass + ' cursor-pointer'"
+                    data-testid="membro-perfil"
+                  >
+                    @for (p of perfis; track p.valor) {
+                      <option [value]="p.valor" [selected]="novoMembro().perfil === p.valor">
+                        {{ p.nome }}
+                      </option>
+                    }
+                  </select>
                 </label>
               </div>
-              <p class="text-[12px] text-muted-foreground">
-                A senha precisa ter 8+ caracteres, com maiúscula, minúscula e número. Passe-a ao
-                funcionário: ele poderá trocá-la depois.
+              <p class="text-[12px] text-muted-foreground" data-testid="membro-perfil-desc">
+                {{ novoMembro().perfil === 'operations' ? perfis[0].desc : perfis[1].desc }} Ele
+                recebe um link por e-mail para criar a senha (vale {{ diasConvite }} dias).
               </p>
               @if (erros().membro; as e) {
                 <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
@@ -494,9 +615,12 @@
                 class="h-10 px-5 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="adicionar-membro"
               >
-                Adicionar funcionário
+                Enviar convite
               </button>
             </div>
+          }
+          @if (limiteDeFuncionarios() && erros().membro; as e) {
+            <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
           }
         </section>
 

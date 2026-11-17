@@ -7,14 +7,25 @@
         Organize suas movimentações com categorias personalizadas.
       </p>
     </div>
-    <button
-      data-tour="nova-categoria"
-      (click)="openCreate()"
-      class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0"
-    >
-      <app-icon name="add" [style]="{ fontSize: '20px' }" /><span>Nova categoria</span>
-    </button>
+    @if (podeEditar()) {
+      <button
+        data-tour="nova-categoria"
+        (click)="openCreate()"
+        class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0"
+      >
+        <app-icon name="add" [style]="{ fontSize: '20px' }" /><span>Nova categoria</span>
+      </button>
+    }
   </div>
+
+  @if (!podeEditar()) {
+    <p
+      class="rounded-xl border border-border bg-muted/60 px-4 py-3 text-[13px] text-muted-foreground"
+      data-testid="somente-leitura"
+    >
+      Seu perfil (Operação) só consulta as categorias. Para mudar, fale com o dono ou o gerente.
+    </p>
+  }
 
   <!-- Tabs -->
   <div class="flex gap-1 p-1 bg-muted rounded-2xl w-fit" data-tour="abas">
@@ -108,7 +119,7 @@
         icon="category"
         title="Organize seu negócio por categorias"
         description="Categorias ajudam você a entender de onde vem o dinheiro e para onde ele vai — sem precisar saber contabilidade. Comece criando a primeira."
-        [hasAction]="true"
+        [hasAction]="podeEditar()"
       >
         <button
           (click)="openCreate()"
@@ -207,6 +218,7 @@
                 <td class="px-4 py-3">
                   <app-toggle
                     [checked]="c.active"
+                    [disabled]="!podeEditar()"
                     [label]="(c.active ? 'Inativar ' : 'Reativar ') + c.name"
                     (changed)="handleToggle(c, $event)"
                   />
@@ -215,7 +227,7 @@
                   <div
                     class="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition"
                   >
-                    @if (!c.protected) {
+                    @if (!c.protected && podeEditar()) {
                       <button
                         (click)="openEdit(c)"
                         class="h-7 w-7 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"

@@ -10,8 +10,13 @@ import {
   viewChild,
 } from '@angular/core';
 import { AuthService } from '../../services/auth.service';
-import { SUBSCRIPTION_MEMBER_LIMIT, SUBSCRIPTION_TIER_LABEL, memberLimitForTier } from 'mintly-lib';
-import { ContaService, Membro } from '../../services/conta.service';
+import {
+  MEMBER_INVITE_EXPIRY_DAYS,
+  SUBSCRIPTION_MEMBER_LIMIT,
+  SUBSCRIPTION_TIER_LABEL,
+  memberLimitForTier,
+} from 'mintly-lib';
+import { ContaService, Membro, PerfilMembro } from '../../services/conta.service';
 import { AVATAR_ACCEPT, readAvatarFile } from '../../shared/avatar-file';
 import { ChipComponent } from '../../shared/chip.component';
 import { ToggleComponent } from '../../shared/toggle.component';
@@ -102,9 +107,33 @@ export class MinhaContaComponent {
 
   // Restaurante
   protected nomeRest = signal('');
-  protected novoMembro = signal({ nome: '', email: '', senha: '' });
-  protected membroSenhaId = signal<string | null>(null);
-  protected membroNovaSenha = signal('');
+  protected novoMembro = signal<{ nome: string; email: string; perfil: PerfilMembro }>({
+    nome: '',
+    email: '',
+    perfil: 'operations',
+  });
+  /** Funcionário com a edição (nome, e-mail, perfil) aberta. */
+  protected membroEditId = signal<string | null>(null);
+  protected edicao = signal<{ nome: string; email: string; perfil: PerfilMembro }>({
+    nome: '',
+    email: '',
+    perfil: 'operations',
+  });
+  /** Funcionário com a confirmação de exclusão aberta. */
+  protected membroExcluirId = signal<string | null>(null);
+  protected readonly perfis: { valor: PerfilMembro; nome: string; desc: string }[] = [
+    {
+      valor: 'operations',
+      nome: 'Operação',
+      desc: 'Lança e vê movimentações (sem salários e pró-labore), consulta cardápio e contas. Não vê relatórios.',
+    },
+    {
+      valor: 'manager',
+      nome: 'Gerente',
+      desc: 'Vê e faz tudo, menos assinatura, funcionários e exclusão do restaurante.',
+    },
+  ];
+  protected readonly diasConvite = MEMBER_INVITE_EXPIRY_DAYS;
   protected exclusaoAberta = signal(false);
   protected exclusaoSenha = signal('');
   protected exclusaoMotivo = signal('');
@@ -129,13 +158,17 @@ export class MinhaContaComponent {
   );
   protected membroValido = computed(() => {
     const m = this.novoMembro();
-    return m.nome.trim().length >= 2 && EMAIL.test(m.email.trim()) && senhaForte(m.senha);
+    return m.nome.trim().length >= 2 && EMAIL.test(m.email.trim());
   });
-  // Vagas do plano: contam só os funcionários ATIVOS (inativar libera a vaga; reativar ocupa uma).
+  protected edicaoValida = computed(() => {
+    const e = this.edicao();
+    return e.nome.trim().length >= 2 && EMAIL.test(e.email.trim());
+  });
+  // Vagas do plano: contam os ATIVOS e os convites pendentes (inativar libera a vaga; reativar ocupa uma).
   protected plano = computed(() => this.auth.subscriptionState().tier ?? 'basic');
   protected nomePlano = computed(() => SUBSCRIPTION_TIER_LABEL[this.plano()]);
   protected limiteFuncionarios = computed(() => memberLimitForTier(this.plano()));
-  protected ativos = computed(() => this.membros().filter((m) => m.status === 'active').length);
+  protected ativos = computed(() => this.membros().filter((m) => m.status !== 'inactive').length);
   protected limiteDeFuncionarios = computed(() => this.ativos() >= this.limiteFuncionarios());
   protected limitePro = SUBSCRIPTION_MEMBER_LIMIT.pro;
 
@@ -143,8 +176,24 @@ export class MinhaContaComponent {
     return (e.target as HTMLInputElement).value;
   }
 
-  protected setMembro(campo: 'nome' | 'email' | 'senha', valor: string): void {
+  protected setMembro(campo: 'nome' | 'email' | 'perfil', valor: string): void {
     this.novoMembro.update((m) => ({ ...m, [campo]: valor }));
+  }
+
+  protected setEdicao(campo: 'nome' | 'email' | 'perfil', valor: string): void {
+    this.edicao.update((e) => ({ ...e, [campo]: valor }));
+  }
+
+  protected nomePerfil(p: PerfilMembro): string {
+    return p === 'operations' ? 'Operação' : 'Gerente';
+  }
+
+  protected rotuloStatus(m: Membro): string {
+    return m.status === 'active' ? 'Ativo' : m.status === 'invited' ? 'Convite enviado' : 'Inativo';
+  }
+
+  protected tomStatus(m: Membro): 'success' | 'warning' | 'neutral' {
+    return m.status === 'active' ? 'success' : m.status === 'invited' ? 'warning' : 'neutral';
   }
 
   protected dataPedido(iso: string): string {
@@ -172,7 +221,8 @@ export class MinhaContaComponent {
     this.emailAberto.set(false);
     this.senhaAberta.set(false);
     this.exclusaoAberta.set(false);
-    this.membroSenhaId.set(null);
+    this.membroEditId.set(null);
+    this.membroExcluirId.set(null);
     for (const s of [
       this.novoEmail,
       this.senhaEmail,
@@ -181,8 +231,8 @@ export class MinhaContaComponent {
       this.senhaConfirma,
     ])
       s.set('');
-    for (const s of [this.membroNovaSenha, this.exclusaoSenha, this.exclusaoMotivo]) s.set('');
-    this.novoMembro.set({ nome: '', email: '', senha: '' });
+    for (const s of [this.exclusaoSenha, this.exclusaoMotivo]) s.set('');
+    this.novoMembro.set({ nome: '', email: '', perfil: 'operations' });
 
     this.ocupado.set('carregar');
     try {
@@ -311,10 +361,12 @@ export class MinhaContaComponent {
       await this.svc.adicionarMembro({
         nome: m.nome.trim(),
         email: m.email.trim(),
-        senha: m.senha,
+        perfil: m.perfil,
       });
-      this.toast.success('Funcionário adicionado. Ele já pode entrar com esse e-mail e senha.');
-      this.novoMembro.set({ nome: '', email: '', senha: '' });
+      this.toast.success(
+        `Convite enviado para ${m.email.trim()}. O link para criar a senha vale ${MEMBER_INVITE_EXPIRY_DAYS} dias.`,
+      );
+      this.novoMembro.set({ nome: '', email: '', perfil: 'operations' });
     } catch (err) {
       this.falha('membro', err, 'Não foi possível adicionar o funcionário.');
     } finally {
@@ -337,9 +389,9 @@ export class MinhaContaComponent {
     this.limpar('membro');
     try {
       await this.svc.atualizarMembro(m.id, {
-        status: m.status === 'active' ? 'inactive' : 'active',
+        status: m.status !== 'inactive' ? 'inactive' : 'active',
       });
-      if (m.status === 'active') {
+      if (m.status !== 'inactive') {
         this.toast.successWithAction(`${m.nome} foi inativado e perdeu o acesso.`, {
           label: 'Desfazer',
           run: () => this.reativarMembro(m),
@@ -354,20 +406,84 @@ export class MinhaContaComponent {
     }
   }
 
-  async definirSenhaMembro(m: Membro): Promise<void> {
-    if (!senhaForte(this.membroNovaSenha())) return;
+  /** Abre (ou fecha) a edição de nome, e-mail e perfil. */
+  abrirEdicao(m: Membro): void {
+    this.membroExcluirId.set(null);
+    if (this.membroEditId() === m.id) {
+      this.membroEditId.set(null);
+      return;
+    }
+    this.edicao.set({ nome: m.nome, email: m.email, perfil: m.perfil });
+    this.membroEditId.set(m.id);
+  }
+
+  async salvarEdicao(m: Membro): Promise<void> {
+    if (!this.edicaoValida()) return;
+    const e = this.edicao();
+    const nome = e.nome.trim();
+    const email = e.email.trim().toLowerCase();
+    const mudancas = {
+      ...(nome !== m.nome ? { nome } : {}),
+      ...(email !== m.email ? { email } : {}),
+      ...(e.perfil !== m.perfil ? { perfil: e.perfil } : {}),
+    };
+    if (Object.keys(mudancas).length === 0) {
+      this.membroEditId.set(null);
+      return;
+    }
     this.ocupado.set('membro');
     this.limpar('membro');
     try {
-      await this.svc.atualizarMembro(m.id, { senha: this.membroNovaSenha() });
-      this.toast.success(`Senha de ${m.nome} atualizada. Ele precisa entrar de novo.`);
-      this.membroSenhaId.set(null);
-      this.membroNovaSenha.set('');
+      await this.svc.atualizarMembro(m.id, mudancas);
+      this.toast.success(
+        mudancas.email && m.status === 'invited'
+          ? `Dados de ${nome} salvos. O convite foi para ${email}.`
+          : mudancas.email
+            ? `Dados de ${nome} salvos. Ele entra de novo com o e-mail novo.`
+            : `Dados de ${nome} salvos.`,
+      );
+      this.membroEditId.set(null);
     } catch (err) {
-      this.falha('membro', err, 'Não foi possível trocar a senha do funcionário.');
+      this.falha('membro', err, 'Não foi possível salvar o funcionário.');
     } finally {
       this.ocupado.set(null);
     }
+  }
+
+  async reenviarConvite(m: Membro): Promise<void> {
+    this.ocupado.set('membro');
+    this.limpar('membro');
+    try {
+      await this.svc.reenviarConvite(m.id);
+      this.toast.success(`Convite reenviado para ${m.email}. O link anterior não vale mais.`);
+    } catch (err) {
+      this.falha('membro', err, 'Não foi possível reenviar o convite.');
+    } finally {
+      this.ocupado.set(null);
+    }
+  }
+
+  pedirExclusaoMembro(m: Membro): void {
+    this.membroEditId.set(null);
+    this.membroExcluirId.set(this.membroExcluirId() === m.id ? null : m.id);
+  }
+
+  async excluirMembro(m: Membro): Promise<void> {
+    this.ocupado.set('membro');
+    this.limpar('membro');
+    try {
+      await this.svc.excluirMembro(m.id);
+      this.toast.success(`${m.nome} foi excluído e perdeu o acesso.`);
+      this.membroExcluirId.set(null);
+    } catch (err) {
+      this.falha('membro', err, 'Não foi possível excluir o funcionário.');
+    } finally {
+      this.ocupado.set(null);
+    }
+  }
+
+  protected venceEm(iso: string): string {
+    return new Date(iso).toLocaleDateString('pt-BR');
   }
 
   async pedirExclusao(): Promise<void> {

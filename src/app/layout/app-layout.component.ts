@@ -1,4 +1,13 @@
-import { Component, ElementRef, OnInit, effect, signal, inject, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  OnInit,
+  computed,
+  effect,
+  signal,
+  inject,
+  viewChild,
+} from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
@@ -13,18 +22,20 @@ import { ToastService } from '../shared/toast.service';
 import { AVATAR_ACCEPT, readAvatarFile } from '../shared/avatar-file';
 import { fmtEndsAt, tierLabel } from '../pages/assinatura/assinatura.format';
 import { MinhaContaComponent } from '../pages/conta/minha-conta.component';
+import { ContaService } from '../services/conta.service';
 
+/** `report`: relatório; o perfil Operação (E.3) não vê. */
 const NAV = [
-  { to: '/visao-geral', label: 'Visão Geral', icon: 'space_dashboard' },
-  { to: '/fluxo-de-caixa', label: 'Fluxo de Caixa', icon: 'account_balance_wallet' },
-  { to: '/receitas', label: 'Receitas', icon: 'trending_up' },
-  { to: '/custos', label: 'Custos & Despesas', icon: 'trending_down' },
-  { to: '/resultado', label: 'Resultado', icon: 'savings' },
-  { to: '/previsoes', label: 'Previsões', icon: 'auto_graph' },
-  { to: '/movimentacoes', label: 'Movimentações', icon: 'swap_horiz' },
-  { to: '/cardapio', label: 'Cardápio', icon: 'restaurant_menu' },
-  { to: '/contas', label: 'Contas Financeiras', icon: 'account_balance' },
-  { to: '/categorias', label: 'Categorias', icon: 'category' },
+  { to: '/visao-geral', label: 'Visão Geral', icon: 'space_dashboard', report: true },
+  { to: '/fluxo-de-caixa', label: 'Fluxo de Caixa', icon: 'account_balance_wallet', report: true },
+  { to: '/receitas', label: 'Receitas', icon: 'trending_up', report: true },
+  { to: '/custos', label: 'Custos & Despesas', icon: 'trending_down', report: true },
+  { to: '/resultado', label: 'Resultado', icon: 'savings', report: true },
+  { to: '/previsoes', label: 'Previsões', icon: 'auto_graph', report: true },
+  { to: '/movimentacoes', label: 'Movimentações', icon: 'swap_horiz', report: false },
+  { to: '/cardapio', label: 'Cardápio', icon: 'restaurant_menu', report: false },
+  { to: '/contas', label: 'Contas Financeiras', icon: 'account_balance', report: false },
+  { to: '/categorias', label: 'Categorias', icon: 'category', report: false },
 ] as const;
 
 @Component({
@@ -66,7 +77,7 @@ const NAV = [
         </div>
 
         <nav class="px-2 flex-1 space-y-1">
-          @for (item of navItems; track item.to) {
+          @for (item of navItems(); track item.to) {
             <a
               [routerLink]="item.to"
               routerLinkActive="bg-mint-soft text-ocean"
@@ -393,7 +404,10 @@ export class AppLayoutComponent implements OnInit {
   private auth = inject(AuthService);
   private tour = inject(TourService);
   protected notifications = inject(NotificationsService);
-  protected navItems = NAV;
+  private conta = inject(ContaService);
+  protected navItems = computed(() =>
+    this.auth.podeVerRelatorios() ? NAV : NAV.filter((item) => !item.report),
+  );
   private toast = inject(ToastService);
   protected notificationsOpen = signal(false);
   /** Gaveta do menu no celular (abaixo de 1024 px a barra lateral não aparece: no tablet ela comia um terço da tela). */
@@ -417,6 +431,12 @@ export class AppLayoutComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // O dono pode ter trocado o perfil do funcionário depois do login: /users/me traz o atual (E.3).
+    if (this.auth.acesso() !== 'owner') {
+      this.conta.carregarConta().catch(() => {
+        // Silencioso: sem conseguir consultar, vale o perfil do login (a API confere de qualquer jeito).
+      });
+    }
     this.notifications.refresh().catch(() => {
       // Silencioso: notificações são um extra, não deve travar o layout se falhar.
     });

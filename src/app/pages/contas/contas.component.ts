@@ -35,6 +35,7 @@ import {
 } from './settlement-form';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { localISODate } from '../../shared/format';
+import { AuthService } from '../../services/auth.service';
 
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -93,6 +94,8 @@ const fmtPct = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits:
   templateUrl: './contas.component.html',
 })
 export class ContasComponent implements OnInit {
+  /** Perfil Operação (E.3) só consulta: a API recusa criar e editar. */
+  protected podeEditar = inject(AuthService).podeMudarCadastros;
   private svc = inject(ContasService);
   private toast = inject(ToastService);
 

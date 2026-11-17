@@ -4,6 +4,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { CardapioComponent, DESTAQUE_MS } from './cardapio.component';
 import { CardapioService, Prato } from '../../services/cardapio.service';
 import { ToastService } from '../../shared/toast.service';
+import { AuthService } from '../../services/auth.service';
 
 const agora = new Date().toISOString();
 
@@ -50,6 +51,7 @@ describe('CardapioComponent', () => {
     const toast = { success: vi.fn(), error: vi.fn(), successWithAction: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
+        { provide: AuthService, useValue: { podeMudarCadastros: signal(true) } },
         provideRouter([]),
         { provide: CardapioService, useValue: svc },
         { provide: ToastService, useValue: toast },

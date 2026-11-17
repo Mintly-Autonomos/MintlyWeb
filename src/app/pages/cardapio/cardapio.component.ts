@@ -18,6 +18,7 @@ import {
   precisaRevisar,
   tempoLabel,
 } from '../../services/cardapio.builder';
+import { AuthService } from '../../services/auth.service';
 
 const INPUT =
   'h-10 rounded-xl border border-border bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint';
@@ -45,6 +46,8 @@ export const DESTAQUE_MS = 4000;
   templateUrl: './cardapio.component.html',
 })
 export class CardapioComponent implements OnInit, OnDestroy {
+  /** Perfil Operação (E.3) só consulta: a API recusa criar e editar. */
+  protected podeEditar = inject(AuthService).podeMudarCadastros;
   private svc = inject(CardapioService);
   private toast = inject(ToastService);
   private route = inject(ActivatedRoute);

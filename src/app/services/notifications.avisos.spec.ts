@@ -13,7 +13,9 @@ describe('NotificationsService: contas vencidas e teto do MEI', () => {
     falhaFluxo?: boolean;
     insights?: TaxInsight[];
     semPerfil?: boolean;
+    operacao?: boolean;
   }) {
+    const perfil = { cadastros: !opts.operacao, relatorios: !opts.operacao };
     const profile = signal<RestaurantProfile | null>(
       opts.semPerfil
         ? null
@@ -27,17 +29,22 @@ describe('NotificationsService: contas vencidas e teto do MEI', () => {
             overdue: opts.overdue ?? { count: 0, receivable: 0, payable: 0 },
           }),
     };
+    const cardapioAlertas = vi.fn().mockResolvedValue(undefined);
     TestBed.configureTestingModule({
       providers: [
         {
           provide: AuthService,
-          useValue: { subscriptionState: () => computeSubscriptionState(null) },
+          useValue: {
+            subscriptionState: () => computeSubscriptionState(null),
+            podeMudarCadastros: () => perfil.cadastros,
+            podeVerRelatorios: () => perfil.relatorios,
+          },
         },
         {
           provide: CardapioService,
           useValue: {
             alertas: signal([]),
-            refreshAlertas: vi.fn().mockResolvedValue(undefined),
+            refreshAlertas: cardapioAlertas,
             keepPrice: vi.fn(),
           },
         },
@@ -45,7 +52,7 @@ describe('NotificationsService: contas vencidas e teto do MEI', () => {
         { provide: FluxoCaixaService, useValue: fluxo },
       ],
     });
-    return { svc: TestBed.inject(NotificationsService), restaurante, fluxo };
+    return { svc: TestBed.inject(NotificationsService), restaurante, fluxo, cardapioAlertas };
   }
 
   const mei = (usedPct: number): TaxInsight => ({
@@ -65,6 +72,17 @@ describe('NotificationsService: contas vencidas e teto do MEI', () => {
       actionRoute: '/fluxo-de-caixa',
       dismissLabel: 'Agora não',
     });
+  });
+
+  it('perfil Operação (E.3): não consulta o Fluxo nem os avisos de preço do cardápio', async () => {
+    const { svc, fluxo, cardapioAlertas } = create({
+      overdue: { count: 2, receivable: 0, payable: 1_250 },
+      operacao: true,
+    });
+    await svc.refresh();
+    expect(fluxo.fetchReport).not.toHaveBeenCalled();
+    expect(cardapioAlertas).not.toHaveBeenCalled();
+    expect(svc.notifications().find((n) => n.kind === 'overdue')).toBeUndefined();
   });
 
   it('só valor a receber vencido não vira aviso', async () => {

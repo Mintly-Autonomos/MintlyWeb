@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { CardapioService } from '../../services/cardapio.service';
 import { ToastService } from '../../shared/toast.service';
+import { AuthService } from '../../services/auth.service';
 import { CardapioComponent } from './cardapio.component';
 
 interface Interno {
@@ -16,6 +17,7 @@ describe('Cardápio: novo prato (relatório, seção 10.4)', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
+        { provide: AuthService, useValue: { podeMudarCadastros: signal(true) } },
         {
           provide: CardapioService,
           useValue: {

@@ -19,6 +19,7 @@ import { ToastService } from '../../shared/toast.service';
 import { apiErrorMessage } from '../../shared/api-error-message';
 import { fmtDateTime } from '../../shared/format';
 import { dreGroupOptionsFor, dreGroupShort, sugereCmv } from '../../shared/dre-group';
+import { AuthService } from '../../services/auth.service';
 
 interface CatForm {
   name: string;
@@ -47,6 +48,8 @@ interface CatForm {
   templateUrl: './categorias.component.html',
 })
 export class CategoriasComponent implements OnInit {
+  /** Perfil Operação (E.3) só consulta: a API recusa criar e editar. */
+  protected podeEditar = inject(AuthService).podeMudarCadastros;
   private svc = inject(CategoriasService);
   private toast = inject(ToastService);
 

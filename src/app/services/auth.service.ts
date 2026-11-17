@@ -1,7 +1,18 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { computeSubscriptionState } from 'mintly-lib';
-import type { Headers, SubscriptionState, SubscriptionTier } from 'mintly-lib';
+import {
+  accessLevelOf,
+  canManageSetup,
+  canViewReports,
+  computeSubscriptionState,
+} from 'mintly-lib';
+import type {
+  AccessLevel,
+  Headers,
+  InvitePreview,
+  SubscriptionState,
+  SubscriptionTier,
+} from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { MintlyClientService } from './mintly-client.service';
 import { apiErrorInfo } from '../shared/api-error';
@@ -15,6 +26,11 @@ export interface AuthUser {
   restaurantId?: string;
   /** Foto de perfil (data URL) — vem do servidor no login/signup (`user.person.avatar`). */
   avatarDataUrl?: string;
+  /**
+   * Dono, ou o perfil do funcionário (E.3): decide o que a tela mostra. Ausente (sessão de antes dos
+   * perfis) = dono. A API confere de novo em todo pedido; aqui é só para não mostrar o que vai ser recusado.
+   */
+  acesso?: AccessLevel;
 }
 
 /**
@@ -111,6 +127,22 @@ export class AuthService {
 
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly currentUser = this._user.asReadonly();
+
+  /** Nível de acesso de quem está logado (E.3). */
+  readonly acesso = computed<AccessLevel>(() => this._user()?.acesso ?? 'owner');
+  /** Relatórios e painéis (Visão geral, Fluxo, Receitas, Custos, Resultado, Previsões). */
+  readonly podeVerRelatorios = computed(() => canViewReports(this.acesso()));
+  /** Criar e editar contas, categorias e cardápio. */
+  readonly podeMudarCadastros = computed(() => canManageSetup(this.acesso()));
+
+  /** Atualiza o perfil (o dono pode ter mudado): vem de /users/me. */
+  setAccessLevel(level: AccessLevel): void {
+    const user = this._user();
+    if (!user || user.acesso === level) return;
+    const next = { ...user, acesso: level };
+    this._user.set(next);
+    this.write(KEYS.user, JSON.stringify({ ...next, avatarDataUrl: undefined }));
+  }
 
   /**
    * Nome do restaurante no menu da conta. A resposta do login não o traz (só a do cadastro), então ele
@@ -354,6 +386,7 @@ export class AuthService {
       email: result.user.email,
       restaurantId: result.user.restaurantId,
       avatarDataUrl: result.user.person.avatar,
+      acesso: accessLevelOf(result.user),
     };
     this.persistTokens(result.accessToken, result.refreshToken, entered);
     this.syncSavedAccount(remember, entered);
@@ -438,6 +471,36 @@ export class AuthService {
       response.payload?.message ??
       'Se o e-mail estiver cadastrado, você receberá as instruções em breve.'
     );
+  }
+
+  /** Para quem é o convite de funcionário do link (E.1). Token inválido, usado ou vencido: lança. */
+  async invitePreview(token: string): Promise<InvitePreview> {
+    if (environment.useMocks) {
+      await delay(300);
+      return {
+        name: 'Funcionário',
+        email: 'funcionario@exemplo.com',
+        restaurantName: 'Meu restaurante',
+        expiresAt: new Date().toISOString(),
+      };
+    }
+    const response = await this.authClient.invitePreview(token, this.headers);
+    if (!response.payload) throw new Error('Resposta do convite sem dados.');
+    return response.payload;
+  }
+
+  /** Aceita o convite: cria a senha. Depois a pessoa entra pelo login normal. */
+  async acceptInvite(
+    token: string,
+    newPassword: string,
+    confirmNewPassword: string,
+  ): Promise<void> {
+    if (environment.useMocks) {
+      await delay(300);
+      if (newPassword !== confirmNewPassword) throw new Error('As senhas não coincidem.');
+      return;
+    }
+    await this.authClient.acceptInvite({ token, newPassword, confirmNewPassword }, this.headers);
   }
 
   /** Redefine a senha a partir do token recebido por e-mail. */

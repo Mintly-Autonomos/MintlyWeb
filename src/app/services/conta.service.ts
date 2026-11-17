@@ -1,13 +1,16 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { MemberStatus } from 'mintly-lib';
+import { accessLevelOf, MemberProfile, MemberStatus } from 'mintly-lib';
 import type { Headers, MyAccount, RestaurantMember } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { apiErrorInfo } from '../shared/api-error';
 import { AuthService } from './auth.service';
 import { MintlyClientService } from './mintly-client.service';
 
-export type MemberStatusKey = 'active' | 'inactive';
+/** `invited`: convite enviado, o funcionário ainda não criou a senha (E.1). */
+export type MemberStatusKey = 'active' | 'inactive' | 'invited';
+/** Perfil do funcionário (E.3): Operação ou Gerente. */
+export type PerfilMembro = 'operations' | 'manager';
 
 /** Funcionário como a tela usa (datas já como texto ISO). */
 export interface Membro {
@@ -15,6 +18,9 @@ export interface Membro {
   nome: string;
   email: string;
   status: MemberStatusKey;
+  perfil: PerfilMembro;
+  /** Só com convite pendente: até quando o link vale (ISO). */
+  conviteVenceEm?: string;
   /** Foto de perfil do funcionário (data URL); sem foto, a tela mostra as iniciais. */
   foto?: string;
 }
@@ -25,6 +31,8 @@ export interface ContaDados {
   telefone: string;
   /** `owner` (dono) ou `member` (funcionário): só o dono vê a parte do restaurante. */
   papel: 'owner' | 'member';
+  /** Só funcionário: o perfil (E.3). */
+  perfil?: PerfilMembro;
 }
 
 function delay(ms = 300): Promise<void> {
@@ -43,7 +51,14 @@ const toMembro = (m: RestaurantMember): Membro => ({
   id: m._id,
   nome: m.name,
   email: m.email,
-  status: m.status === 'inactive' ? 'inactive' : 'active',
+  status:
+    m.status === MemberStatus.Inactive
+      ? 'inactive'
+      : m.status === MemberStatus.Invited
+        ? 'invited'
+        : 'active',
+  perfil: m.profile === MemberProfile.Operations ? 'operations' : 'manager',
+  ...(m.inviteExpiresAt ? { conviteVenceEm: new Date(m.inviteExpiresAt).toISOString() } : {}),
 });
 
 const toDados = (a: MyAccount): ContaDados => ({
@@ -51,7 +66,19 @@ const toDados = (a: MyAccount): ContaDados => ({
   email: a.email,
   telefone: a.phone ?? '',
   papel: a.role === 'member' ? 'member' : 'owner',
+  ...(a.role === 'member'
+    ? { perfil: a.memberProfile === MemberProfile.Operations ? 'operations' : 'manager' }
+    : {}),
 });
+
+const PERFIL_TO_LIB: Record<PerfilMembro, MemberProfile> = {
+  operations: MemberProfile.Operations,
+  manager: MemberProfile.Manager,
+};
+const STATUS_TO_LIB: Record<'active' | 'inactive', MemberStatus> = {
+  active: MemberStatus.Active,
+  inactive: MemberStatus.Inactive,
+};
 
 /**
  * Conta do usuário e do restaurante (modal "Minha conta"): dados pessoais, e-mail, senha, nome do restaurante,
@@ -100,7 +127,11 @@ export class ContaService {
       return;
     }
     const res = await this.call((h) => this.client.userClient.getMe(h));
-    if (res.payload) this.dados.set(toDados(res.payload));
+    if (res.payload) {
+      this.dados.set(toDados(res.payload));
+      // O menu e as telas seguem o perfil atual (o dono pode ter mudado depois do login).
+      this.auth.setAccessLevel(accessLevelOf(res.payload));
+    }
   }
 
   async salvarDados(mudancas: { nome?: string; telefone?: string }): Promise<void> {
@@ -228,17 +259,25 @@ export class ContaService {
     }
   }
 
-  async adicionarMembro(m: { nome: string; email: string; senha: string }): Promise<void> {
+  /** Convida o funcionário (E.1): ele recebe o link por e-mail e cria a própria senha. */
+  async adicionarMembro(m: { nome: string; email: string; perfil: PerfilMembro }): Promise<void> {
     if (environment.useMocks) {
       await delay();
       mock.membros = [
         ...mock.membros,
-        { id: `m-${Date.now()}`, nome: m.nome, email: m.email, status: 'active' },
+        {
+          id: `m-${Date.now()}`,
+          nome: m.nome,
+          email: m.email,
+          status: 'invited',
+          perfil: m.perfil,
+          conviteVenceEm: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        },
       ];
     } else {
       await this.call((h) =>
         this.client.restaurantClient.createMember(
-          { name: m.nome, email: m.email, password: m.senha },
+          { name: m.nome, email: m.email, profile: PERFIL_TO_LIB[m.perfil] },
           h,
         ),
       );
@@ -246,31 +285,63 @@ export class ContaService {
     await this.carregarMembros(true);
   }
 
+  /** Ativa/inativa, muda nome, e-mail ou perfil (E.2, E.3). */
   async atualizarMembro(
     id: string,
-    mudancas: { status?: MemberStatusKey; senha?: string },
+    mudancas: {
+      status?: 'active' | 'inactive';
+      nome?: string;
+      email?: string;
+      perfil?: PerfilMembro;
+    },
   ): Promise<void> {
     if (environment.useMocks) {
       await delay();
       mock.membros = mock.membros.map((x) =>
-        x.id === id && mudancas.status ? { ...x, status: mudancas.status } : x,
+        x.id === id
+          ? {
+              ...x,
+              ...(mudancas.status ? { status: mudancas.status } : {}),
+              ...(mudancas.nome ? { nome: mudancas.nome } : {}),
+              ...(mudancas.email ? { email: mudancas.email } : {}),
+              ...(mudancas.perfil ? { perfil: mudancas.perfil } : {}),
+            }
+          : x,
       );
     } else {
       await this.call((h) =>
         this.client.restaurantClient.updateMember(
           id,
           {
-            ...(mudancas.status
-              ? {
-                  status:
-                    mudancas.status === 'inactive' ? MemberStatus.Inactive : MemberStatus.Active,
-                }
-              : {}),
-            ...(mudancas.senha ? { password: mudancas.senha } : {}),
+            ...(mudancas.status ? { status: STATUS_TO_LIB[mudancas.status] } : {}),
+            ...(mudancas.nome !== undefined ? { name: mudancas.nome } : {}),
+            ...(mudancas.email !== undefined ? { email: mudancas.email } : {}),
+            ...(mudancas.perfil ? { profile: PERFIL_TO_LIB[mudancas.perfil] } : {}),
           },
           h,
         ),
       );
+    }
+    await this.carregarMembros(true);
+  }
+
+  /** Manda um link novo (o anterior deixa de valer). Só para convite pendente. */
+  async reenviarConvite(id: string): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+    } else {
+      await this.call((h) => this.client.restaurantClient.resendInvite(id, h));
+    }
+    await this.carregarMembros(true);
+  }
+
+  /** Exclui o funcionário (E.2): perde o acesso, sai da lista e libera a vaga e o e-mail. */
+  async excluirMembro(id: string): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      mock.membros = mock.membros.filter((x) => x.id !== id);
+    } else {
+      await this.call((h) => this.client.restaurantClient.deleteMember(id, h));
     }
     await this.carregarMembros(true);
   }
