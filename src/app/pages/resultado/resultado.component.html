@@ -218,7 +218,9 @@
         status="positive"
         [delta]="statDelta(d.deltas.grossRevenue, { note: notaComparacao() })"
         subtext="Salão + delivery"
-      />
+      >
+        <app-hint slot="hint" [text]="h.receitaBrutaMes" />
+      </app-stat-card>
       <app-stat-card
         label="Margem bruta"
         [value]="fmtBRL(d.current.grossMargin)"
@@ -227,7 +229,7 @@
         [subtext]="pctFmt(pctDaReceita(d.current.grossMargin)) + ' da receita'"
         [delta]="statDelta(d.deltas.grossMargin, { note: notaComparacao() })"
       >
-        <app-hint slot="hint" text="Receita líquida menos o custo dos ingredientes (CMV)." />
+        <app-hint slot="hint" [text]="h.margemBruta" />
       </app-stat-card>
       <app-stat-card
         label="Despesas operacionais"
@@ -236,7 +238,9 @@
         status="warning"
         [subtext]="pctFmt(pctDaReceita(d.current.operatingExpenses)) + ' da receita'"
         [delta]="statDelta(d.deltas.operatingExpenses, { note: notaComparacao() })"
-      />
+      >
+        <app-hint slot="hint" [text]="h.despesasOperacionais" />
+      </app-stat-card>
       <app-stat-card
         label="Margem líquida"
         [value]="pctFmt(margemLiquida())"
@@ -248,7 +252,9 @@
             ? 'Era ' + pctFmt(margemLiquidaAnterior()) + ' em ' + fmtMonthLong(d.previousMonth)
             : ''
         "
-      />
+      >
+        <app-hint slot="hint" [text]="h.margemLiquida" />
+      </app-stat-card>
     </div>
 
     @if (foraDoCmv().length > 0) {
@@ -321,6 +327,7 @@
       [loading]="loading()"
       [height]="340"
     >
+      <span slot="title-extra"><app-hint [text]="h.cascataResultado" /></span>
       <app-waterfall-chart [rows]="waterfallResultado()" />
     </app-chart-card>
 
@@ -493,6 +500,7 @@
       [loading]="loading()"
       [height]="320"
     >
+      <span slot="title-extra"><app-hint [text]="h.historicoResultado" /></span>
       <div slot="action" class="flex flex-wrap items-center gap-2">
         <div
           class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"

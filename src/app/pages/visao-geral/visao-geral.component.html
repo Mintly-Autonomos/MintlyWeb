@@ -162,10 +162,7 @@
           status="neutral"
           [spark]="netProfitSpark()"
         >
-          <app-hint
-            slot="hint"
-            text="O que sobra depois de todos os custos, despesas e impostos."
-          />
+          <app-hint slot="hint" [text]="h.lucroMes" />
         </app-stat-card>
         <app-stat-card
           label="Caixa hoje"
@@ -173,7 +170,9 @@
           icon="account_balance_wallet"
           status="neutral"
           [spark]="cashSpark()"
-        />
+        >
+          <app-hint slot="hint" [text]="h.caixaHoje" />
+        </app-stat-card>
         <app-stat-card
           label="Projeção 30 dias"
           [value]="fmtBRL(d.cards.projection.balance)"
@@ -185,10 +184,7 @@
           icon="timeline"
           status="warning"
         >
-          <app-hint
-            slot="hint"
-            text="Caixa de hoje mais o que já está lançado para os próximos 30 dias (a receber e a pagar). É o mesmo número do Fluxo de caixa. As Previsões somam também o ritmo de vendas e custos, por isso dão outro valor."
-          />
+          <app-hint slot="hint" [text]="h.projecao30" />
           <app-chip slot="badge" tone="ocean">Estimativa</app-chip>
         </app-stat-card>
         <app-stat-card
@@ -238,7 +234,9 @@
           icon="trending_up"
           status="neutral"
           [spark]="revenueSpark()"
-        />
+        >
+          <app-hint slot="hint" [text]="h.receitaBrutaMes" />
+        </app-stat-card>
       </div>
     </div>
 
@@ -255,6 +253,7 @@
         emptyTitle="Ainda não há lançamentos para mostrar"
         emptyDescription="Registre uma venda ou uma despesa e este gráfico passa a mostrar a evolução da sua receita e dos seus custos."
       >
+        <span slot="title-extra"><app-hint [text]="h.receitaVsCustos" /></span>
         <app-button slot="empty-action" icon="point_of_sale" (clicked)="lancar('entrada')"
           >Lançar venda</app-button
         >
@@ -301,6 +300,7 @@
         emptyTitle="Seu lucro vai aparecer aqui"
         emptyDescription="Com vendas e despesas registradas, mostramos do que entrou até o que sobrou, passo a passo."
       >
+        <span slot="title-extra"><app-hint [text]="h.cascataResultado" /></span>
         <app-button slot="empty-action" icon="point_of_sale" (clicked)="lancar('entrada')"
           >Lançar venda</app-button
         >

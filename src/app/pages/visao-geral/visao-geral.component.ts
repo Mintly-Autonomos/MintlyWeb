@@ -17,7 +17,7 @@ import { BulletComponent } from '../../shared/bullet.component';
 import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-chart.component';
 import { AreaChartComponent, AreaSeries } from '../../shared/area-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { CMV_HINT, PRIME_COST_HINT } from '../../shared/metric-hints';
+import { CMV_HINT, PRIME_COST_HINT, METRIC_HINTS } from '../../shared/metric-hints';
 import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
@@ -89,6 +89,8 @@ function pillarDetail(key: string, value: number | null, mesPassado = false): st
   templateUrl: './visao-geral.component.html',
 })
 export class VisaoGeralComponent implements OnInit {
+  /** Texto do "?" de cada número e gráfico: o que é e como se calcula (P.1). */
+  protected readonly h = METRIC_HINTS;
   private svc = inject(DashboardService);
   private toast = inject(ToastService);
   private router = inject(Router);

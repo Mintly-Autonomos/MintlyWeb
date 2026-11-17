@@ -85,21 +85,27 @@
         icon="account_balance_wallet"
         status="neutral"
         subtext="Somando todas as contas ativas"
-      />
+      >
+        <app-hint slot="hint" [text]="h.caixaHoje" />
+      </app-stat-card>
       <app-stat-card
         [label]="'A receber (' + label() + ')'"
         [value]="fmtBRL(d.receivable)"
         icon="south_west"
         status="positive"
         [spark]="sparkReceber()"
-      />
+      >
+        <app-hint slot="hint" [text]="h.aReceber" />
+      </app-stat-card>
       <app-stat-card
         [label]="'A pagar (' + label() + ')'"
         [value]="fmtBRL(d.payable)"
         icon="north_east"
         status="warning"
         [spark]="sparkPagar()"
-      />
+      >
+        <app-hint slot="hint" [text]="h.aPagar" />
+      </app-stat-card>
       <app-stat-card
         [label]="'Saldo previsto (' + label() + ')'"
         [value]="fmtBRL(d.projectedBalance)"
@@ -107,10 +113,7 @@
         status="warning"
         [subtext]="menorSaldoTexto()"
       >
-        <app-hint
-          slot="hint"
-          text="Estimativa de quanto sobra em caixa ao fim do horizonte escolhido, com base nas contas já lançadas."
-        />
+        <app-hint slot="hint" [text]="h.saldoPrevisto" />
         <app-chip slot="badge" tone="ocean" icon="insights">Estimativa</app-chip>
       </app-stat-card>
     </div>
@@ -166,6 +169,7 @@
       [loading]="loading()"
       [height]="300"
     >
+      <span slot="title-extra"><app-hint [text]="h.entradasSaidas" /></span>
       <app-bar-chart
         [data]="blocos()"
         categoryKey="semana"

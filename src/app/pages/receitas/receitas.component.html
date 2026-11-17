@@ -79,7 +79,9 @@
           icon="payments"
           status="positive"
           [spark]="d.sparks.receitaBruta"
-        />
+        >
+          <app-hint slot="hint" [text]="h.receitaBrutaRecebida" />
+        </app-stat-card>
         <app-stat-card
           label="Receita líquida"
           [value]="fmtBRL(d.receitaLiquida)"
@@ -93,7 +95,7 @@
           status="neutral"
           [spark]="d.sparks.receitaLiquida"
         >
-          <app-hint slot="hint" text="O que sobra da receita após impostos sobre venda." />
+          <app-hint slot="hint" [text]="h.receitaLiquida" />
         </app-stat-card>
         <app-stat-card
           label="Ticket médio"
@@ -108,10 +110,7 @@
           status="neutral"
           [spark]="d.sparks.ticketMedio"
         >
-          <app-hint
-            slot="hint"
-            text='Receita bruta dividida pelo número de vendas. Num fechamento do dia, informe quantas vendas ele soma no campo "Quantas vendas"; sem isso, cada lançamento conta como uma venda.'
-          />
+          <app-hint slot="hint" [text]="h.ticketMedio" />
         </app-stat-card>
         <app-stat-card
           [label]="d.pedidosLabel"
@@ -125,7 +124,9 @@
           icon="restaurant"
           status="neutral"
           [spark]="d.sparks.pedidos"
-        />
+        >
+          <app-hint slot="hint" [text]="h.vendas" />
+        </app-stat-card>
       </div>
 
       <!-- 3 — Insight de canal -->
@@ -152,6 +153,7 @@
         [loading]="loading()"
         [height]="300"
       >
+        <span slot="title-extra"><app-hint [text]="h.brutaLiquida" /></span>
         <app-waterfall-chart [rows]="d.waterfall" />
       </app-chart-card>
 
@@ -246,6 +248,7 @@
         [loading]="loading()"
         [height]="430"
       >
+        <span slot="title-extra"><app-hint [text]="h.itensMaisVendidos" /></span>
         <div
           slot="action"
           class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
@@ -285,6 +288,7 @@
           [loading]="loading()"
           [height]="300"
         >
+          <span slot="title-extra"><app-hint [text]="h.receitaPorCategoria" /></span>
           <div class="h-full flex items-center gap-4">
             <div class="h-full flex-1 min-w-0">
               <app-donut-chart [data]="porCategoriaSlices()" [valueFormatter]="fmtBRL" />
@@ -313,9 +317,7 @@
           [height]="300"
         >
           <span slot="title-extra">
-            <app-hint
-              text="Compara quanto cada canal fatura (barra escura) e quanto realmente sobra depois das taxas (barra verde). No delivery, a plataforma cobra comissão, que reduz seu lucro."
-            />
+            <app-hint [text]="h.canais" />
           </span>
           <div class="h-full flex flex-col">
             <div class="flex-1 min-h-0">
@@ -351,6 +353,7 @@
         [loading]="loading()"
         [height]="280"
       >
+        <span slot="title-extra"><app-hint [text]="h.formasPagamento" /></span>
         <app-bar-chart
           [data]="d.formasPagamento"
           categoryKey="forma"
@@ -369,6 +372,7 @@
         [loading]="loading()"
         [height]="320"
       >
+        <span slot="title-extra"><app-hint [text]="h.tendenciaReceita" /></span>
         <div
           slot="action"
           class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
