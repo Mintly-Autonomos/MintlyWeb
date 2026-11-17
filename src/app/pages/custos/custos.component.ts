@@ -12,7 +12,7 @@ import { BulletComponent } from '../../shared/bullet.component';
 import { ToggleGroupComponent, ToggleGroupOption } from '../../shared/toggle-group.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { CMV_HINT, PRIME_COST_HINT } from '../../shared/metric-hints';
+import { CMV_HINT, PRIME_COST_HINT, METRIC_HINTS } from '../../shared/metric-hints';
 import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
 import { CmvAvisoComponent, DespesaForaDoCmv } from '../../shared/cmv-aviso.component';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
@@ -54,6 +54,8 @@ const TREND_COLORS = [
   templateUrl: './custos.component.html',
 })
 export class CustosComponent implements OnInit {
+  /** Texto do "?" de cada número e gráfico: o que é e como se calcula (P.1). */
+  protected readonly h = METRIC_HINTS;
   private svc = inject(CustosService);
   private toast = inject(ToastService);
 

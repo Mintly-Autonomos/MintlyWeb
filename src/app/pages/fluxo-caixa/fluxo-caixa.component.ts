@@ -12,6 +12,7 @@ import { AuthService } from '../../services/auth.service';
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { HintComponent } from '../../shared/hint.component';
+import { METRIC_HINTS } from '../../shared/metric-hints';
 import { StatCardComponent } from '../../shared/stat-card.component';
 import { ChartCardComponent } from '../../shared/chart-card.component';
 import { InsightCardComponent } from '../../shared/insight-card.component';
@@ -89,6 +90,8 @@ const STATUS_META: Record<
   templateUrl: './fluxo-caixa.component.html',
 })
 export class FluxoCaixaComponent implements OnInit {
+  /** Texto do "?" de cada número e gráfico: o que é e como se calcula (P.1). */
+  protected readonly h = METRIC_HINTS;
   private svc = inject(FluxoCaixaService);
   private auth = inject(AuthService);
   protected empresa = computed(() => this.auth.currentUser()?.empresa?.trim() ?? '');

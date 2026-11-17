@@ -59,7 +59,9 @@
         icon="trending_down"
         [status]="(d.total.deltaPrevious ?? 0) > 0 ? 'warning' : 'positive'"
         [spark]="historySpark()"
-      />
+      >
+        <app-hint slot="hint" [text]="h.custosTotal" />
+      </app-stat-card>
       <app-stat-card
         label="CMV"
         [value]="pctFmt((d.cmv.pctOfRevenue ?? 0) * 100)"
@@ -87,7 +89,7 @@
         [value]="pctFmt((d.primeCost.pctOfRevenue ?? 0) * 100)"
         icon="restaurant_menu"
         status="warning"
-        [subtext]="fmtBRL(d.primeCost.cmv + d.primeCost.labor) + ' de CMV + pró-labore'"
+        [subtext]="fmtBRL(d.primeCost.cmv + d.primeCost.labor) + ' de CMV + pessoal'"
       >
         <app-hint slot="hint" [text]="primeCostHint" />
         <app-bullet
@@ -106,10 +108,7 @@
         status="warning"
         [subtext]="taxaMaquininhaTexto()"
       >
-        <app-hint
-          slot="hint"
-          text="Comissão que os apps de delivery (iFood, Rappi...) cobram sobre as vendas deles. A taxa da maquininha fica separada, embaixo do valor."
-        />
+        <app-hint slot="hint" [text]="h.taxaPlataforma" />
         @if (d.platformFee.pctOfDelivery; as pct) {
           <app-chip slot="badge" tone="warning" icon="percent"
             >{{ pctFmt(pct * 100) }} do delivery</app-chip
@@ -387,7 +386,7 @@
       [height]="420"
     >
       <span slot="title-extra">
-        <app-hint text="Acompanhe se os custos estão subindo mês a mês e em qual categoria." />
+        <app-hint [text]="h.evolucaoCustos" />
       </span>
       <div
         slot="action"

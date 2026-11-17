@@ -6,6 +6,7 @@ import { RestauranteService, TaxRegimeKey } from '../../services/restaurante.ser
 import { IconComponent } from '../../shared/icon.component';
 import { ChipComponent } from '../../shared/chip.component';
 import { HintComponent } from '../../shared/hint.component';
+import { METRIC_HINTS } from '../../shared/metric-hints';
 import { ButtonComponent } from '../../shared/button.component';
 import { ModalComponent } from '../../shared/modal.component';
 import { StatCardComponent } from '../../shared/stat-card.component';
@@ -91,6 +92,8 @@ const REGIME_LABEL: Record<TaxRegimeKey, string> = {
   templateUrl: './resultado.component.html',
 })
 export class ResultadoComponent implements OnInit {
+  /** Texto do "?" de cada número e gráfico: o que é e como se calcula (P.1). */
+  protected readonly h = METRIC_HINTS;
   private svc = inject(ResultadoService);
   private restauranteSvc = inject(RestauranteService);
   private toast = inject(ToastService);
