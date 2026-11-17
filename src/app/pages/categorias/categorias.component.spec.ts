@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { CategoriasComponent } from './categorias.component';
 import { CategoriasService, Category } from '../../services/categorias.service';
 import { ToastService } from '../../shared/toast.service';
+import { AuthService } from '../../services/auth.service';
 
 const agora = new Date().toISOString();
 
@@ -50,6 +51,7 @@ describe('CategoriasComponent — onde a despesa entra no resultado', () => {
     };
     TestBed.configureTestingModule({
       providers: [
+        { provide: AuthService, useValue: { podeMudarCadastros: signal(true) } },
         { provide: CategoriasService, useValue: svc },
         { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), show: vi.fn() } },
       ],

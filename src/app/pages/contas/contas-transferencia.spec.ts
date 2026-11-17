@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { ContasComponent } from './contas.component';
 import { Account, ContasService } from '../../services/contas.service';
 import { ToastService } from '../../shared/toast.service';
+import { AuthService } from '../../services/auth.service';
 
 const conta = (over: Partial<Account>): Account =>
   ({
@@ -47,6 +48,7 @@ describe('Contas: transferir entre contas e saldo inicial (relatório S3.2)', ()
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
+        { provide: AuthService, useValue: { podeMudarCadastros: signal(true) } },
         { provide: ContasService, useValue: svc },
         { provide: ToastService, useValue: toast },
       ],
