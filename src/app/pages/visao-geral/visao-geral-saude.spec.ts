@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import { FluxoCaixaService } from '../../services/fluxo-caixa.service';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import type { HealthCap } from 'mintly-lib';
@@ -34,6 +35,11 @@ describe('Visão Geral: motivo da trava da nota e mês-base (relatório S2.3)', 
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
+        // Card 'Estou devendo?' (P.8): sem resposta, fica no esqueleto e não atrapalha.
+        {
+          provide: FluxoCaixaService,
+          useValue: { fetchReport: vi.fn(() => new Promise(() => undefined)) },
+        },
         {
           provide: DashboardService,
           useValue: { data, loading: signal(false), refresh: vi.fn(() => Promise.resolve()) },

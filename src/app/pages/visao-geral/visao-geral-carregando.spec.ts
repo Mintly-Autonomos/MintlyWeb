@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import { FluxoCaixaService } from '../../services/fluxo-caixa.service';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AiService } from '../../services/ai.service';
@@ -12,6 +13,11 @@ describe('Visão Geral: esqueleto na primeira carga (relatório U.1)', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
+        // Card 'Estou devendo?' (P.8): sem resposta, fica no esqueleto e não atrapalha.
+        {
+          provide: FluxoCaixaService,
+          useValue: { fetchReport: vi.fn(() => new Promise(() => undefined)) },
+        },
         {
           provide: DashboardService,
           useValue: {
