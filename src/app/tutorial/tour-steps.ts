@@ -150,6 +150,11 @@ export const PAGE_STEPS: Record<string, TourStep[]> = {
       text: '“Nova entrada” é para uma venda ou outra receita; “Nova saída” é para uma despesa. É daqui que vêm quase todos os números do Mintly.',
     },
     {
+      target: 'como-lancar',
+      title: 'Passo a passo de um lançamento',
+      text: 'Nunca lançou? “Como lançar?” abre o formulário e explica cada campo, na ordem.',
+    },
+    {
       target: 'resumo',
       title: 'Resumo',
       text: 'O que já foi recebido, o que já foi pago e quanto ainda está pendente (aguardando confirmação).',
@@ -254,6 +259,73 @@ export const COMMON_STEPS: TourStep[] = [
     target: 'ajuda',
     title: 'Quer rever?',
     text: 'Clique no “?” sempre que quiser ver o tutorial da tela em que estiver.',
+  },
+];
+
+/**
+ * Passo a passo de como criar uma movimentação: percorre o formulário de "Nova entrada" campo a campo. Começa
+ * pelo botão "Como lançar?" de Movimentações. Os campos que não aparecem (ex.: pratos numa saída) são pulados.
+ */
+export const LANCAMENTO_STEPS: TourStep[] = [
+  {
+    target: 'mov-tipo',
+    title: '1. Entrada ou saída',
+    text: 'Entrada é dinheiro que chega (uma venda, por exemplo). Saída é dinheiro que vai (uma conta, um fornecedor). Dá para trocar aqui a qualquer momento.',
+  },
+  {
+    target: 'mov-titulo',
+    title: '2. Um nome para achar depois',
+    text: 'Algo curto que você reconheça na lista, como “Vendas do almoço” ou “Boleto da Coca-Cola”.',
+  },
+  {
+    target: 'mov-pratos',
+    title: '3. Pratos vendidos (opcional)',
+    text: 'Se quiser, escolha os pratos e as quantidades: o valor é somado sozinho e o Mintly mostra o que mais vende. Pode pular.',
+  },
+  {
+    target: 'mov-valor',
+    title: '4. Quanto',
+    text: 'O valor cheio, antes de qualquer taxa. Digite os centavos depois da vírgula (ex.: 1.234,50).',
+  },
+  {
+    target: 'mov-data',
+    title: '5. Quando aconteceu',
+    text: 'O dia da venda ou da despesa. É por essa data que o lançamento entra no mês certo do Resultado.',
+  },
+  {
+    target: 'mov-categoria',
+    title: '6. Que tipo de dinheiro é',
+    text: 'A categoria diz de onde vem ou para onde vai o dinheiro (venda no balcão, aluguel, insumos…). É ela que monta os relatórios.',
+  },
+  {
+    target: 'mov-conta',
+    title: '7. Onde o dinheiro está',
+    text: 'Em qual conta o dinheiro entrou ou saiu: caixa, banco, maquininha ou app de delivery. Em maquininha e app, o Mintly calcula a taxa e a data do repasse.',
+  },
+  {
+    target: 'mov-forma',
+    title: '8. Como foi pago',
+    text: 'Pix, dinheiro, débito, crédito… Na maquininha, cada forma pode ter uma taxa diferente.',
+  },
+  {
+    target: 'mov-status',
+    title: '9. Já caiu na conta?',
+    text: 'Recebido ou pago: o dinheiro já mexeu. Pendente: ainda vai entrar ou sair (boleto, repasse do app). O pendente aparece no Fluxo de caixa.',
+  },
+  {
+    target: 'mov-venda',
+    title: '10. Canal, hora e número de vendas (opcional)',
+    text: 'Salão, delivery ou encomenda; a hora mostra quando você mais vende; e, num fechamento do dia, quantas vendas ele soma deixa o ticket médio certo.',
+  },
+  {
+    target: 'mov-obs',
+    title: '11. Observações (opcional)',
+    text: 'Qualquer detalhe que ajude depois: número do pedido, nome do cliente, nota fiscal.',
+  },
+  {
+    target: 'mov-registrar',
+    title: '12. Pronto',
+    text: 'Com os campos obrigatórios preenchidos, o botão libera. Ele mostra o que falta enquanto estiver bloqueado.',
   },
 ];
 

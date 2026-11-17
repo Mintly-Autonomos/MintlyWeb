@@ -195,6 +195,12 @@ export class TourOverlayComponent implements OnDestroy {
   private mostrarAlvo(alvo: string): void {
     const el = findTourTarget(alvo);
     if (!el || el.closest('header, aside')) return;
+    // Dentro de um modal quem rola é o modal, não a página.
+    if (el.closest('app-modal')) {
+      const reduzirModal = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ block: 'center', behavior: reduzirModal ? 'auto' : 'smooth' });
+      return;
+    }
     const r = el.getBoundingClientRect();
     const vh = window.innerHeight;
     const alto = r.height > vh - ALTURA_CABECALHO - 40;

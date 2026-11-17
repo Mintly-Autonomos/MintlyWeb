@@ -38,8 +38,8 @@ export const METRIC_HINTS = {
     'resultado do mês ÷ receita bruta × 100.',
   ),
   cascataResultado: calc(
-    'Do faturamento até o lucro, passo a passo.',
-    'receita bruta − impostos sobre a venda − CMV − despesas operacionais = resultado do mês.',
+    'Das vendas até o lucro, uma linha por etapa: cada barra começa onde a anterior terminou, e o que fica à esquerda do traço do zero é prejuízo. O % é sobre as vendas.',
+    'vendas − impostos sobre a venda − taxas − CMV − mão de obra − outras despesas = resultado do mês (na Visão geral, taxas e mão de obra ficam dentro das despesas operacionais).',
   ),
   historicoResultado: calc(
     'O lucro de cada mês (barras) e a margem (linha).',

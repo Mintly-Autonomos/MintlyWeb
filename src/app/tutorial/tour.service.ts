@@ -37,7 +37,12 @@ export class TourService {
 
   /** Inicia o tutorial da página em `url`. Devolve false se nenhum passo tem alvo visível. */
   start(url: string): boolean {
-    const visiveis = stepsForPage(url).filter((s) => findTourTarget(s.target) !== null);
+    return this.startSteps(stepsForPage(url));
+  }
+
+  /** Inicia um tutorial com estes passos (ex.: o passo a passo do lançamento). Só entram os visíveis. */
+  startSteps(steps: TourStep[]): boolean {
+    const visiveis = steps.filter((s) => findTourTarget(s.target) !== null);
     if (visiveis.length === 0) return false;
     this.steps.set(visiveis);
     this.index.set(0);
