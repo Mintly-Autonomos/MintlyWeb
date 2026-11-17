@@ -7,7 +7,16 @@
         Registre e acompanhe suas receitas e despesas.
       </p>
     </div>
-    <div class="flex gap-2 sm:shrink-0" data-tour="novo-lancamento">
+    <div class="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end" data-tour="novo-lancamento">
+      <button
+        type="button"
+        (click)="tutorialLancamento()"
+        data-testid="tutorial-lancamento"
+        data-tour="como-lancar"
+        class="flex flex-1 sm:flex-none justify-center items-center gap-1.5 whitespace-nowrap h-10 px-3 rounded-xl text-ocean text-sm font-medium hover:bg-mint-soft transition cursor-pointer"
+      >
+        <app-icon name="school" [style]="{ fontSize: '20px' }" /><span>Como lançar?</span>
+      </button>
       <button
         (click)="openCreate('expense')"
         class="flex flex-1 sm:flex-none justify-center items-center gap-1.5 sm:gap-2 whitespace-nowrap h-10 px-3 sm:px-4 rounded-xl border border-border bg-card text-foreground text-sm font-medium hover:bg-muted transition cursor-pointer"
@@ -413,7 +422,7 @@
       <div class="space-y-5">
         <!-- Tipo -->
         @if (!editing()) {
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-2 gap-2" data-tour="mov-tipo">
             @for (t of tipoOpts; track t.value) {
               <button
                 type="button"
@@ -449,7 +458,7 @@
         }
 
         <!-- Título -->
-        <label class="block">
+        <label class="block" data-tour="mov-titulo">
           <span class="text-[13px] font-medium block mb-1.5">Título</span>
           <input
             [value]="form().title"
@@ -473,7 +482,7 @@
 
         <!-- Pratos vendidos (só entradas) -->
         @if (form().type === 'income') {
-          <div class="space-y-2" data-testid="pratos-venda">
+          <div class="space-y-2" data-testid="pratos-venda" data-tour="mov-pratos">
             <span class="text-[13px] font-medium block"
               >Pratos vendidos <span class="text-muted-foreground">(opcional)</span></span
             >
@@ -543,7 +552,7 @@
 
         <!-- Valor + Data -->
         <div class="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4">
-          <label class="block">
+          <label class="block" data-tour="mov-valor">
             <span class="text-[13px] font-medium block mb-1.5">Valor bruto</span>
             <div class="relative">
               <span
@@ -588,7 +597,7 @@
               </p>
             }
           </label>
-          <label class="block">
+          <label class="block" data-tour="mov-data">
             <span class="text-[13px] font-medium block mb-1.5">Data da movimentação</span>
             <input
               [value]="form().date"
@@ -604,7 +613,7 @@
 
         <!-- Categoria + Conta -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label class="block">
+          <label class="block" data-tour="mov-categoria">
             <span class="text-[13px] font-medium block mb-1.5">Categoria</span>
             <select
               [value]="form().categoryId ?? ''"
@@ -629,7 +638,7 @@
               }}
             </p>
           </label>
-          <label class="block">
+          <label class="block" data-tour="mov-conta">
             <span class="text-[13px] font-medium block mb-1.5">Conta financeira</span>
             <select
               [value]="form().accountId ?? ''"
@@ -657,7 +666,7 @@
         </div>
 
         <!-- Forma de pagamento -->
-        <div>
+        <div data-tour="mov-forma">
           <div class="text-[12px] font-semibold text-foreground/80 mb-1.5">Forma de pagamento</div>
           <div class="flex gap-2 flex-wrap">
             @for (pm of paymentMethods; track pm) {
@@ -731,7 +740,7 @@
         }
 
         <!-- Status -->
-        <div>
+        <div data-tour="mov-status">
           <div class="text-[12px] font-semibold text-foreground/80 mb-1.5">Status</div>
           <div class="grid grid-cols-3 gap-2">
             @for (st of statusCards; track st.value) {
@@ -758,7 +767,7 @@
 
         <!-- Canal, hora da venda e número de vendas (S3.4): só em entrada -->
         @if (form().type === 'income') {
-          <div class="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr] gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr] gap-4" data-tour="mov-venda">
             <label class="block">
               <span class="text-[13px] font-medium block mb-1.5">Canal</span>
               <select
@@ -821,7 +830,7 @@
         }
 
         <!-- Observações -->
-        <label class="block">
+        <label class="block" data-tour="mov-obs">
           <span class="text-[13px] font-medium block mb-1.5"
             >Observações <span class="text-muted-foreground">(opcional)</span></span
           >
@@ -881,6 +890,7 @@
               type="button"
               (click)="save()"
               [disabled]="!formValid"
+              data-tour="mov-registrar"
               class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 disabled:opacity-50 transition cursor-pointer"
             >
               {{ editing() ? 'Salvar alterações' : 'Registrar movimentação' }}

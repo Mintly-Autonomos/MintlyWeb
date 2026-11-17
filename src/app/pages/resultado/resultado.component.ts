@@ -13,7 +13,8 @@ import { StatCardComponent } from '../../shared/stat-card.component';
 import { ChartCardComponent } from '../../shared/chart-card.component';
 import { InsightCardComponent } from '../../shared/insight-card.component';
 import { SectionHeaderComponent } from '../../shared/section-header.component';
-import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-chart.component';
+import type { WaterfallRow } from '../../shared/waterfall-chart.component';
+import { ProfitBridgeComponent } from '../../shared/profit-bridge.component';
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
@@ -84,7 +85,7 @@ const REGIME_LABEL: Record<TaxRegimeKey, string> = {
     ChartCardComponent,
     InsightCardComponent,
     SectionHeaderComponent,
-    WaterfallChartComponent,
+    ProfitBridgeComponent,
     BarChartComponent,
     LineChartComponent,
     CmvAvisoComponent,
@@ -254,13 +255,41 @@ export class ResultadoComponent implements OnInit {
   protected waterfallResultado = computed<WaterfallRow[]>(() => {
     const d = this.data();
     if (!d) return [];
-    return [
-      { label: 'Receita bruta', value: d.current.grossRevenue, kind: 'start' },
-      { label: 'Impostos', value: -d.current.taxes, kind: 'down' },
-      { label: 'CMV', value: -d.current.cmv, kind: 'down' },
-      { label: 'Desp. operacionais', value: -d.current.operatingExpenses, kind: 'down' },
-      { label: 'Resultado', value: d.current.netProfit, kind: 'end' },
+    const c = d.current;
+    const soma = (kinds: string[]) =>
+      d.operatingExpenseItems
+        .filter((i) => kinds.includes(i.kind))
+        .reduce((s, i) => s + i.amount, 0);
+    const taxas = soma(['platformFee', 'cardFee']);
+    const pessoal = soma(['labor']);
+    const outras = Math.max(0, c.operatingExpenses - taxas - pessoal);
+    const naoOp = (c.nonOperatingIncome ?? 0) !== 0 || (c.nonOperatingExpenses ?? 0) !== 0;
+    const linhas: WaterfallRow[] = [
+      { label: 'Vendas', value: c.grossRevenue, kind: 'start' },
+      { label: 'Impostos sobre venda', value: -c.taxes, kind: 'down' },
+      { label: 'Taxas dos apps e da maquininha', value: -taxas, kind: 'down' },
+      { label: 'CMV (insumos)', value: -c.cmv, kind: 'down' },
+      { label: 'Mão de obra', value: -pessoal, kind: 'down' },
+      { label: 'Outras despesas', value: -outras, kind: 'down' },
+      {
+        label: naoOp ? 'Resultado operacional' : 'Resultado do mês',
+        value: c.netProfit,
+        kind: 'end',
+      },
     ];
+    if (naoOp) {
+      linhas.push(
+        { label: 'Entradas não operacionais', value: c.nonOperatingIncome ?? 0, kind: 'up' },
+        { label: 'Saídas não operacionais', value: -(c.nonOperatingExpenses ?? 0), kind: 'down' },
+        {
+          label: 'Depois do não operacional',
+          value: c.resultAfterNonOperating ?? c.netProfit,
+          kind: 'end',
+        },
+      );
+    }
+    // Etapa zerada não ajuda a ler (ex.: sem imposto configurado): sai da ponte.
+    return linhas.filter((l) => l.kind === 'start' || l.kind === 'end' || l.value !== 0);
   });
 
   /** CMV zerado mas com despesa variável em despesa operacional: provavelmente é insumo na categoria errada. */

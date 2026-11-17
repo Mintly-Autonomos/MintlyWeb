@@ -14,7 +14,8 @@ import { ChartCardComponent } from '../../shared/chart-card.component';
 import { InsightCardComponent, InsightSeverity } from '../../shared/insight-card.component';
 import { SectionHeaderComponent } from '../../shared/section-header.component';
 import { BulletComponent } from '../../shared/bullet.component';
-import { WaterfallChartComponent, WaterfallRow } from '../../shared/waterfall-chart.component';
+import type { WaterfallRow } from '../../shared/waterfall-chart.component';
+import { ProfitBridgeComponent } from '../../shared/profit-bridge.component';
 import { AreaChartComponent, AreaSeries } from '../../shared/area-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { CMV_HINT, PRIME_COST_HINT, METRIC_HINTS } from '../../shared/metric-hints';
@@ -83,7 +84,7 @@ function pillarDetail(key: string, value: number | null, mesPassado = false): st
     InsightCardComponent,
     SectionHeaderComponent,
     BulletComponent,
-    WaterfallChartComponent,
+    ProfitBridgeComponent,
     AreaChartComponent,
   ],
   templateUrl: './visao-geral.component.html',
@@ -249,12 +250,12 @@ export class VisaoGeralComponent implements OnInit {
     if (!d) return [];
     const w = d.profitWaterfall;
     return [
-      { label: 'Receita Bruta', value: w.grossRevenue, kind: 'start' },
-      { label: 'Impostos', value: -w.taxes, kind: 'down' },
-      { label: 'CMV', value: -w.cmv, kind: 'down' },
-      { label: 'Desp. operacionais', value: -w.operatingExpenses, kind: 'down' },
-      { label: 'Lucro Líquido', value: w.netProfit, kind: 'end' },
-    ];
+      { label: 'Vendas', value: w.grossRevenue, kind: 'start' as const },
+      { label: 'Impostos sobre venda', value: -w.taxes, kind: 'down' as const },
+      { label: 'CMV (insumos)', value: -w.cmv, kind: 'down' as const },
+      { label: 'Despesas operacionais', value: -w.operatingExpenses, kind: 'down' as const },
+      { label: 'Lucro do mês', value: w.netProfit, kind: 'end' as const },
+    ].filter((l) => l.kind === 'start' || l.kind === 'end' || l.value !== 0);
   });
 
   /** Nenhum lançamento no período (nem série, nem cascata): os gráficos mostram o convite para lançar. */

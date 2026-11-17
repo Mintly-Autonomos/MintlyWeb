@@ -40,6 +40,8 @@ import {
   splitDishText,
 } from '../../shared/dish-match';
 import { moneyToInput } from '../../shared/money-input';
+import { TourService } from '../../tutorial/tour.service';
+import { LANCAMENTO_STEPS } from '../../tutorial/tour-steps';
 import {
   describeSettlementRule,
   resolveSettlementRule,
@@ -157,6 +159,7 @@ export class MovimentacoesComponent implements OnInit {
   private route = inject(ActivatedRoute, { optional: true });
   private router = inject(Router, { optional: true });
   private cardapioSvc = inject(CardapioService);
+  private tour = inject(TourService);
 
   // ── UI state ──────────────────────────────────────────────────────────
   protected creating = signal(false);
@@ -827,6 +830,13 @@ export class MovimentacoesComponent implements OnInit {
     return (
       (active.find((a) => a.isDefault) ?? (active.length === 1 ? active[0] : undefined))?.id ?? null
     );
+  }
+
+  /** "Como lançar?": abre uma nova entrada e explica o formulário campo a campo. */
+  tutorialLancamento(): void {
+    this.openCreate('income');
+    // O formulário precisa estar na tela para o tutorial achar os campos.
+    setTimeout(() => this.tour.startSteps(LANCAMENTO_STEPS), 80);
   }
 
   openCreate(type: MovType = 'income'): void {
