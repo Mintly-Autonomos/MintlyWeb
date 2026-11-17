@@ -154,7 +154,61 @@
         [height]="300"
       >
         <span slot="title-extra"><app-hint [text]="h.brutaLiquida" /></span>
-        <app-waterfall-chart [rows]="d.waterfall" />
+        @if (composicao().length === 0) {
+          <p class="h-full grid place-items-center text-[13px] text-muted-foreground">
+            Sem vendas recebidas no período.
+          </p>
+        } @else {
+          <div class="h-full flex flex-col justify-center gap-5" data-testid="bruta-liquida">
+            <div class="text-[13px] text-muted-foreground">
+              De <span class="font-semibold text-foreground">{{ fmtBRL(d.receitaBruta) }}</span>
+              vendidos
+            </div>
+            <div
+              class="flex h-10 w-full overflow-hidden rounded-xl bg-muted"
+              role="img"
+              [attr.aria-label]="
+                'Fica com você ' +
+                fmtPct(composicao()[0].pct) +
+                ', taxas ' +
+                fmtPct(composicao()[1].pct) +
+                ', impostos ' +
+                fmtPct(composicao()[2].pct)
+              "
+            >
+              @for (p of composicao(); track p.chave) {
+                @if (p.pct > 0) {
+                  <div
+                    class="h-full"
+                    [style.width.%]="p.pct"
+                    [style.background]="p.cor"
+                    [title]="p.nome + ': ' + fmtBRL(p.valor) + ' (' + fmtPct(p.pct) + ')'"
+                  ></div>
+                }
+              }
+            </div>
+            <ul class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              @for (p of composicao(); track p.chave) {
+                <li
+                  class="rounded-xl border border-border p-3"
+                  [attr.data-testid]="'composicao-' + p.chave"
+                >
+                  <div class="flex items-center gap-2 text-[12px] text-muted-foreground">
+                    <span
+                      class="h-2.5 w-2.5 rounded-full shrink-0"
+                      [style.background]="p.cor"
+                    ></span>
+                    {{ p.nome }}
+                  </div>
+                  <div class="text-[16px] font-bold tabular-nums mt-0.5">{{ fmtBRL(p.valor) }}</div>
+                  <div class="text-[12px] text-muted-foreground tabular-nums">
+                    {{ fmtPct(p.pct) }}
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+        }
       </app-chart-card>
 
       <!-- 5 — Heatmap -->
@@ -253,19 +307,20 @@
           slot="action"
           class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
         >
-          @for (m of ['receita', 'qtd']; track m) {
+          @for (m of rankModes; track m.key) {
             <button
               type="button"
-              (click)="rankMode.set($any(m))"
-              [attr.aria-pressed]="rankMode() === m"
+              (click)="rankMode.set(m.key)"
+              [attr.aria-pressed]="rankMode() === m.key"
+              [attr.data-testid]="'ranking-' + m.key"
               [class]="
                 'h-8 px-3 rounded-full text-[12px] font-semibold transition-colors duration-150 cursor-pointer ' +
-                (rankMode() === m
+                (rankMode() === m.key
                   ? 'bg-mint-soft text-ocean'
                   : 'text-muted-foreground hover:bg-muted')
               "
             >
-              {{ m === 'receita' ? 'Por receita (R$)' : 'Por quantidade' }}
+              {{ m.label }}
             </button>
           }
         </div>
@@ -289,25 +344,15 @@
           [height]="300"
         >
           <span slot="title-extra"><app-hint [text]="h.receitaPorCategoria" /></span>
-          <div class="h-full flex items-center gap-4">
-            <div class="h-full flex-1 min-w-0">
-              <app-donut-chart [data]="porCategoriaSlices()" [valueFormatter]="fmtBRL" />
-            </div>
-            <ul class="w-[46%] shrink-0 space-y-2 text-[12px]">
-              @for (c of porCategoriaSlices(); track c.label) {
-                <li class="flex items-center gap-2">
-                  <span
-                    class="h-2.5 w-2.5 rounded-full shrink-0"
-                    [style.background]="c.color"
-                  ></span>
-                  <span class="truncate">{{ c.label }}</span>
-                  <span class="ml-auto font-semibold tabular-nums whitespace-nowrap">
-                    {{ Math.round((c.value / catTotal()) * 100) }}%
-                  </span>
-                </li>
-              }
-            </ul>
-          </div>
+          <app-bar-chart
+            [data]="d.porCategoria"
+            categoryKey="categoria"
+            [series]="categoriaSeries"
+            orientation="bars"
+            [categoryLabelWidth]="130"
+            [valueFormatter]="abrev"
+            [tooltipFormatter]="fmtBRL"
+          />
         </app-chart-card>
 
         <app-chart-card
@@ -356,7 +401,7 @@
         <span slot="title-extra"><app-hint [text]="h.formasPagamento" /></span>
         <app-bar-chart
           [data]="d.formasPagamento"
-          categoryKey="forma"
+          categoryKey="rotulo"
           [series]="formasPagamentoSeries"
           orientation="bars"
           [categoryLabelWidth]="90"
@@ -396,7 +441,7 @@
         <app-line-chart
           [data]="d.tendencia"
           categoryKey="mes"
-          [series]="trendMode() === 'total' ? tendenciaSeriesTotal : tendenciaSeriesCanal()"
+          [series]="trendMode() === 'total' ? tendenciaSeriesTotal() : tendenciaSeriesCanal()"
           [valueFormatter]="abrev"
         />
       </app-chart-card>

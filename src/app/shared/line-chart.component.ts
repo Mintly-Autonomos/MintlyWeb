@@ -15,6 +15,8 @@ export interface LineSeries {
   key: string;
   name: string;
   color: string;
+  /** Linha tracejada (ex.: ano anterior, média), para não competir com a série principal. */
+  dashed?: boolean;
 }
 
 /** Qualquer objeto de dados; os campos são lidos dinamicamente por `categoryKey`/`series[].key`. */
@@ -88,7 +90,13 @@ interface AxisTick {
         }
 
         @for (s of linePaths(); track s.key) {
-          <path [attr.d]="s.d" fill="none" [attr.stroke]="s.color" stroke-width="2.5" />
+          <path
+            [attr.d]="s.d"
+            fill="none"
+            [attr.stroke]="s.color"
+            [attr.stroke-width]="s.dashed ? 2 : 2.5"
+            [attr.stroke-dasharray]="s.dashed ? '5 4' : null"
+          />
           @if (hoverIndex(); as hi) {
             <circle
               [attr.cx]="s.points[hi].x"
@@ -233,7 +241,7 @@ export class LineChartComponent implements AfterViewInit, OnDestroy {
         return { x: ticks[i]?.pos ?? 0, y: this.yOf(value) };
       });
       const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-      return { key: sr.key, color: sr.color, d, points };
+      return { key: sr.key, color: sr.color, dashed: !!sr.dashed, d, points };
     });
   });
 

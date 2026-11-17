@@ -10,16 +10,13 @@ import { METRIC_HINTS } from '../../shared/metric-hints';
 import { StatCardComponent } from '../../shared/stat-card.component';
 import { ChartCardComponent } from '../../shared/chart-card.component';
 import { InsightCardComponent } from '../../shared/insight-card.component';
-import { WaterfallChartComponent } from '../../shared/waterfall-chart.component';
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
-import { DonutChartComponent, DonutSlice } from '../../shared/donut-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, formatCompact } from '../../shared/format';
 
 const PERIODS: PeriodKey[] = ['Hoje', '7 dias', 'Este mês', 'Mês passado', 'Personalizado'];
 
-const CAT_COLORS = ['var(--ocean)', 'var(--mint)', 'var(--warning)', 'var(--success)'];
 const PAY_COLORS = ['var(--mint)', 'var(--ocean)', 'var(--warning)'];
 
 @Component({
@@ -34,9 +31,7 @@ const PAY_COLORS = ['var(--mint)', 'var(--ocean)', 'var(--warning)'];
     StatCardComponent,
     ChartCardComponent,
     InsightCardComponent,
-    WaterfallChartComponent,
     BarChartComponent,
-    DonutChartComponent,
     LineChartComponent,
   ],
   templateUrl: './receitas.component.html',
@@ -51,7 +46,12 @@ export class ReceitasComponent implements OnInit {
   protected period = signal<PeriodKey>('Este mês');
   protected customFrom = signal(`${hoje().slice(0, 8)}01`);
   protected customTo = signal(hoje());
-  protected rankMode = signal<'receita' | 'qtd'>('receita');
+  protected rankMode = signal<'receita' | 'qtd' | 'lucro'>('receita');
+  protected readonly rankModes: { key: 'receita' | 'qtd' | 'lucro'; label: string }[] = [
+    { key: 'receita', label: 'Por receita (R$)' },
+    { key: 'qtd', label: 'Por quantidade' },
+    { key: 'lucro', label: 'Por lucro (R$)' },
+  ];
   protected trendMode = signal<'total' | 'canal'>('total');
 
   protected data = this.svc.data;
@@ -67,9 +67,20 @@ export class ReceitasComponent implements OnInit {
     { key: 'receita', name: 'Receita bruta', color: 'var(--ocean)' },
     { key: 'liquida', name: 'Receita líquida', color: 'var(--mint)' },
   ];
-  protected tendenciaSeriesTotal: LineSeries[] = [
-    { key: 'total', name: 'Receita total', color: 'var(--ocean)' },
-  ];
+  protected tendenciaSeriesTotal = computed<LineSeries[]>(() =>
+    this.data()?.tendencia[0]?.anoAnterior !== undefined
+      ? [
+          { key: 'total', name: 'Receita total', color: 'var(--ocean)' },
+          {
+            key: 'anoAnterior',
+            name: 'Mesmo mês do ano anterior',
+            color: 'var(--muted-foreground)',
+            dashed: true,
+          },
+          { key: 'media3', name: 'Média de 3 meses', color: 'var(--mint)', dashed: true },
+        ]
+      : [{ key: 'total', name: 'Receita total', color: 'var(--ocean)' }],
+  );
   private readonly serieSalao: LineSeries = { key: 'salao', name: 'Salão', color: 'var(--ocean)' };
   private readonly serieDelivery: LineSeries = {
     key: 'delivery',
@@ -99,51 +110,79 @@ export class ReceitasComponent implements OnInit {
     const d = this.data();
     if (!d) return [];
     const mode = this.rankMode();
-    return [...d.itens]
-      .sort((a, b) => (mode === 'receita' ? b.receita - a.receita : b.qtd - a.qtd))
+    // "Por lucro" só com os pratos que têm custo no cardápio (sem custo não dá para saber o lucro).
+    const base = mode === 'lucro' ? d.itens.filter((i) => i.lucro !== null) : d.itens;
+    return [...base]
+      .sort((a, b) =>
+        mode === 'receita'
+          ? b.receita - a.receita
+          : mode === 'qtd'
+            ? b.qtd - a.qtd
+            : (b.lucro ?? 0) - (a.lucro ?? 0),
+      )
       .slice(0, 8);
   });
 
   /** Subtítulo do ranking; avisa quantas vendas ficaram de fora por não informarem os pratos. */
   protected rankingDescription(semPratos: number): string {
-    const base = 'Ordenado do maior para o menor';
-    if (semPratos <= 0) return base;
-    const vendas =
-      semPratos === 1
-        ? '1 venda sem pratos informados fica'
-        : `${semPratos} vendas sem pratos informados ficam`;
-    return `${base} · ${vendas} de fora`;
+    const partes = ['Ordenado do maior para o menor'];
+    if (semPratos > 0) {
+      partes.push(
+        semPratos === 1
+          ? '1 venda sem pratos informados fica de fora'
+          : `${semPratos} vendas sem pratos informados ficam de fora`,
+      );
+    }
+    const semCusto =
+      this.rankMode() === 'lucro'
+        ? (this.data()?.itens ?? []).filter((i) => i.lucro === null).length
+        : 0;
+    if (semCusto > 0) {
+      partes.push(
+        semCusto === 1
+          ? '1 prato sem custo no cardápio fica de fora'
+          : `${semCusto} pratos sem custo no cardápio ficam de fora`,
+      );
+    }
+    return partes.join(' · ');
   }
 
   protected rankingSeries = computed<BarSeries[]>(() => [
     {
-      key: this.rankMode() === 'receita' ? 'receita' : 'qtd',
+      key: this.rankMode(),
       name: 'Itens',
-      color: 'var(--ocean)',
+      color: this.rankMode() === 'lucro' ? 'var(--mint)' : 'var(--ocean)',
     },
   ]);
 
   protected rankingTooltipFormatter = computed(() =>
-    this.rankMode() === 'receita' ? formatBRL : this.identityFormatter,
+    this.rankMode() === 'qtd' ? this.identityFormatter : formatBRL,
   );
 
   protected rankingValueFormatter = computed(() =>
-    this.rankMode() === 'receita' ? formatCompact : this.identityFormatter,
+    this.rankMode() === 'qtd' ? this.identityFormatter : formatCompact,
   );
 
-  protected porCategoriaSlices = computed<DonutSlice[]>(() => {
+  /** P.9: "Bruta → líquida" numa barra só: o que fica com você, as taxas e os impostos. */
+  protected composicao = computed(() => {
     const d = this.data();
-    if (!d) return [];
-    return d.porCategoria.map((c, i) => ({
-      label: c.categoria,
-      value: c.receita,
-      color: CAT_COLORS[i % CAT_COLORS.length],
-    }));
+    if (!d || d.receitaBruta <= 0) return [];
+    const pct = (v: number) => (v / d.receitaBruta) * 100;
+    return [
+      { chave: 'liquida', nome: 'Fica com você', valor: d.receitaLiquida, cor: 'var(--mint)' },
+      { chave: 'taxas', nome: 'Taxas', valor: d.taxas, cor: 'var(--warning)' },
+      { chave: 'impostos', nome: 'Impostos sobre venda', valor: d.impostos, cor: 'var(--ocean)' },
+    ].map((p) => ({ ...p, pct: Math.max(0, pct(p.valor)) }));
   });
 
-  protected catTotal = computed(
-    () => this.porCategoriaSlices().reduce((s, c) => s + c.value, 0) || 1,
-  );
+  protected fmtPct(v: number): string {
+    return `${v.toFixed(1).replace('.', ',')}%`;
+  }
+
+  /** P.9: receita por categoria em barras horizontais, da maior para a menor. */
+  protected categoriaSeries: BarSeries[] = [
+    { key: 'receita', name: 'Receita', color: 'var(--ocean)' },
+  ];
 
   protected formasPagamentoSeries: BarSeries[] = [
     { key: 'valor', name: 'Recebido', color: 'var(--mint)' },
