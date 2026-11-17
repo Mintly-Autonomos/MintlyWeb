@@ -19,6 +19,7 @@ const membro = (over: Partial<Membro> = {}): Membro => ({
   nome: 'Ana Garçom',
   email: 'ana@teste.com',
   status: 'active',
+  perfil: 'operations',
   ...over,
 });
 
@@ -71,6 +72,8 @@ describe('MinhaContaComponent', () => {
       renomearRestaurante: vi.fn(() => Promise.resolve()),
       adicionarMembro: vi.fn(() => Promise.resolve()),
       atualizarMembro: vi.fn(() => Promise.resolve()),
+      reenviarConvite: vi.fn(() => Promise.resolve()),
+      excluirMembro: vi.fn(() => Promise.resolve()),
       pedirExclusao: vi.fn(() => Promise.resolve()),
       cancelarExclusao: vi.fn(() => Promise.resolve()),
     };
@@ -281,8 +284,9 @@ describe('MinhaContaComponent', () => {
           membro({ id: 'm2', nome: 'Bia', email: 'bia@teste.com', status: 'inactive' }),
         ],
       });
-      expect(q('funcionario-m1')!.textContent).toContain('Ativo');
-      expect(q('funcionario-m2')!.textContent).toContain('Inativo');
+      expect(q('status-m1')!.textContent).toContain('Ativo');
+      expect(q('status-m2')!.textContent).toContain('Inativo');
+      expect(q('perfil-m1')!.textContent).toContain('Operação');
       expect(text()).toContain('ana@teste.com');
       expect(q('sem-funcionarios')).toBeNull();
     });
@@ -292,20 +296,38 @@ describe('MinhaContaComponent', () => {
       expect(q('sem-funcionarios')).not.toBeNull();
     });
 
-    it('adicionar exige nome, e-mail e senha forte; manda tudo sem espaços nas pontas', async () => {
+    it('convidar exige nome e e-mail (sem senha); manda o perfil e tudo sem espaços nas pontas', async () => {
       const { q, svc, type, click } = await naAbaRestaurante();
+      expect(q('membro-senha')).toBeNull();
       expect(q<HTMLButtonElement>('adicionar-membro')!.disabled).toBe(true);
       await type('membro-nome', '  Ana Garçom ');
-      await type('membro-email', 'ana@teste.com');
-      await type('membro-senha', 'fraca');
+      await type('membro-email', 'ana');
       expect(q<HTMLButtonElement>('adicionar-membro')!.disabled).toBe(true);
-      await type('membro-senha', 'Func12345');
+      await type('membro-email', 'ana@teste.com');
       expect(q<HTMLButtonElement>('adicionar-membro')!.disabled).toBe(false);
+      expect(q('membro-perfil-desc')!.textContent).toContain('Não vê relatórios');
       await click('adicionar-membro');
       expect(svc.adicionarMembro).toHaveBeenCalledWith({
         nome: 'Ana Garçom',
         email: 'ana@teste.com',
-        senha: 'Func12345',
+        perfil: 'operations',
+      });
+    });
+
+    it('convidar como Gerente', async () => {
+      const { q, svc, type, click, settle } = await naAbaRestaurante();
+      await type('membro-nome', 'Bia');
+      await type('membro-email', 'bia@teste.com');
+      const perfil = q<HTMLSelectElement>('membro-perfil')!;
+      perfil.value = 'manager';
+      perfil.dispatchEvent(new Event('change'));
+      await settle();
+      expect(q('membro-perfil-desc')!.textContent).toContain('menos assinatura');
+      await click('adicionar-membro');
+      expect(svc.adicionarMembro).toHaveBeenCalledWith({
+        nome: 'Bia',
+        email: 'bia@teste.com',
+        perfil: 'manager',
       });
     });
 
@@ -316,7 +338,6 @@ describe('MinhaContaComponent', () => {
       });
       await type('membro-nome', 'Ana');
       await type('membro-email', 'ana@teste.com');
-      await type('membro-senha', 'Func12345');
       await click('adicionar-membro');
       expect(text()).toContain('Este e-mail já está cadastrado.');
     });
@@ -332,7 +353,7 @@ describe('MinhaContaComponent', () => {
       });
       expect(q('limite-funcionarios')).not.toBeNull();
       expect(q('adicionar-membro')).toBeNull();
-      expect(text()).toContain('5 de 5 funcionários ativos');
+      expect(text()).toContain('5 de 5 vagas de funcionário usadas');
       expect(text()).toContain('plano Básico');
       expect(text()).toContain('mude para o plano Pro (até 20)');
     });
@@ -341,14 +362,14 @@ describe('MinhaContaComponent', () => {
       const { q, text } = await naAbaRestaurante({ membros: ativos(4) });
       expect(q('limite-funcionarios')).toBeNull();
       expect(q('adicionar-membro')).not.toBeNull();
-      expect(text()).toContain('4 de 5 funcionários ativos');
+      expect(text()).toContain('4 de 5 vagas de funcionário usadas');
     });
 
     it('plano Pro com 5 ativos ainda tem vagas (5 de 20)', async () => {
       const { q, text } = await naAbaRestaurante({ membros: ativos(5), tier: 'pro' });
       expect(q('limite-funcionarios')).toBeNull();
       expect(q('adicionar-membro')).not.toBeNull();
-      expect(text()).toContain('5 de 20 funcionários ativos · plano Pro');
+      expect(text()).toContain('5 de 20 vagas de funcionário usadas · plano Pro');
     });
 
     it(`plano Pro: com ${SUBSCRIPTION_MEMBER_LIMIT.pro} ativos o formulário some e não oferece o Pro de novo`, async () => {
@@ -363,7 +384,7 @@ describe('MinhaContaComponent', () => {
 
     it('sem tipo de plano conhecido vale o Básico', async () => {
       const { text } = await naAbaRestaurante({ membros: ativos(1), tier: null });
-      expect(text()).toContain('1 de 5 funcionários ativos · plano Básico');
+      expect(text()).toContain('1 de 5 vagas de funcionário usadas · plano Básico');
     });
 
     it('inativados não ocupam vaga: 5 inativos + 2 ativos continua com vagas', async () => {
@@ -371,8 +392,76 @@ describe('MinhaContaComponent', () => {
         membro({ id: `i${i}`, email: `i${i}@t.com`, status: 'inactive' }),
       );
       const { q, text } = await naAbaRestaurante({ membros: [...inativos, ...ativos(2)] });
-      expect(text()).toContain('2 de 5 funcionários ativos');
+      expect(text()).toContain('2 de 5 vagas de funcionário usadas');
       expect(q('adicionar-membro')).not.toBeNull();
+    });
+
+    it('convite pendente ocupa vaga e aparece como "Convite enviado", com a validade', async () => {
+      const convidado = membro({
+        id: 'c1',
+        email: 'c@t.com',
+        status: 'invited',
+        conviteVenceEm: '2026-11-24T12:00:00.000Z',
+      });
+      const { q, text } = await naAbaRestaurante({ membros: [...ativos(4), convidado] });
+      expect(text()).toContain('5 de 5 vagas de funcionário usadas');
+      expect(q('status-c1')!.textContent).toContain('Convite enviado');
+      expect(q('convite-vence-c1')!.textContent).toContain('24/11/2026');
+      expect(q('adicionar-membro')).toBeNull();
+    });
+
+    it('reenviar convite só aparece para convidado e chama o serviço', async () => {
+      const { q, svc, click } = await naAbaRestaurante({
+        membros: [membro(), membro({ id: 'c1', email: 'c@t.com', status: 'invited' })],
+      });
+      expect(q('reenviar-convite-m1')).toBeNull();
+      await click('reenviar-convite-c1');
+      expect(svc.reenviarConvite).toHaveBeenCalledWith('c1');
+    });
+
+    it('editar: abre com nome, e-mail e perfil; manda só o que mudou', async () => {
+      const { q, svc, type, click, settle } = await naAbaRestaurante({ membros: [membro()] });
+      await click('editar-membro-m1');
+      expect(q<HTMLInputElement>('edicao-nome-m1')!.value).toBe('Ana Garçom');
+      await type('edicao-email-m1', 'ana.nova@teste.com');
+      const perfil = q<HTMLSelectElement>('edicao-perfil-m1')!;
+      perfil.value = 'manager';
+      perfil.dispatchEvent(new Event('change'));
+      await settle();
+      await click('salvar-membro-m1');
+      expect(svc.atualizarMembro).toHaveBeenCalledWith('m1', {
+        email: 'ana.nova@teste.com',
+        perfil: 'manager',
+      });
+      expect(q('edicao-membro-m1')).toBeNull();
+    });
+
+    it('editar sem mudar nada só fecha; e-mail inválido não deixa salvar', async () => {
+      const { q, svc, type, click } = await naAbaRestaurante({ membros: [membro()] });
+      await click('editar-membro-m1');
+      await type('edicao-email-m1', 'ana');
+      expect(q<HTMLButtonElement>('salvar-membro-m1')!.disabled).toBe(true);
+      await type('edicao-email-m1', 'ana@teste.com');
+      await click('salvar-membro-m1');
+      expect(svc.atualizarMembro).not.toHaveBeenCalled();
+      expect(q('edicao-membro-m1')).toBeNull();
+    });
+
+    it('excluir pede confirmação; cancelar não exclui; confirmar chama o serviço', async () => {
+      const { q, svc, click, root, settle } = await naAbaRestaurante({ membros: [membro()] });
+      await click('excluir-membro-m1');
+      expect(q('confirmar-exclusao-membro-m1')!.textContent).toContain('histórico');
+      const cancelar = Array.from(
+        q('confirmar-exclusao-membro-m1')!.querySelectorAll('button'),
+      ).find((b) => b.textContent?.trim() === 'Cancelar')!;
+      cancelar.click();
+      await settle();
+      expect(q('confirmar-exclusao-membro-m1')).toBeNull();
+      expect(svc.excluirMembro).not.toHaveBeenCalled();
+      await click('excluir-membro-m1');
+      await click('confirmar-excluir-m1');
+      expect(svc.excluirMembro).toHaveBeenCalledWith('m1');
+      expect(root.querySelector('[data-testid="confirmar-exclusao-membro-m1"]')).toBeNull();
     });
 
     it('com o plano cheio, reativar fica desabilitado; inativar continua liberado', async () => {
@@ -405,17 +494,10 @@ describe('MinhaContaComponent', () => {
       expect(svc.atualizarMembro).toHaveBeenNthCalledWith(2, 'm2', { status: 'active' });
     });
 
-    it('nova senha do funcionário: abre o campo, exige 8+ caracteres e manda a senha', async () => {
-      const { q, svc, root, type, click, settle } = await naAbaRestaurante({ membros: [membro()] });
-      const abrir = Array.from(root.querySelectorAll('button')).find(
-        (b) => b.textContent?.trim() === 'Nova senha',
-      )!;
-      abrir.click();
-      await settle();
-      expect(q<HTMLButtonElement>('salvar-senha-membro-m1')!.disabled).toBe(true);
-      await type('senha-membro-m1', 'NovaSenha77');
-      await click('salvar-senha-membro-m1');
-      expect(svc.atualizarMembro).toHaveBeenCalledWith('m1', { senha: 'NovaSenha77' });
+    it('o dono não define mais a senha do funcionário (E.1)', async () => {
+      const { root } = await naAbaRestaurante({ membros: [membro()] });
+      const botoes = Array.from(root.querySelectorAll('button')).map((b) => b.textContent?.trim());
+      expect(botoes).not.toContain('Nova senha');
     });
   });
 

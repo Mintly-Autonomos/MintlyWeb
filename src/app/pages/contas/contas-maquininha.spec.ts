@@ -5,6 +5,7 @@ import { PlatformKind } from 'mintly-lib';
 import { ContasComponent } from './contas.component';
 import { Account, ContasService } from '../../services/contas.service';
 import { ToastService } from '../../shared/toast.service';
+import { AuthService } from '../../services/auth.service';
 import { CustosComponent } from '../custos/custos.component';
 import { CustosService } from '../../services/custos.service';
 
@@ -53,6 +54,7 @@ describe('Contas: maquininha e taxa por forma de pagamento (relatório S3.3)', (
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
+        { provide: AuthService, useValue: { podeMudarCadastros: signal(true) } },
         { provide: ContasService, useValue: svc },
         { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
       ],

@@ -28,6 +28,11 @@ import { maskEmail } from '../../shared/mask-email';
             Entre com sua nova senha para continuar.
           </app-alert>
         }
+        @if (conviteOk) {
+          <app-alert variant="success" title="Senha criada">
+            Agora é só entrar com seu e-mail e a senha que você acabou de criar.
+          </app-alert>
+        }
         @if (error()) {
           <div
             role="alert"
@@ -184,7 +189,10 @@ export class LoginComponent {
   private auth = inject(AuthService);
   /** Chegou da redefinição de senha (`?reset=ok`). */
   protected resetOk = inject(ActivatedRoute).snapshot.queryParamMap.get('reset') === 'ok';
-  protected email = '';
+  /** Chegou do convite de funcionário (`?convite=ok&email=...`): o e-mail já vem preenchido. */
+  private query = inject(ActivatedRoute).snapshot.queryParamMap;
+  protected conviteOk = this.query.get('convite') === 'ok';
+  protected email = this.conviteOk ? (this.query.get('email') ?? '') : '';
   protected password = '';
   protected remember = false;
   /** Conta lembrada neste aparelho ("Manter conectado" marcado antes): o login pede só a senha. */

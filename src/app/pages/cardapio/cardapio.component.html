@@ -8,16 +8,26 @@
           vale revisar o preço: o sino avisa quando um prato passa de 5 meses e meio sem revisão.
         </p>
       </div>
-      <button
-        type="button"
-        data-tour="novo-prato"
-        (click)="toggleAdd()"
-        class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-sm font-semibold bg-mint-soft text-ocean hover:brightness-95 transition cursor-pointer"
-      >
-        <app-icon name="add" [style]="{ fontSize: '18px' }" />
-        Novo prato
-      </button>
+      @if (podeEditar()) {
+        <button
+          type="button"
+          data-tour="novo-prato"
+          (click)="toggleAdd()"
+          class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-sm font-semibold bg-mint-soft text-ocean hover:brightness-95 transition cursor-pointer"
+        >
+          <app-icon name="add" [style]="{ fontSize: '18px' }" />
+          Novo prato
+        </button>
+      }
     </div>
+    @if (!podeEditar()) {
+      <p
+        class="rounded-xl border border-border bg-muted/60 px-4 py-3 mb-3 text-[13px] text-muted-foreground"
+        data-testid="somente-leitura"
+      >
+        Seu perfil (Operação) só consulta o cardápio. Para mudar, fale com o dono ou o gerente.
+      </p>
+    }
 
     @if (incompletos() > 0 && pratos().length > 0) {
       <p class="text-[12.5px] text-warning mb-3">
@@ -359,7 +369,7 @@
                     >
                       Cancelar
                     </button>
-                  } @else {
+                  } @else if (podeEditar()) {
                     @if (p.active) {
                       <button
                         type="button"

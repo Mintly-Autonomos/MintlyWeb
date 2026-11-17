@@ -2,6 +2,15 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
+/**
+ * Relatórios (E.3): o perfil Operação não os vê. Quem não pode vai para Movimentações (a API recusaria os
+ * dados de qualquer jeito).
+ */
+export const reportsGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  return auth.podeVerRelatorios() ? true : inject(Router).createUrlTree(['/movimentacoes']);
+};
+
 export const authGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);

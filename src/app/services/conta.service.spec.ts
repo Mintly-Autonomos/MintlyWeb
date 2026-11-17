@@ -22,6 +22,7 @@ describe('ContaService', () => {
     refresh: ReturnType<typeof vi.fn>;
     logout: ReturnType<typeof vi.fn>;
     setCompanyName: ReturnType<typeof vi.fn>;
+    setAccessLevel: ReturnType<typeof vi.fn>;
     currentUser: ReturnType<typeof vi.fn>;
   };
 
@@ -39,6 +40,8 @@ describe('ContaService', () => {
       listMembers: vi.fn(),
       createMember: vi.fn(),
       updateMember: vi.fn(),
+      resendInvite: vi.fn(),
+      deleteMember: vi.fn(),
       requestDeletion: vi.fn(),
       cancelDeletion: vi.fn(),
     };
@@ -48,6 +51,7 @@ describe('ContaService', () => {
       refresh: vi.fn(() => Promise.resolve(true)),
       logout: vi.fn(() => Promise.resolve()),
       setCompanyName: vi.fn(),
+      setAccessLevel: vi.fn(),
       currentUser: vi.fn(() => ({ nome: 'Davi', email: 'davi@teste.com' })),
     };
     TestBed.configureTestingModule({
@@ -90,6 +94,18 @@ describe('ContaService', () => {
     userClient['getMe'].mockReturnValue(ok({ ...conta, role: 'member' }));
     await svc.carregarConta();
     expect(svc.dados()?.papel).toBe('member');
+  });
+
+  it('funcionário traz o perfil e atualiza o acesso da sessão (E.3)', async () => {
+    userClient['getMe'].mockReturnValue(
+      ok({ ...conta, role: 'member', memberProfile: 'operations' }),
+    );
+    await svc.carregarConta();
+    expect(svc.dados()?.perfil).toBe('operations');
+    expect(auth.setAccessLevel).toHaveBeenCalledWith('operations');
+    userClient['getMe'].mockReturnValue(ok(conta));
+    await svc.carregarConta();
+    expect(auth.setAccessLevel).toHaveBeenLastCalledWith('owner');
   });
 
   it('salvar dados manda só o que mudou e guarda a resposta', async () => {
@@ -174,16 +190,32 @@ describe('ContaService', () => {
 
   describe('funcionários', () => {
     const lista = [
-      { _id: 'm1', name: 'Ana', email: 'ana@teste.com', status: 'active' },
-      { _id: 'm2', name: 'Bia', email: 'bia@teste.com', status: 'inactive' },
+      { _id: 'm1', name: 'Ana', email: 'ana@teste.com', status: 'active', profile: 'manager' },
+      { _id: 'm2', name: 'Bia', email: 'bia@teste.com', status: 'inactive', profile: 'operations' },
+      {
+        _id: 'm3',
+        name: 'Caio',
+        email: 'caio@teste.com',
+        status: 'invited',
+        profile: 'operations',
+        inviteExpiresAt: '2026-11-24T12:00:00.000Z',
+      },
     ];
 
     it('lista com o formato da tela', async () => {
       restaurantClient['listMembers'].mockReturnValue(ok(lista));
       await svc.carregarMembros();
       expect(svc.membros()).toEqual([
-        { id: 'm1', nome: 'Ana', email: 'ana@teste.com', status: 'active' },
-        { id: 'm2', nome: 'Bia', email: 'bia@teste.com', status: 'inactive' },
+        { id: 'm1', nome: 'Ana', email: 'ana@teste.com', status: 'active', perfil: 'manager' },
+        { id: 'm2', nome: 'Bia', email: 'bia@teste.com', status: 'inactive', perfil: 'operations' },
+        {
+          id: 'm3',
+          nome: 'Caio',
+          email: 'caio@teste.com',
+          status: 'invited',
+          perfil: 'operations',
+          conviteVenceEm: '2026-11-24T12:00:00.000Z',
+        },
       ]);
     });
 
@@ -205,7 +237,7 @@ describe('ContaService', () => {
       restaurantClient['listMembers'].mockReturnValue(ok(lista));
       personClient['getAvatarByUsername'].mockRejectedValue(httpError(500));
       await svc.carregarMembros();
-      expect(svc.membros()).toHaveLength(2);
+      expect(svc.membros()).toHaveLength(3);
       expect(svc.membros()[0].foto).toBeUndefined();
     });
 
@@ -213,32 +245,47 @@ describe('ContaService', () => {
       restaurantClient['listMembers'].mockReturnValue(ok(lista));
       restaurantClient['createMember'].mockReturnValue(ok(lista[0]));
       await svc.carregarMembros();
-      expect(personClient['getAvatarByUsername']).toHaveBeenCalledTimes(2);
+      expect(personClient['getAvatarByUsername']).toHaveBeenCalledTimes(3);
 
-      await svc.adicionarMembro({ nome: 'Ana', email: 'ana@teste.com', senha: 'Func12345' });
-      expect(personClient['getAvatarByUsername']).toHaveBeenCalledTimes(2);
+      await svc.adicionarMembro({ nome: 'Ana', email: 'ana@teste.com', perfil: 'operations' });
+      expect(personClient['getAvatarByUsername']).toHaveBeenCalledTimes(3);
 
       await svc.carregarMembros();
-      expect(personClient['getAvatarByUsername']).toHaveBeenCalledTimes(4);
+      expect(personClient['getAvatarByUsername']).toHaveBeenCalledTimes(6);
     });
 
-    it('adicionar manda nome, e-mail e senha e recarrega a lista', async () => {
-      restaurantClient['createMember'].mockReturnValue(ok(lista[0]));
+    it('convidar manda nome, e-mail e perfil (sem senha) e recarrega a lista', async () => {
+      restaurantClient['createMember'].mockReturnValue(ok(lista[2]));
       restaurantClient['listMembers'].mockReturnValue(ok(lista));
-      await svc.adicionarMembro({ nome: 'Ana', email: 'ana@teste.com', senha: 'Func12345' });
+      await svc.adicionarMembro({ nome: 'Caio', email: 'caio@teste.com', perfil: 'operations' });
       expect(restaurantClient['createMember'].mock.calls[0][0]).toEqual({
-        name: 'Ana',
-        email: 'ana@teste.com',
-        password: 'Func12345',
+        name: 'Caio',
+        email: 'caio@teste.com',
+        profile: 'operations',
       });
-      expect(svc.membros()).toHaveLength(2);
+      expect(svc.membros()).toHaveLength(3);
     });
 
-    it('inativar e definir senha vão no mesmo PATCH, com o status no formato da lib', async () => {
+    it('status, perfil e validade do convite no formato da tela', async () => {
+      restaurantClient['listMembers'].mockReturnValue(ok(lista));
+      await svc.carregarMembros();
+      expect(svc.membros().map((m) => [m.status, m.perfil])).toEqual([
+        ['active', 'manager'],
+        ['inactive', 'operations'],
+        ['invited', 'operations'],
+      ]);
+      expect(svc.membros()[2].conviteVenceEm).toBe('2026-11-24T12:00:00.000Z');
+    });
+
+    it('inativar, editar e trocar o perfil vão no PATCH com os nomes da lib', async () => {
       restaurantClient['updateMember'].mockReturnValue(ok(lista[0]));
       restaurantClient['listMembers'].mockReturnValue(ok(lista));
       await svc.atualizarMembro('m1', { status: 'inactive' });
-      await svc.atualizarMembro('m1', { senha: 'NovaSenha77' });
+      await svc.atualizarMembro('m1', {
+        nome: 'Ana Paula',
+        email: 'ap@teste.com',
+        perfil: 'manager',
+      });
       expect(restaurantClient['updateMember'].mock.calls[0]).toEqual([
         'm1',
         { status: 'inactive' },
@@ -246,9 +293,20 @@ describe('ContaService', () => {
       ]);
       expect(restaurantClient['updateMember'].mock.calls[1]).toEqual([
         'm1',
-        { password: 'NovaSenha77' },
+        { name: 'Ana Paula', email: 'ap@teste.com', profile: 'manager' },
         expect.anything(),
       ]);
+    });
+
+    it('reenviar convite e excluir chamam a API e recarregam a lista', async () => {
+      restaurantClient['listMembers'].mockReturnValue(ok(lista));
+      restaurantClient['resendInvite'].mockReturnValue(ok(lista[2]));
+      restaurantClient['deleteMember'].mockResolvedValue(undefined);
+      await svc.reenviarConvite('m3');
+      await svc.excluirMembro('m2');
+      expect(restaurantClient['resendInvite'].mock.calls[0][0]).toBe('m3');
+      expect(restaurantClient['deleteMember'].mock.calls[0][0]).toBe('m2');
+      expect(restaurantClient['listMembers']).toHaveBeenCalledTimes(2);
     });
   });
 

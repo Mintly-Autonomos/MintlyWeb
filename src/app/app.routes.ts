@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, sessionExpiredGuard } from './guards/auth.guard';
+import { authGuard, guestGuard, reportsGuard, sessionExpiredGuard } from './guards/auth.guard';
 import { subscriptionGuard } from './guards/subscription.guard';
 import { onboardingGuard } from './guards/onboarding.guard';
 import { environment } from '../environments/environment';
@@ -41,6 +41,12 @@ export const routes: Routes = [
         title: 'Redefinir senha',
         loadComponent: () =>
           import('./pages/auth/redefinir-senha.component').then((m) => m.RedefinirSenhaComponent),
+      },
+      {
+        path: 'aceitar-convite',
+        title: 'Aceitar convite',
+        loadComponent: () =>
+          import('./pages/auth/aceitar-convite.component').then((m) => m.AceitarConviteComponent),
       },
       {
         path: 'token-invalido',
@@ -144,36 +150,42 @@ export const routes: Routes = [
       {
         path: 'receitas',
         title: 'Receitas',
+        canActivate: [reportsGuard],
         loadComponent: () =>
           import('./pages/receitas/receitas.component').then((m) => m.ReceitasComponent),
       },
       {
         path: 'custos',
         title: 'Custos e despesas',
+        canActivate: [reportsGuard],
         loadComponent: () =>
           import('./pages/custos/custos.component').then((m) => m.CustosComponent),
       },
       {
         path: 'fluxo-de-caixa',
         title: 'Fluxo de caixa',
+        canActivate: [reportsGuard],
         loadComponent: () =>
           import('./pages/fluxo-caixa/fluxo-caixa.component').then((m) => m.FluxoCaixaComponent),
       },
       {
         path: 'resultado',
         title: 'Resultado',
+        canActivate: [reportsGuard],
         loadComponent: () =>
           import('./pages/resultado/resultado.component').then((m) => m.ResultadoComponent),
       },
       {
         path: 'previsoes',
         title: 'Previsões',
+        canActivate: [reportsGuard],
         loadComponent: () =>
           import('./pages/previsoes/previsoes.component').then((m) => m.PrevisoesComponent),
       },
       {
         path: 'visao-geral',
         title: 'Visão geral',
+        canActivate: [reportsGuard],
         loadComponent: () =>
           import('./pages/visao-geral/visao-geral.component').then((m) => m.VisaoGeralComponent),
       },

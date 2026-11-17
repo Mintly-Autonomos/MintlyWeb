@@ -19,16 +19,27 @@
           <span>Transferir entre contas</span>
         </button>
       }
-      <button
-        data-tour="nova-conta"
-        (click)="openCreate()"
-        class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0"
-      >
-        <app-icon name="add" [style]="{ fontSize: '20px' }" />
-        <span>Nova conta</span>
-      </button>
+      @if (podeEditar()) {
+        <button
+          data-tour="nova-conta"
+          (click)="openCreate()"
+          class="flex items-center gap-2 h-10 px-4 rounded-xl bg-mint text-primary-foreground text-sm font-medium hover:brightness-95 transition cursor-pointer shrink-0"
+        >
+          <app-icon name="add" [style]="{ fontSize: '20px' }" />
+          <span>Nova conta</span>
+        </button>
+      }
     </div>
   </div>
+
+  @if (!podeEditar()) {
+    <p
+      class="rounded-xl border border-border bg-muted/60 px-4 py-3 text-[13px] text-muted-foreground"
+      data-testid="somente-leitura"
+    >
+      Seu perfil (Operação) só consulta as contas. Para mudar, fale com o dono ou o gerente.
+    </p>
+  }
 
   <!-- Summary -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" data-tour="resumo">
@@ -87,7 +98,7 @@
         icon="account_balance"
         title="Você ainda não tem contas"
         description="Comece adicionando o banco, caixa físico ou plataforma onde o dinheiro do seu negócio entra. Isso permite acompanhar saldos reais e organizar suas movimentações."
-        [hasAction]="true"
+        [hasAction]="podeEditar()"
       >
         <button
           (click)="openCreate()"
@@ -136,7 +147,7 @@
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-              @if (a.active) {
+              @if (a.active && podeEditar()) {
                 <button
                   type="button"
                   (click)="openOpening(a)"
@@ -147,13 +158,15 @@
                   <app-icon name="savings" [style]="{ fontSize: '17px' }" />
                 </button>
               }
-              <button
-                (click)="openEdit(a)"
-                class="h-8 w-8 rounded-xl grid place-items-center text-muted-foreground hover:bg-muted transition cursor-pointer"
-                title="Editar"
-              >
-                <app-icon name="edit" [style]="{ fontSize: '17px' }" />
-              </button>
+              @if (podeEditar()) {
+                <button
+                  (click)="openEdit(a)"
+                  class="h-8 w-8 rounded-xl grid place-items-center text-muted-foreground hover:bg-muted transition cursor-pointer"
+                  title="Editar"
+                >
+                  <app-icon name="edit" [style]="{ fontSize: '17px' }" />
+                </button>
+              }
               <button
                 (click)="details.set(getDetails(a))"
                 class="h-8 w-8 rounded-xl grid place-items-center text-muted-foreground hover:bg-muted transition cursor-pointer"
@@ -225,7 +238,7 @@
             <div [title]="toggleReason(a)">
               <app-toggle
                 [checked]="a.active"
-                [disabled]="toggleDisabled(a)"
+                [disabled]="toggleDisabled(a) || !podeEditar()"
                 [label]="(a.active ? 'Inativar ' : 'Reativar ') + a.name"
                 (changed)="handleToggle(a, $event)"
               />
