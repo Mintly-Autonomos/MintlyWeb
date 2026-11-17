@@ -125,11 +125,29 @@ export class CardapioInterativoComponent {
     return i ? quadranteDe(i, a.limiarQtd, a.margemMedia) : null;
   });
 
+  /** P.9: filtro por categoria do cardápio ('' = todas). */
+  protected categoriaFiltro = signal('');
+  protected categoriasMatriz = computed(() =>
+    [
+      ...new Set(
+        this.analise()
+          .itens.map((i) => i.categoria)
+          .filter((c): c is string => !!c),
+      ),
+    ].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  );
+
   protected pontos = computed<ScatterPoint[]>(() => {
     const a = this.analise();
-    return a.itens.map((i) => {
+    const cat = this.categoriaFiltro();
+    const itens = cat ? a.itens.filter((i) => i.categoria === cat) : a.itens;
+    // P.9: o tamanho do ponto segue o lucro total do prato (margem por unidade × vendidos).
+    const lucroMax = Math.max(1, ...itens.map((i) => Math.max(0, i.margem * i.qtd)));
+    return itens.map((i) => {
       const g = quadranteDe(i, a.limiarQtd, a.margemMedia);
       return {
+        escala: 0.75 + 0.85 * Math.sqrt(Math.max(0, i.margem * i.qtd) / lucroMax),
+        rotulo: itens.length <= 25,
         id: i.id,
         nome: i.nome,
         categoria: i.categoria,

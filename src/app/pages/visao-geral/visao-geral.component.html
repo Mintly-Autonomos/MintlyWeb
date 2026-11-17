@@ -144,6 +144,35 @@
                 {{ base }}
               </p>
             }
+            <!-- P.9: os pilares da nota à vista, e as dívidas -->
+            <ul class="mt-3 w-full max-w-[300px] space-y-1.5 text-left" data-testid="saude-pilares">
+              @for (p of d.health.pillars; track p.key) {
+                <li class="text-[11.5px]">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-muted-foreground">{{ pillarLabel[p.key] }}</span>
+                    <span class="font-semibold tabular-nums" [style.color]="pillarColor(p.score)">{{
+                      p.score === null ? '—' : p.score.toFixed(0)
+                    }}</span>
+                  </div>
+                  <div class="mt-0.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      class="h-full rounded-full"
+                      [style.width.%]="p.score ?? 0"
+                      [style.background]="pillarColor(p.score)"
+                    ></div>
+                  </div>
+                </li>
+              }
+              <li
+                class="text-[11.5px] flex items-center justify-between gap-2 pt-0.5"
+                data-testid="saude-dividas"
+              >
+                <span class="text-muted-foreground">Dívidas e vencidos</span>
+                <span class="font-semibold" [style.color]="dividas().cor">{{
+                  dividas().texto
+                }}</span>
+              </li>
+            </ul>
             <div class="mt-3 inline-flex items-center gap-0.5 text-[13px] font-semibold text-ocean">
               Ver como calculamos
               <app-icon name="chevron_right" [style]="{ fontSize: '18px' }" />
@@ -244,8 +273,16 @@
     <div class="grid grid-cols-1 gap-6">
       <app-chart-card
         data-tour="grafico-receita-custos"
-        title="Receita vs. Custos e despesas"
-        description="Últimos 6 meses e projeção do fechamento do mês atual."
+        [title]="
+          graficoPrincipal() === 'resultado'
+            ? 'Resultado mês a mês'
+            : 'Receita vs. Custos e despesas'
+        "
+        [description]="
+          graficoPrincipal() === 'resultado'
+            ? 'Últimos 6 meses: receita menos custos e despesas. Verde é lucro, vermelho é prejuízo.'
+            : 'Últimos 6 meses e projeção do fechamento do mês atual.'
+        "
         [loading]="loading()"
         [height]="340"
         [empty]="semMovimento()"
@@ -264,31 +301,63 @@
           (clicked)="lancar('saida')"
           >Lançar despesa</app-button
         >
-        <div
-          slot="action"
-          class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground"
-          data-testid="legenda-receita-custos"
-        >
-          <span class="inline-flex items-center gap-1.5"
-            ><span class="h-2.5 w-2.5 rounded-full" style="background: var(--ocean)"></span
-            >Receita</span
-          >
-          <span class="inline-flex items-center gap-1.5"
-            ><span class="h-2.5 w-2.5 rounded-full" style="background: var(--warning)"></span>Custos
-            e despesas</span
-          >
-          <span class="inline-flex items-center gap-1.5"
-            ><span class="w-4 border-t-2 border-dashed border-muted-foreground"></span>Projeção do
-            mês atual</span
-          >
+        <div slot="action" class="flex flex-wrap items-center gap-2">
+          <div class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card">
+            @for (g of ['resultado', 'linhas']; track g) {
+              <button
+                type="button"
+                (click)="graficoPrincipal.set($any(g))"
+                [attr.aria-pressed]="graficoPrincipal() === g"
+                [attr.data-testid]="'grafico-' + g"
+                [class]="
+                  'h-7 px-3 rounded-full text-[12px] font-semibold transition-colors cursor-pointer ' +
+                  (graficoPrincipal() === g
+                    ? 'bg-mint-soft text-ocean'
+                    : 'text-muted-foreground hover:bg-muted')
+                "
+              >
+                {{ g === 'resultado' ? 'Resultado' : 'Receita e custos' }}
+              </button>
+            }
+          </div>
+          @if (graficoPrincipal() === 'linhas') {
+            <div
+              class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground"
+              data-testid="legenda-receita-custos"
+            >
+              <span class="inline-flex items-center gap-1.5"
+                ><span class="h-2.5 w-2.5 rounded-full" style="background: var(--ocean)"></span
+                >Receita</span
+              >
+              <span class="inline-flex items-center gap-1.5"
+                ><span class="h-2.5 w-2.5 rounded-full" style="background: var(--warning)"></span
+                >Custos e despesas</span
+              >
+              <span class="inline-flex items-center gap-1.5"
+                ><span class="w-4 border-t-2 border-dashed border-muted-foreground"></span>Projeção
+                do mês atual</span
+              >
+            </div>
+          }
         </div>
-        <app-area-chart
-          [data]="mainData()"
-          categoryKey="month"
-          [series]="mainSeries"
-          [valueFormatter]="abrev"
-          [zeroBaseline]="true"
-        />
+        @if (graficoPrincipal() === 'resultado') {
+          <app-bar-chart
+            [data]="resultadoMensal()"
+            categoryKey="mes"
+            [series]="resultadoSeries"
+            orientation="columns"
+            [valueFormatter]="abrev"
+            [colorFor]="resultadoCor"
+          />
+        } @else {
+          <app-area-chart
+            [data]="mainData()"
+            categoryKey="month"
+            [series]="mainSeries"
+            [valueFormatter]="abrev"
+            [zeroBaseline]="true"
+          />
+        }
       </app-chart-card>
 
       <app-chart-card
@@ -347,7 +416,7 @@
             <div class="flex items-center justify-between text-[13px]">
               <span class="font-semibold">{{ pillarLabel[p.key] }}</span>
               <span class="tabular-nums font-bold" [style.color]="pillarColor(p.score)">{{
-                p.score ?? '—'
+                p.score === null ? '—' : p.score.toFixed(0)
               }}</span>
             </div>
             <div class="mt-2 h-2 rounded-full bg-muted overflow-hidden">

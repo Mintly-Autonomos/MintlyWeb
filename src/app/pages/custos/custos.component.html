@@ -207,158 +207,184 @@
       }
 
       <div class="mt-4 space-y-2">
-        @for (linha of linhas(); track linha.key) {
-          <!-- Só abre quem tem itens para mostrar; sem subcategoria a linha é só leitura. -->
-          @let temItens = linha.subitems.length > 0;
-          <div
-            [class]="
-              'rounded-xl border transition-colors ' +
-              (openCat() === linha.key && temItens
-                ? 'border-mint bg-mint-soft/30'
-                : temItens
-                  ? 'border-border hover:bg-muted/60'
-                  : 'border-border')
-            "
+        <!-- P.9: agrupado em CMV, mão de obra, taxas, impostos e outras; cada grupo abre e fecha -->
+        @for (g of gruposTabela(); track g.key) {
+          <button
+            type="button"
+            (click)="alternarGrupo(g.key)"
+            [attr.aria-expanded]="grupoAberto(g.key)"
+            [attr.data-testid]="'grupo-' + g.key"
+            class="w-full flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-left cursor-pointer hover:bg-muted"
           >
-            <button
-              type="button"
-              (click)="toggleCat(linha.key)"
-              [disabled]="!temItens"
-              [attr.aria-expanded]="temItens ? openCat() === linha.key : null"
-              [class]="
-                'w-full flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3 text-left rounded-xl ' +
-                (temItens ? 'cursor-pointer' : 'cursor-default')
-              "
+            <span class="h-2.5 w-2.5 rounded-sm shrink-0" [style.background]="g.cor"></span>
+            <span class="text-[13px] font-semibold">{{ g.nome }}</span>
+            <span class="text-[12px] text-muted-foreground"
+              >· {{ g.itens.length }} {{ g.itens.length === 1 ? 'categoria' : 'categorias' }}</span
             >
-              <span
-                class="h-9 w-9 rounded-xl grid place-items-center bg-muted text-muted-foreground shrink-0"
+            <span class="ml-auto text-[13px] font-bold tabular-nums">{{ fmtBRL(g.total) }}</span>
+            <span class="text-[12px] text-muted-foreground tabular-nums w-12 text-right">{{
+              pctFmt(g.pct)
+            }}</span>
+            <app-icon
+              [name]="grupoAberto(g.key) ? 'expand_less' : 'expand_more'"
+              [style]="{ fontSize: '18px' }"
+            />
+          </button>
+          @if (grupoAberto(g.key)) {
+            @for (linha of g.itens; track linha.key) {
+              <!-- Só abre quem tem itens para mostrar; sem subcategoria a linha é só leitura. -->
+              @let temItens = linha.subitems.length > 0;
+              <div
+                [class]="
+                  'rounded-xl border transition-colors ' +
+                  (openCat() === linha.key && temItens
+                    ? 'border-mint bg-mint-soft/30'
+                    : temItens
+                      ? 'border-border hover:bg-muted/60'
+                      : 'border-border')
+                "
               >
-                <app-icon [name]="iconForExpense(linha)" [style]="{ fontSize: '18px' }" />
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="flex items-center gap-2">
-                  <span class="text-[13.5px] font-semibold truncate">{{ linha.name }}</span>
-                  @if (temAlerta(linha)) {
-                    <app-chip tone="warning" icon="warning">alerta</app-chip>
-                  }
-                </span>
-                <span class="mt-1.5 block h-2 rounded-full bg-muted overflow-hidden">
+                <button
+                  type="button"
+                  (click)="toggleCat(linha.key)"
+                  [disabled]="!temItens"
+                  [attr.aria-expanded]="temItens ? openCat() === linha.key : null"
+                  [class]="
+                    'w-full flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3 text-left rounded-xl ' +
+                    (temItens ? 'cursor-pointer' : 'cursor-default')
+                  "
+                >
                   <span
-                    class="block h-full rounded-full bg-ocean transition-all duration-300"
-                    [style.width.%]="(linha.metric / maxMetric()) * 100"
-                  ></span>
-                </span>
-                <span class="block text-[11.5px] text-muted-foreground mt-1">{{
-                  linha.behavior === CategoryBehavior.Fixed
-                    ? 'Fixo'
-                    : linha.behavior === CategoryBehavior.Mixed
-                      ? 'Misto'
-                      : 'Variável'
-                }}</span>
-              </span>
-              <span class="text-[14px] font-bold tabular-nums w-[112px] text-right">
-                {{ valueMode() === 'brl' ? fmtBRL(linha.amount) : pctFmt(linha.metric) }}
-              </span>
-              <span class="w-[74px] text-right">
-                @if (deltaOf(itemDelta(linha)); as delta) {
-                  @if (delta.novo) {
-                    <span class="text-[11.5px] text-muted-foreground">novo</span>
-                  } @else if (delta.neutral) {
-                    <span class="text-[11.5px] text-muted-foreground">estável</span>
-                  } @else {
-                    <span
-                      [class]="
-                        'inline-flex items-center gap-1 text-[11.5px] font-semibold tabular-nums ' +
-                        (delta.up ? 'text-warning' : 'text-success')
-                      "
-                    >
-                      <app-icon
-                        [name]="delta.up ? 'arrow_upward' : 'arrow_downward'"
-                        [style]="{ fontSize: '13px' }"
-                      />
-                      {{ delta.text }}
-                    </span>
-                  }
-                }
-              </span>
-              @if (temItens) {
-                <app-icon
-                  [name]="openCat() === linha.key ? 'expand_less' : 'expand_more'"
-                  className="text-muted-foreground"
-                  [style]="{ fontSize: '20px' }"
-                />
-              } @else {
-                <span class="w-5 shrink-0" aria-hidden="true"></span>
-              }
-            </button>
-            @if (openCat() === linha.key && temItens) {
-              <div class="px-3.5 pb-3.5 space-y-2">
-                @for (sub of linha.subitems; track sub.key) {
-                  <div
-                    [class]="
-                      'flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl px-3 py-2.5 border transition-shadow ' +
-                      (isAnomalo(sub)
-                        ? 'border-warning/40 bg-warning/10'
-                        : 'border-border bg-muted/40') +
-                      (subDestaque() === sub.key ? ' ring-2 ring-warning/60' : '')
-                    "
+                    class="h-9 w-9 rounded-xl grid place-items-center bg-muted text-muted-foreground shrink-0"
                   >
-                    <span class="text-[13px] font-medium min-w-0 truncate">{{ sub.name }}</span>
-                    @if (isAnomalo(sub)) {
-                      <app-chip
-                        tone="warning"
-                        icon="warning"
-                        [title]="'Este item está bem acima da média dos últimos meses — vale investigar.'"
-                      >
-                        fora do padrão
-                      </app-chip>
-                    }
-                    <span class="ml-auto text-[13px] font-semibold tabular-nums">{{
-                      fmtBRL(sub.amount)
-                    }}</span>
-                    <span class="inline-flex items-center gap-1">
-                      @if (deltaOf(subDelta(sub)); as delta) {
-                        @if (delta.novo) {
-                          <span class="text-[11.5px] text-muted-foreground">novo</span>
-                        } @else if (delta.neutral) {
-                          <span class="text-[11.5px] text-muted-foreground">estável</span>
-                        } @else {
-                          <span
-                            [class]="
-                              'inline-flex items-center gap-1 text-[11.5px] font-semibold tabular-nums ' +
-                              (delta.up ? 'text-warning' : 'text-success')
-                            "
-                          >
-                            <app-icon
-                              [name]="delta.up ? 'arrow_upward' : 'arrow_downward'"
-                              [style]="{ fontSize: '13px' }"
-                            />
-                            {{ delta.text }}
-                          </span>
-                        }
+                    <app-icon [name]="iconForExpense(linha)" [style]="{ fontSize: '18px' }" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="flex items-center gap-2">
+                      <span class="text-[13.5px] font-semibold truncate">{{ linha.name }}</span>
+                      @if (temAlerta(linha)) {
+                        <app-chip tone="warning" icon="warning">alerta</app-chip>
                       }
-                      <app-hint
-                        text="Comparado com o período escolhido acima. Verde = caiu, âmbar = subiu."
-                      />
                     </span>
+                    <span class="mt-1.5 block h-2 rounded-full bg-muted overflow-hidden">
+                      <span
+                        class="block h-full rounded-full bg-ocean transition-all duration-300"
+                        [style.width.%]="(linha.metric / maxMetric()) * 100"
+                      ></span>
+                    </span>
+                    <span class="block text-[11.5px] text-muted-foreground mt-1">{{
+                      linha.behavior === CategoryBehavior.Fixed
+                        ? 'Fixo'
+                        : linha.behavior === CategoryBehavior.Mixed
+                          ? 'Misto'
+                          : 'Variável'
+                    }}</span>
+                  </span>
+                  <span class="text-[14px] font-bold tabular-nums w-[112px] text-right">
+                    {{ valueMode() === 'brl' ? fmtBRL(linha.amount) : pctFmt(linha.metric) }}
+                  </span>
+                  <span class="w-[74px] text-right">
+                    @if (deltaOf(itemDelta(linha)); as delta) {
+                      @if (delta.novo) {
+                        <span class="text-[11.5px] text-muted-foreground">novo</span>
+                      } @else if (delta.neutral) {
+                        <span class="text-[11.5px] text-muted-foreground">estável</span>
+                      } @else {
+                        <span
+                          [class]="
+                            'inline-flex items-center gap-1 text-[11.5px] font-semibold tabular-nums ' +
+                            (delta.up ? 'text-warning' : 'text-success')
+                          "
+                        >
+                          <app-icon
+                            [name]="delta.up ? 'arrow_upward' : 'arrow_downward'"
+                            [style]="{ fontSize: '13px' }"
+                          />
+                          {{ delta.text }}
+                        </span>
+                      }
+                    }
+                  </span>
+                  @if (temItens) {
+                    <app-icon
+                      [name]="openCat() === linha.key ? 'expand_less' : 'expand_more'"
+                      className="text-muted-foreground"
+                      [style]="{ fontSize: '20px' }"
+                    />
+                  } @else {
+                    <span class="w-5 shrink-0" aria-hidden="true"></span>
+                  }
+                </button>
+                @if (openCat() === linha.key && temItens) {
+                  <div class="px-3.5 pb-3.5 space-y-2">
+                    @for (sub of linha.subitems; track sub.key) {
+                      <div
+                        [class]="
+                          'flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl px-3 py-2.5 border transition-shadow ' +
+                          (isAnomalo(sub)
+                            ? 'border-warning/40 bg-warning/10'
+                            : 'border-border bg-muted/40') +
+                          (subDestaque() === sub.key ? ' ring-2 ring-warning/60' : '')
+                        "
+                      >
+                        <span class="text-[13px] font-medium min-w-0 truncate">{{ sub.name }}</span>
+                        @if (isAnomalo(sub)) {
+                          <app-chip
+                            tone="warning"
+                            icon="warning"
+                            [title]="'Este item está bem acima da média dos últimos meses — vale investigar.'"
+                          >
+                            fora do padrão
+                          </app-chip>
+                        }
+                        <span class="ml-auto text-[13px] font-semibold tabular-nums">{{
+                          fmtBRL(sub.amount)
+                        }}</span>
+                        <span class="inline-flex items-center gap-1">
+                          @if (deltaOf(subDelta(sub)); as delta) {
+                            @if (delta.novo) {
+                              <span class="text-[11.5px] text-muted-foreground">novo</span>
+                            } @else if (delta.neutral) {
+                              <span class="text-[11.5px] text-muted-foreground">estável</span>
+                            } @else {
+                              <span
+                                [class]="
+                                  'inline-flex items-center gap-1 text-[11.5px] font-semibold tabular-nums ' +
+                                  (delta.up ? 'text-warning' : 'text-success')
+                                "
+                              >
+                                <app-icon
+                                  [name]="delta.up ? 'arrow_upward' : 'arrow_downward'"
+                                  [style]="{ fontSize: '13px' }"
+                                />
+                                {{ delta.text }}
+                              </span>
+                            }
+                          }
+                          <app-hint
+                            text="Comparado com o período escolhido acima. Verde = caiu, âmbar = subiu."
+                          />
+                        </span>
+                      </div>
+                    }
+                    <div class="flex items-start gap-1.5 text-[11.5px] text-muted-foreground pt-1">
+                      <app-icon
+                        name="info"
+                        className="shrink-0 mt-0.5"
+                        [style]="{ fontSize: '14px' }"
+                      />
+                      <span
+                        >As setas mostram quanto cada item mudou em relação ao
+                        {{
+                          compare() === 'anterior' ? 'mês anterior' : 'média dos últimos 3 meses'
+                        }}.</span
+                      >
+                    </div>
                   </div>
                 }
-                <div class="flex items-start gap-1.5 text-[11.5px] text-muted-foreground pt-1">
-                  <app-icon
-                    name="info"
-                    className="shrink-0 mt-0.5"
-                    [style]="{ fontSize: '14px' }"
-                  />
-                  <span
-                    >As setas mostram quanto cada item mudou em relação ao
-                    {{
-                      compare() === 'anterior' ? 'mês anterior' : 'média dos últimos 3 meses'
-                    }}.</span
-                  >
-                </div>
               </div>
             }
-          </div>
+          }
         }
         @if (linhas().length === 0) {
           <p class="text-[13px] text-muted-foreground py-6 text-center">

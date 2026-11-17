@@ -28,6 +28,10 @@ export interface ScatterPoint {
   grupoLabel: string;
   cor: string;
   forma: ScatterShape;
+  /** Tamanho do ponto (1 = padrão). P.9: proporcional ao lucro total do prato. */
+  escala?: number;
+  /** Escreve o nome ao lado do ponto (P.9: dá para ler sem passar o mouse). */
+  rotulo?: boolean;
 }
 
 const M = { top: 18, right: 24, bottom: 44, left: 64 };
@@ -208,48 +212,75 @@ const M = { top: 18, right: 24, bottom: 44, left: 64 };
               (focus)="hover.set(p.id)"
               (blur)="hover.set(null)"
             >
-              @switch (p.forma) {
-                @case ('square') {
-                  <rect
-                    [attr.x]="px(p.x) - 7"
-                    [attr.y]="py(p.y) - 7"
-                    width="14"
-                    height="14"
-                    [attr.fill]="p.cor"
-                    fill-opacity="0.9"
-                    stroke="var(--card)"
-                  />
+              <g
+                [attr.transform]="
+                  'translate(' +
+                  px(p.x) +
+                  ' ' +
+                  py(p.y) +
+                  ') scale(' +
+                  (p.escala ?? 1) +
+                  ') translate(' +
+                  -px(p.x) +
+                  ' ' +
+                  -py(p.y) +
+                  ')'
+                "
+              >
+                @switch (p.forma) {
+                  @case ('square') {
+                    <rect
+                      [attr.x]="px(p.x) - 7"
+                      [attr.y]="py(p.y) - 7"
+                      width="14"
+                      height="14"
+                      [attr.fill]="p.cor"
+                      fill-opacity="0.9"
+                      stroke="var(--card)"
+                    />
+                  }
+                  @case ('diamond') {
+                    <rect
+                      [attr.x]="px(p.x) - 6"
+                      [attr.y]="py(p.y) - 6"
+                      width="12"
+                      height="12"
+                      [attr.transform]="'rotate(45 ' + px(p.x) + ' ' + py(p.y) + ')'"
+                      [attr.fill]="p.cor"
+                      fill-opacity="0.9"
+                      stroke="var(--card)"
+                    />
+                  }
+                  @case ('triangle') {
+                    <polygon
+                      [attr.points]="triangle(px(p.x), py(p.y))"
+                      [attr.fill]="p.cor"
+                      fill-opacity="0.9"
+                      stroke="var(--card)"
+                    />
+                  }
+                  @default {
+                    <circle
+                      [attr.cx]="px(p.x)"
+                      [attr.cy]="py(p.y)"
+                      r="8"
+                      [attr.fill]="p.cor"
+                      fill-opacity="0.9"
+                      stroke="var(--card)"
+                    />
+                  }
                 }
-                @case ('diamond') {
-                  <rect
-                    [attr.x]="px(p.x) - 6"
-                    [attr.y]="py(p.y) - 6"
-                    width="12"
-                    height="12"
-                    [attr.transform]="'rotate(45 ' + px(p.x) + ' ' + py(p.y) + ')'"
-                    [attr.fill]="p.cor"
-                    fill-opacity="0.9"
-                    stroke="var(--card)"
-                  />
-                }
-                @case ('triangle') {
-                  <polygon
-                    [attr.points]="triangle(px(p.x), py(p.y))"
-                    [attr.fill]="p.cor"
-                    fill-opacity="0.9"
-                    stroke="var(--card)"
-                  />
-                }
-                @default {
-                  <circle
-                    [attr.cx]="px(p.x)"
-                    [attr.cy]="py(p.y)"
-                    r="8"
-                    [attr.fill]="p.cor"
-                    fill-opacity="0.9"
-                    stroke="var(--card)"
-                  />
-                }
+              </g>
+              @if (p.rotulo) {
+                <text
+                  [attr.x]="px(p.x) + 9 * (p.escala ?? 1) + 4"
+                  [attr.y]="py(p.y) + 4"
+                  font-size="10.5"
+                  fill="var(--foreground)"
+                  class="pointer-events-none select-none"
+                >
+                  {{ p.nome.length > 18 ? p.nome.slice(0, 17) + '…' : p.nome }}
+                </text>
               }
               @if (p.id === selectedId) {
                 <circle
