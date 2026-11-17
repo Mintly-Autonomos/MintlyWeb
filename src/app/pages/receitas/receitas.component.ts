@@ -67,10 +67,30 @@ export class ReceitasComponent implements OnInit {
   protected tendenciaSeriesTotal: LineSeries[] = [
     { key: 'total', name: 'Receita total', color: 'var(--ocean)' },
   ];
-  protected tendenciaSeriesCanal: LineSeries[] = [
-    { key: 'salao', name: 'Salão', color: 'var(--ocean)' },
-    { key: 'delivery', name: 'Delivery', color: 'var(--mint)' },
-  ];
+  private readonly serieSalao: LineSeries = { key: 'salao', name: 'Salão', color: 'var(--ocean)' };
+  private readonly serieDelivery: LineSeries = {
+    key: 'delivery',
+    name: 'Delivery',
+    color: 'var(--mint)',
+  };
+  private readonly serieEncomendas: LineSeries = {
+    key: 'encomendas',
+    name: 'Encomendas',
+    color: 'var(--warning)',
+  };
+  /** Encomendas só entra no gráfico de quem já lançou alguma. */
+  protected tendenciaSeriesCanal = computed<LineSeries[]>(() =>
+    this.data()?.temEncomendas
+      ? [this.serieSalao, this.serieDelivery, this.serieEncomendas]
+      : [this.serieSalao, this.serieDelivery],
+  );
+
+  /** Ícone e cor do chip de cada canal. */
+  protected canalChip(canal: string): { tone: 'mint' | 'warning' | 'ocean'; icon: string } {
+    if (canal === 'Salão') return { tone: 'mint', icon: 'storefront' };
+    if (canal === 'Encomendas') return { tone: 'ocean', icon: 'cake' };
+    return { tone: 'warning', icon: 'delivery_dining' };
+  }
 
   protected ranking = computed(() => {
     const d = this.data();

@@ -1,6 +1,7 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { CategoryBehavior, DreGroup, MovementChannel } from 'mintly-lib';
+import type { SalesChannel } from 'mintly-lib';
 import type {
   ExpensesReport,
   ExpensesQuery,
@@ -16,7 +17,13 @@ import { MintlyClientService } from './mintly-client.service';
 import mockCustos from '../mocks/mock_custos.json';
 
 export type { ExpensesReport, ExpensesQuery, ExpenseItem, ExpenseSubitem, ExpenseAnomaly };
-export type ChannelFilter = 'dineIn' | 'delivery' | undefined;
+export type ChannelFilter = 'dineIn' | 'delivery' | 'orders' | undefined;
+
+const CHANNEL_FILTER_TO_LIB: Record<Exclude<ChannelFilter, undefined>, SalesChannel> = {
+  dineIn: MovementChannel.DineIn,
+  delivery: MovementChannel.Delivery,
+  orders: MovementChannel.Orders,
+};
 
 function delay(ms = 380): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -236,12 +243,7 @@ export class CustosService {
       }
       const query: ExpensesQuery = {
         month,
-        channel:
-          channel === 'dineIn'
-            ? MovementChannel.DineIn
-            : channel === 'delivery'
-              ? MovementChannel.Delivery
-              : undefined,
+        channel: channel ? CHANNEL_FILTER_TO_LIB[channel] : undefined,
       };
       const response = await this.call((headers) => this.reportClient.expenses(query, headers));
       if (!response.payload) throw new Error('Resposta de /reports/expenses sem payload.');
