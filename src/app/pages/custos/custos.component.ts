@@ -17,6 +17,8 @@ import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-
 import { CmvAvisoComponent, DespesaForaDoCmv } from '../../shared/cmv-aviso.component';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
+import { StackedBarsComponent, StackedSeries } from '../../shared/stacked-bars.component';
+import { GRUPOS, SEM_DETALHE, custosPorGrupo, percentuaisMensais } from './custos-grupos';
 
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
@@ -27,18 +29,11 @@ interface LinhaDespesa extends ExpenseItem {
   metric: number;
 }
 
-const TREND_COLORS = [
-  'var(--warning)',
-  'var(--ocean)',
-  'var(--mint)',
-  'var(--success)',
-  'var(--error)',
-];
-
 @Component({
   selector: 'app-custos',
   standalone: true,
   imports: [
+    StackedBarsComponent,
     IconComponent,
     ChipComponent,
     HintComponent,
@@ -67,7 +62,6 @@ export class CustosComponent implements OnInit {
   protected valueMode = signal<'brl' | 'pct'>('brl');
   protected compare = signal<Compare>('anterior');
   protected lente = signal<Lente>('todos');
-  protected trendMode = signal<'total' | 'categoria'>('total');
   protected openCat = signal<string | null>(null);
   protected subDestaque = signal<string | null>(null);
 
@@ -120,10 +114,6 @@ export class CustosComponent implements OnInit {
     { value: 'fixos', label: 'Só fixos' },
   ];
 
-  protected trendSeriesTotal: LineSeries[] = [
-    { key: 'total', name: 'Total de custos e despesas', color: 'var(--ocean)' },
-  ];
-
   /** Linha a linha, já filtrada pelo "lente" (fixo/variável — misto entra como fixo, N4/§351). */
   protected linhas = computed<LinhaDespesa[]>(() => {
     const d = this.data();
@@ -147,28 +137,6 @@ export class CustosComponent implements OnInit {
   protected maxMetric = computed(() => Math.max(...this.linhas().map((l) => l.metric), 1));
   protected totalLinhas = computed(() => this.linhas().reduce((acc, l) => acc + l.amount, 0));
 
-  /** Série "Por categoria": as 5 maiores despesas do mês, cada uma com sua própria série de cor. */
-  protected trendSeriesCategoria = computed<LineSeries[]>(() =>
-    (this.data()?.items ?? []).slice(0, 5).map((item, i) => ({
-      key: item.key,
-      name: item.name,
-      color: TREND_COLORS[i % TREND_COLORS.length],
-    })),
-  );
-  protected trendDataCategoria = computed(() => {
-    const top5 = (this.data()?.items ?? []).slice(0, 5);
-    if (top5.length === 0) return [];
-    const meses = top5[0].history.map((h) => h.month);
-    return meses.map((mes, i) => {
-      const row: Record<string, string | number> = { mes: fmtMonthShort(mes) };
-      for (const item of top5) row[item.key] = item.history[i]?.amount ?? 0;
-      return row;
-    });
-  });
-  protected trendDataTotal = computed(
-    () => this.data()?.history.map((h) => ({ mes: fmtMonthShort(h.month), total: h.total })) ?? [],
-  );
-
   ngOnInit(): void {
     this.load();
   }
@@ -186,7 +154,46 @@ export class CustosComponent implements OnInit {
     this.svc
       .refresh(this.monthQuery())
       .catch(() => this.toast.error('Não foi possível carregar os dados de custos.'));
+    // P.9: receita de cada mês para o CMV % e o custo primário %; sem ela, só esse gráfico some.
+    this.svc
+      .receitaMensal(this.monthQuery())
+      .then((r) => this.receitaMes.set(r))
+      .catch(() => this.receitaMes.set(new Map()));
   }
+
+  // ── P.9 (tabela 13.3): grupos de custo ──
+  private receitaMes = signal<ReadonlyMap<string, number>>(new Map());
+  protected readonly grupoSeries: StackedSeries[] = [...GRUPOS, SEM_DETALHE].map((g) => ({
+    key: g.key,
+    name: g.nome,
+    color: g.cor,
+  }));
+  /** Custo de cada grupo, mês a mês (barras empilhadas, eixo do zero). */
+  protected porGrupo = computed(() =>
+    custosPorGrupo(this.data()?.items ?? [], this.data()?.history ?? []).map((l) => ({
+      ...l,
+      mes: fmtMonthShort(l.mes),
+    })),
+  );
+  /** CMV % e custo primário % de cada mês, com as metas tracejadas. */
+  protected percentuais = computed(() => {
+    const d = this.data();
+    if (!d) return [];
+    return percentuaisMensais(custosPorGrupo(d.items, d.history), this.receitaMes()).map((p) => ({
+      mes: fmtMonthShort(p.mes),
+      cmvPct: p.cmvPct,
+      primePct: p.primePct,
+      cmvMeta: Math.round(d.cmv.target.max * 1000) / 10,
+      primeMeta: Math.round(d.primeCost.targetMax * 1000) / 10,
+    }));
+  });
+  protected readonly percentuaisSeries: LineSeries[] = [
+    { key: 'cmvPct', name: 'CMV %', color: 'var(--ocean)' },
+    { key: 'cmvMeta', name: 'Teto do CMV', color: 'var(--ocean)', dashed: true },
+    { key: 'primePct', name: 'Custo primário %', color: 'var(--mint)' },
+    { key: 'primeMeta', name: 'Teto do custo primário', color: 'var(--mint)', dashed: true },
+  ];
+  protected readonly pctTexto = (v: number) => `${String(v).replace('.', ',')}%`;
 
   setMonth(m: MonthOpt): void {
     this.monthSel.set(m);

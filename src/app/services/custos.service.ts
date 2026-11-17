@@ -233,6 +233,18 @@ export class CustosService {
     return typeof err === 'object' && err !== null && apiErrorInfo(err).status === 401;
   }
 
+  /**
+   * Receita bruta de cada mês (P.9: CMV % e custo primário % mês a mês). Vem do histórico do Resultado,
+   * que é a mesma receita por competência do DRE. Mês → valor.
+   */
+  async receitaMensal(month?: string): Promise<Map<string, number>> {
+    if (environment.useMocks) return new Map();
+    const response = await this.call((headers) =>
+      this.reportClient.result({ month, historyMonths: 6 }, headers),
+    );
+    return new Map((response.payload?.history ?? []).map((h) => [h.month, h.grossRevenue]));
+  }
+
   async refresh(month?: string, channel?: ChannelFilter): Promise<void> {
     this.loading.set(true);
     try {

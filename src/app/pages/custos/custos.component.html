@@ -381,39 +381,38 @@
     <app-chart-card
       data-tour="evolucao"
       title="Evolução de custos e despesas"
-      description="Últimos 6 meses"
+      description="Últimos 6 meses, por grupo"
       [loading]="loading()"
       [height]="420"
     >
       <span slot="title-extra">
         <app-hint [text]="h.evolucaoCustos" />
       </span>
-      <div
-        slot="action"
-        class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
-      >
-        @for (m of ['total', 'categoria']; track m) {
-          <button
-            type="button"
-            (click)="trendMode.set($any(m))"
-            [attr.aria-pressed]="trendMode() === m"
-            [class]="
-              'h-7 px-3 rounded-full text-[12px] font-semibold transition-colors duration-150 cursor-pointer ' +
-              (trendMode() === m
-                ? 'bg-mint-soft text-ocean'
-                : 'text-muted-foreground hover:bg-muted')
-            "
-          >
-            {{ m === 'total' ? 'Total' : 'Por categoria' }}
-          </button>
-        }
-      </div>
-      <app-line-chart
-        [data]="trendMode() === 'total' ? trendDataTotal() : trendDataCategoria()"
+      <app-stacked-bars
+        [data]="porGrupo()"
         categoryKey="mes"
-        [series]="trendMode() === 'total' ? trendSeriesTotal : trendSeriesCategoria()"
+        [series]="grupoSeries"
         [valueFormatter]="abrev"
       />
     </app-chart-card>
+
+    <!-- 6 — CMV % e custo primário % (P.9) -->
+    @if (percentuais().length > 0) {
+      <app-chart-card
+        data-tour="percentuais"
+        title="CMV e custo primário, mês a mês"
+        description="Quanto da receita foi para insumos e para insumos + mão de obra, contra o teto"
+        [loading]="loading()"
+        [height]="300"
+      >
+        <span slot="title-extra"><app-hint [text]="h.percentuaisMensais" /></span>
+        <app-line-chart
+          [data]="percentuais()"
+          categoryKey="mes"
+          [series]="percentuaisSeries"
+          [valueFormatter]="pctTexto"
+        />
+      </app-chart-card>
+    }
   }
 </div>

@@ -70,7 +70,12 @@ describe('CustosComponent — Para onde está indo seu dinheiro', () => {
       providers: [
         {
           provide: CustosService,
-          useValue: { data: signal(data), loading: signal(false), refresh },
+          useValue: {
+            data: signal(data),
+            loading: signal(false),
+            refresh,
+            receitaMensal: vi.fn(() => Promise.resolve(new Map())),
+          },
         },
         { provide: ToastService, useValue: { error: vi.fn() } },
       ],
