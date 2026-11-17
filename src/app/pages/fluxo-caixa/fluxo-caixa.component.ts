@@ -22,6 +22,7 @@ import { AreaChartComponent, AreaSeries, AreaDot } from '../../shared/area-chart
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, formatCompact, shortDateRange } from '../../shared/format';
+import { calendarioDoHorizonte, grandesVencimentos, saldoNoFimDoBloco } from './fluxo-calendario';
 
 const HORIZONS = [30, 60, 90];
 
@@ -120,10 +121,33 @@ export class FluxoCaixaComponent implements OnInit {
   protected statusMeta = STATUS_META;
   protected emptyState = EMPTY_STATE;
 
-  protected areaSeries: AreaSeries[] = [
-    { key: 'real', name: 'Saldo realizado', color: 'var(--ocean)', fill: true },
-    { key: 'futuro', name: 'Saldo previsto', color: 'var(--ocean)', dashed: true, fill: true },
-  ];
+  /** P.9: com reserva calculada, a linha do caixa mínimo entra no gráfico. */
+  protected areaSeries = computed<AreaSeries[]>(() => {
+    const base: AreaSeries[] = [
+      { key: 'real', name: 'Saldo realizado', color: 'var(--ocean)', fill: true },
+      { key: 'futuro', name: 'Saldo previsto', color: 'var(--ocean)', dashed: true, fill: true },
+    ];
+    return this.caixaMinimo() > 0
+      ? [
+          ...base,
+          { key: 'minimo', name: 'Caixa mínimo (reserva)', color: 'var(--error)', dashed: true },
+        ]
+      : base;
+  });
+  protected caixaMinimo = computed(() => this.data()?.safetyThreshold.value ?? 0);
+
+  /** P.9: lista ou calendário dos vencimentos. */
+  protected visao = signal<'calendario' | 'lista'>('calendario');
+  protected calendario = computed(() => {
+    const d = this.data();
+    return d ? calendarioDoHorizonte(d.projection, d.today) : [];
+  });
+  protected readonly diasDaSemana = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  /** Saldo previsto no fim de cada bloco do Entradas × Saídas. */
+  protected saldosDosBlocos = computed(() => {
+    const d = this.data();
+    return d ? saldoNoFimDoBloco(d) : [];
+  });
   protected blocosSeries: BarSeries[] = [
     { key: 'entradas', name: 'Entradas', color: 'var(--mint)' },
     { key: 'saidas', name: 'Saídas', color: 'var(--warning)' },
@@ -165,15 +189,18 @@ export class FluxoCaixaComponent implements OnInit {
   protected serie = computed(() => {
     const d = this.data();
     if (!d) return [];
+    const minimo = this.caixaMinimo() > 0 ? this.caixaMinimo() : null;
     const passado = d.realized.map((p) => ({
       rotulo: formatDia(p.date),
       real: p.balance,
       futuro: null as number | null,
+      minimo,
     }));
     const futuro = d.projection.map((p, i) => ({
       rotulo: formatDia(p.date),
       real: i === 0 ? p.balance : (null as number | null),
       futuro: p.balance,
+      minimo,
     }));
     return [...passado, ...futuro];
   });
@@ -183,6 +210,15 @@ export class FluxoCaixaComponent implements OnInit {
     const c = this.criticalInsight();
     if (!d) return [];
     const base: AreaDot[] = [{ atLabel: this.hojeRotulo(), key: 'real', color: 'var(--ocean)' }];
+    // P.9: os grandes vencimentos (aluguel, 13º, DAS…) marcados na linha, para ver quando e por que o caixa aperta.
+    for (const v of grandesVencimentos(d)) {
+      base.push({
+        atLabel: formatDia(v.dueDate),
+        key: 'futuro',
+        color: 'var(--error)',
+        caption: `${v.title} ${formatBRL(v.amount)}`,
+      });
+    }
     if (c) {
       base.push({
         atLabel: formatDia(c.date),
