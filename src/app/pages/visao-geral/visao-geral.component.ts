@@ -21,6 +21,7 @@ import { CMV_HINT, PRIME_COST_HINT } from '../../shared/metric-hints';
 import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
+import { EstouDevendoComponent } from './estou-devendo.component';
 
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
@@ -71,6 +72,7 @@ function pillarDetail(key: string, value: number | null, mesPassado = false): st
   selector: 'app-visao-geral',
   standalone: true,
   imports: [
+    EstouDevendoComponent,
     IconComponent,
     ChipComponent,
     HintComponent,
