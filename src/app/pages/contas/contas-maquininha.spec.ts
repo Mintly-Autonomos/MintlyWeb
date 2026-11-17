@@ -173,6 +173,7 @@ describe('Custos: taxa da maquininha separada da comissão dos apps (S3.3)', () 
             data: signal(data),
             loading: signal(false),
             refresh: vi.fn(() => Promise.resolve()),
+            receitaMensal: vi.fn(() => Promise.resolve(new Map())),
           },
         },
         { provide: ToastService, useValue: { error: vi.fn() } },

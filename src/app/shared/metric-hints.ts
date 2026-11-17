@@ -132,8 +132,12 @@ export const METRIC_HINTS = {
     'soma das comissões das contas de app no mês; o % é sobre o que foi vendido por esses apps.',
   ),
   evolucaoCustos: calc(
-    'Se os custos estão subindo mês a mês, e em qual categoria.',
-    'soma de custos e despesas de cada mês; em "Por categoria", as 5 maiores categorias.',
+    'Se os custos estão subindo mês a mês e qual grupo puxou: CMV, mão de obra, taxas, impostos ou outras despesas. O eixo começa no zero.',
+    'soma das despesas de cada grupo no mês, pela data do lançamento; a altura da coluna é o total do mês.',
+  ),
+  percentuaisMensais: calc(
+    'Quanto da receita de cada mês foi para insumos (CMV) e para insumos + mão de obra (custo primário). As linhas tracejadas são os tetos: acima delas, a margem está apertando.',
+    'CMV % = CMV do mês ÷ receita bruta do mês × 100; custo primário % = (CMV + mão de obra) ÷ receita bruta × 100. Mês sem venda, ou com gasto de categoria que a tela não detalha, fica de fora.',
   ),
 } as const;
 

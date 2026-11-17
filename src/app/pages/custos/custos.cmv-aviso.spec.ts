@@ -57,6 +57,7 @@ describe('CustosComponent — aviso de CMV zerado', () => {
             data: signal(data),
             loading: signal(false),
             refresh: vi.fn(() => Promise.resolve()),
+            receitaMensal: vi.fn(() => Promise.resolve(new Map())),
           },
         },
         { provide: ToastService, useValue: { error: vi.fn() } },
