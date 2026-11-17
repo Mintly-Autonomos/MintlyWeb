@@ -9,6 +9,8 @@ import {
   MovStatus,
   PaymentMethod,
   PAYMENT_METHODS,
+  Channel,
+  CHANNEL_LABEL,
   STATUS_META,
   DuplicateMovementError,
   ImportMovementItem,
@@ -38,7 +40,13 @@ import {
   splitDishText,
 } from '../../shared/dish-match';
 import { moneyToInput } from '../../shared/money-input';
-import { describeSettlementRule, resolveSettlementRule, settlementDueDate } from 'mintly-lib';
+import {
+  describeSettlementRule,
+  resolveSettlementRule,
+  SALE_TIME_PATTERN,
+  SALES_COUNT_MAX,
+  settlementDueDate,
+} from 'mintly-lib';
 import type { SettlementRule } from 'mintly-lib';
 import { apiErrorMessage, isNoResponseError } from '../../shared/api-error-message';
 import { matchName, avisosImportacao } from '../../shared/import-parse';
@@ -105,6 +113,12 @@ interface MovForm {
   accountId: string | null;
   paymentMethod: PaymentMethod | '';
   status: MovStatus;
+  /** Canal escolhido; '' = automático (pela conta). */
+  channel: Channel | '';
+  /** Hora da venda (`HH:MM`), só entradas; '' = não informada. */
+  saleTime: string;
+  /** Quantas vendas o lançamento soma, só entradas; '' = 1. */
+  salesCount: string;
   notes: string;
   /**
    * Pratos vendidos (só entradas): prato do cardápio e quantidade. O nome e o preço são para mostrar e para
@@ -213,6 +227,9 @@ export class MovimentacoesComponent implements OnInit {
     accountId: null,
     paymentMethod: '',
     status: 'pending',
+    channel: '',
+    saleTime: '',
+    salesCount: '',
     notes: '',
     items: [],
   });
@@ -584,7 +601,59 @@ export class MovimentacoesComponent implements OnInit {
   }
 
   get formValid(): boolean {
-    return this.missingFields.length === 0 && !this.amountError && !this.dateError;
+    return (
+      this.missingFields.length === 0 &&
+      !this.amountError &&
+      !this.dateError &&
+      !this.saleTimeError &&
+      !this.salesCountError
+    );
+  }
+
+  // ── Canal, hora e número de vendas (S3.4) ────────────────────────────
+  protected readonly channelLabel = CHANNEL_LABEL;
+
+  /** Canais de venda que a pessoa pode escolher (o campo só aparece em entrada). */
+  protected readonly channelOptions: { value: Channel; label: string }[] = (
+    ['dineIn', 'delivery', 'orders'] as Channel[]
+  ).map((value) => ({ value, label: CHANNEL_LABEL[value] }));
+
+  protected get channelHint(): string {
+    return this.form().channel === 'orders'
+      ? 'Encomenda aparece separada do salão e do delivery em Receitas.'
+      : 'Automático: app de delivery conta como Delivery; o resto, como Salão.';
+  }
+
+  protected get saleTimeError(): string {
+    const t = this.form().saleTime;
+    if (this.form().type !== 'income' || !t) return '';
+    return SALE_TIME_PATTERN.test(t) ? '' : 'Hora no formato HH:MM (ex.: 14:30).';
+  }
+
+  protected get salesCountError(): string {
+    const v = this.form().salesCount.trim();
+    if (this.form().type !== 'income' || !v) return '';
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 1) return 'Informe um número inteiro a partir de 1.';
+    if (n > SALES_COUNT_MAX) return `No máximo ${SALES_COUNT_MAX} vendas num lançamento.`;
+    return '';
+  }
+
+  /**
+   * Campos de venda que vão para a API (hora e número só em entrada; vazio = não informado). O canal
+   * guardado numa despesa (não há campo para ela) volta como estava.
+   */
+  private saleFields(f: MovForm): {
+    channel: Channel | null;
+    saleTime: string | null;
+    salesCount: number | null;
+  } {
+    const income = f.type === 'income';
+    return {
+      channel: f.channel || null,
+      saleTime: income && f.saleTime ? f.saleTime : null,
+      salesCount: income && f.salesCount.trim() ? Number(f.salesCount) : null,
+    };
   }
 
   categoryName(id: string | null): string {
@@ -739,6 +808,10 @@ export class MovimentacoesComponent implements OnInit {
             : 'pending',
         // categoria trocou de universo (receita/despesa) — evita mandar um id incompatível.
         categoryId: null,
+        // Canal, hora e número de vendas são da entrada: trocar o tipo volta ao automático.
+        channel: type === f.type ? f.channel : '',
+        saleTime: type === 'income' ? f.saleTime : '',
+        salesCount: type === 'income' ? f.salesCount : '',
       };
     });
   }
@@ -766,6 +839,9 @@ export class MovimentacoesComponent implements OnInit {
       accountId: this.defaultAccountId(),
       paymentMethod: '',
       status: type === 'income' ? 'received' : 'paid',
+      channel: '',
+      saleTime: '',
+      salesCount: '',
       notes: '',
       items: [],
     });
@@ -786,6 +862,9 @@ export class MovimentacoesComponent implements OnInit {
       accountId: m.accountId,
       paymentMethod: m.paymentMethod ?? '',
       status: m.status,
+      channel: m.channel ?? '',
+      saleTime: m.saleTime ?? '',
+      salesCount: m.salesCount != null ? String(m.salesCount) : '',
       notes: m.notes ?? '',
       items: (m.items ?? []).map((i) => ({
         menuItemId: i.menuItemId,
@@ -1386,6 +1465,7 @@ export class MovimentacoesComponent implements OnInit {
           paymentMethod: f.paymentMethod as PaymentMethod,
           notes: f.notes || null,
           items: this.itemsPayload(f),
+          ...this.saleFields(f),
         });
         this.toast.success('Movimentação atualizada.');
         this.editing.set(null);
@@ -1402,6 +1482,7 @@ export class MovimentacoesComponent implements OnInit {
             status: f.status,
             notes: f.notes || null,
             items: this.itemsPayload(f),
+            ...this.saleFields(f),
           },
           force,
         );

@@ -6,7 +6,7 @@
 import { shortDateRange } from '../shared/format';
 
 export type PeriodKey = 'Hoje' | '7 dias' | 'Este mês' | 'Mês passado' | 'Personalizado';
-export type Canal = 'salao' | 'delivery';
+export type Canal = 'salao' | 'delivery' | 'encomendas';
 
 /** Entrada já recebida, na forma que o cálculo precisa. */
 export interface ReceitaMov {
@@ -23,6 +23,12 @@ export interface ReceitaMov {
   payment: string;
   /** Pratos vendidos nesta entrada (cópia do cardápio no dia). Ausente: a venda não informou os pratos. */
   pratos?: { menuItemId: string; name: string; qty: number; unitPrice: number }[];
+  /** Dia da venda ("AAAA-MM-DD"), que pode ser antes do dinheiro entrar. Base do dia da semana no mapa. */
+  saleDate?: string;
+  /** Hora da venda ("HH:MM"). Ausente: fechamento do dia ou venda sem hora (fica fora do mapa). */
+  saleTime?: string;
+  /** Quantas vendas a entrada soma (fechamento do dia). Ausente = 1. */
+  salesCount?: number;
 }
 
 export interface ItemReceita {
@@ -73,12 +79,29 @@ export interface ReceitasDataset {
   heatmap: { dia: string; faixa: string; valor: number }[] | null;
   heatmapMax: number;
   heatmapVazioMsg?: string;
-  tendencia: { mes: string; total: number; salao: number; delivery: number }[];
+  /** Quantas vendas do período entraram no mapa (têm hora), ex.: "12 de 40 vendas com hora informada". */
+  heatmapCobertura?: string;
+  /** Alguma entrada (em qualquer período) é encomenda: a tela mostra o canal. */
+  temEncomendas: boolean;
+  tendencia: { mes: string; total: number; salao: number; delivery: number; encomendas: number }[];
   tendenciaDescricao: string;
   pedidosLabel: string;
 }
 
 export const FAIXAS = ['Manhã', 'Almoço', 'Tarde', 'Noite'] as const;
+export type Faixa = (typeof FAIXAS)[number];
+
+/** Faixa do dia pela hora da venda: manhã até 10:59, almoço 11:00–14:59, tarde 15:00–17:59, noite depois. */
+export function faixaDaHora(hhmm: string): Faixa {
+  const h = Number(hhmm.slice(0, 2));
+  if (h < 11) return 'Manhã';
+  if (h < 15) return 'Almoço';
+  if (h < 18) return 'Tarde';
+  return 'Noite';
+}
+
+/** Vendas que a entrada soma (ausente = 1). */
+const vendas = (m: ReceitaMov) => m.salesCount ?? 1;
 export const DIAS_SEMANA = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'] as const;
 
 const MESES = [
@@ -154,7 +177,7 @@ export function resolveWindow(
       prevEnd: prev,
       refLabel: `Hoje, ${fmtDia(today).slice(0, 5)}`,
       comparacaoLabel: 'vs. ontem',
-      pedidosLabel: 'Lançamentos hoje',
+      pedidosLabel: 'Vendas hoje',
       trend: 'day',
     };
   }
@@ -168,7 +191,7 @@ export function resolveWindow(
       prevEnd: addDays(start, -1),
       refLabel: `${fmtDia(start)} – ${fmtDia(today)}`,
       comparacaoLabel: 'vs. 7 dias anteriores',
-      pedidosLabel: 'Lançamentos em 7 dias',
+      pedidosLabel: 'Vendas em 7 dias',
       trend: 'day',
     };
   }
@@ -183,7 +206,7 @@ export function resolveWindow(
       prevEnd: monthEnd(prevStart),
       refLabel: monthLabel(start),
       comparacaoLabel: 'vs. mês retrasado',
-      pedidosLabel: 'Lançamentos no mês',
+      pedidosLabel: 'Vendas no mês',
       trend: 'month',
     };
   }
@@ -197,7 +220,7 @@ export function resolveWindow(
       prevEnd: addDays(from, -1),
       refLabel: `${fmtDia(from)} – ${fmtDia(to)}`,
       comparacaoLabel: 'vs. período anterior equivalente',
-      pedidosLabel: 'Lançamentos no período',
+      pedidosLabel: 'Vendas no período',
       trend: dias <= 14 ? 'day' : 'week',
     };
   }
@@ -215,7 +238,7 @@ export function resolveWindow(
     prevEnd: prevEndCap > prevMonthEnd ? prevMonthEnd : prevEndCap,
     refLabel: monthLabel(start),
     comparacaoLabel: 'vs. mesmo período do mês anterior',
-    pedidosLabel: 'Lançamentos no mês',
+    pedidosLabel: 'Vendas no mês',
     trend: 'month',
   };
 }
@@ -230,14 +253,54 @@ interface Totals {
   count: number;
   ticket: number;
 }
+/** `count` = número de vendas (o fechamento do dia soma várias); ticket = receita ÷ vendas. */
 function totals(movs: ReceitaMov[], start: string, end: string): Totals {
   const sel = movs.filter((m) => within(m, start, end));
   const gross = money(sum(sel.map((m) => m.gross)));
+  const count = sum(sel.map(vendas));
   return {
     gross,
     net: money(sum(sel.map((m) => m.net))),
-    count: sel.length,
-    ticket: sel.length ? money(gross / sel.length) : 0,
+    count,
+    ticket: count ? money(gross / count) : 0,
+  };
+}
+
+const NOME_CANAL: Record<Canal, string> = {
+  salao: 'Salão',
+  delivery: 'Delivery',
+  encomendas: 'Encomendas',
+};
+
+/**
+ * Mapa dia da semana × faixa do dia: soma das vendas COM hora no período. O dia da semana é o da venda
+ * (não o do repasse). Sem nenhuma venda com hora, devolve `null` e a tela explica como preencher.
+ */
+function mapaDeVendas(sel: ReceitaMov[]): {
+  heatmap: ReceitasDataset['heatmap'];
+  max: number;
+  cobertura?: string;
+} {
+  const comHora = sel.filter((m) => m.saleTime);
+  if (comHora.length === 0) return { heatmap: null, max: 0 };
+  const cel = new Map<string, number>();
+  for (const m of comHora) {
+    const dia = DIAS_SEMANA[(parse(m.saleDate ?? m.date).getDay() + 6) % 7];
+    const k = `${dia}|${faixaDaHora(m.saleTime!)}`;
+    cel.set(k, (cel.get(k) ?? 0) + m.gross);
+  }
+  const heatmap = DIAS_SEMANA.flatMap((dia) =>
+    FAIXAS.map((faixa) => ({ dia, faixa, valor: money(cel.get(`${dia}|${faixa}`) ?? 0) })),
+  );
+  const totalVendas = sum(sel.map(vendas));
+  const vendasComHora = sum(comHora.map(vendas));
+  return {
+    heatmap,
+    max: Math.max(...heatmap.map((h) => h.valor)),
+    cobertura:
+      vendasComHora < totalVendas
+        ? `${vendasComHora.toLocaleString('pt-BR')} de ${totalVendas.toLocaleString('pt-BR')} vendas do período têm hora informada.`
+        : undefined,
   };
 }
 
@@ -326,20 +389,27 @@ export function buildReceitas(
     };
   });
 
-  const canais = (['salao', 'delivery'] as const).map((canal) => {
+  // Encomendas só aparece para quem já lançou alguma (em qualquer período), para não poluir quem não tem.
+  const temEncomendas = movs.some((m) => m.canal === 'encomendas');
+  const listaCanais: Canal[] = temEncomendas
+    ? ['salao', 'delivery', 'encomendas']
+    : ['salao', 'delivery'];
+  const canais = listaCanais.map((canal) => {
     const doCanal = sel.filter((m) => m.canal === canal);
     const receita = money(sum(doCanal.map((m) => m.gross)));
     const net = sum(doCanal.map((m) => m.net));
     const taxaPct = receita > 0 ? Math.round(((receita - net) / receita) * 100) : 0;
     return {
-      canal: canal === 'salao' ? 'Salão' : 'Delivery',
+      canal: NOME_CANAL[canal],
       receita,
       liquida: money(net - receita * taxRatio),
       nota:
         canal === 'salao'
           ? 'Sem taxas de marketplace'
           : taxaPct > 0
-            ? `Após taxas da plataforma (~${taxaPct}%)`
+            ? canal === 'delivery'
+              ? `Após taxas da plataforma (~${taxaPct}%)`
+              : `Após taxas (~${taxaPct}%)`
             : 'Sem taxas registradas',
     };
   });
@@ -350,8 +420,10 @@ export function buildReceitas(
   const parte = (a: string, b: string, mes: string) => {
     const t = movs.filter((m) => within(m, a, b));
     const total = money(sum(t.map((m) => m.gross)));
-    const salao = money(sum(t.filter((m) => m.canal === 'salao').map((m) => m.gross)));
-    tendencia.push({ mes, total, salao, delivery: money(total - salao) });
+    const doCanal = (c: Canal) => money(sum(t.filter((m) => m.canal === c).map((m) => m.gross)));
+    const salao = doCanal('salao');
+    const encomendas = doCanal('encomendas');
+    tendencia.push({ mes, total, salao, encomendas, delivery: money(total - salao - encomendas) });
   };
   if (win.trend === 'month') {
     const base = monthStart(win.end);
@@ -397,6 +469,8 @@ export function buildReceitas(
   }));
   const resto = money(sum(porCategoriaTodas.slice(5).map((g) => g.receita)));
   if (resto > 0) porCategoria.push({ categoria: 'Outras', receita: resto });
+
+  const mapa = mapaDeVendas(sel);
 
   const pagamentos = new Map<string, number>();
   for (const m of sel)
@@ -444,10 +518,12 @@ export function buildReceitas(
     formasPagamento: [...pagamentos.entries()]
       .map(([forma, valor]) => ({ forma, valor: money(valor) }))
       .sort((a, b) => b.valor - a.valor),
-    heatmap: null,
-    heatmapMax: 0,
+    heatmap: mapa.heatmap,
+    heatmapMax: mapa.max,
     heatmapVazioMsg:
-      'O padrão por dia da semana e horário aparece quando os lançamentos tiverem horário de venda.',
+      'Preencha a hora da venda nos lançamentos (campo "Hora da venda") para ver em que dia e horário você mais vende.',
+    heatmapCobertura: mapa.cobertura,
+    temEncomendas,
     tendencia,
     tendenciaDescricao,
     pedidosLabel: win.pedidosLabel,

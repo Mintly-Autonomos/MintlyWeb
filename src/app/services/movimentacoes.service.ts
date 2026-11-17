@@ -34,7 +34,15 @@ import { loadWorkbook } from '../shared/exceljs-loader';
 
 export type MovType = 'income' | 'expense';
 export type MovStatus = 'received' | 'paid' | 'pending' | 'cancelled';
-export type Channel = 'dineIn' | 'delivery' | 'shared';
+export type Channel = 'dineIn' | 'delivery' | 'orders' | 'shared';
+
+/** Nome do canal na tela. */
+export const CHANNEL_LABEL: Record<Channel, string> = {
+  dineIn: 'Salão',
+  delivery: 'Delivery',
+  orders: 'Encomendas',
+  shared: 'Casa toda',
+};
 export type PaymentMethod =
   | 'Dinheiro'
   | 'PIX'
@@ -72,6 +80,10 @@ export interface Movement {
   paymentMethod: PaymentMethod | null;
   /** Canal (fatia 5) — ausente: usa o canal efetivo nos relatórios. */
   channel: Channel | null;
+  /** Hora da venda (`HH:MM`, S3.4). Só em entrada; null = não informada (ex.: fechamento do dia). */
+  saleTime?: string | null;
+  /** Quantas vendas o lançamento soma (S3.4). Só em entrada; null/ausente = 1. */
+  salesCount?: number | null;
   notes: string | null;
   /** Pratos vendidos (só vendas que informaram). Base do ranking de mais vendidos. */
   items?: SaleItem[];
@@ -119,11 +131,13 @@ const DIRECTION_FROM_LIB: Record<MovementDirection, MovType> = {
 const CHANNEL_TO_LIB: Record<Channel, MovementChannel> = {
   dineIn: MovementChannel.DineIn,
   delivery: MovementChannel.Delivery,
+  orders: MovementChannel.Orders,
   shared: MovementChannel.Shared,
 };
 const CHANNEL_FROM_LIB: Record<MovementChannel, Channel> = {
   [MovementChannel.DineIn]: 'dineIn',
   [MovementChannel.Delivery]: 'delivery',
+  [MovementChannel.Orders]: 'orders',
   [MovementChannel.Shared]: 'shared',
 };
 
@@ -190,6 +204,8 @@ function toMovement(raw: FinancialMovement): Movement {
     category?: { _id: string };
     subcategory?: { _id: string };
     channel?: MovementChannel;
+    saleTime?: string;
+    salesCount?: number;
     paymentMethod: LibPaymentMethod;
     description?: string;
     items?: SaleItem[];
@@ -220,6 +236,8 @@ function toMovement(raw: FinancialMovement): Movement {
     accountId: r.account?._id ?? null,
     paymentMethod: PAYMENT_FROM_LIB[r.paymentMethod] ?? null,
     channel: r.channel ? CHANNEL_FROM_LIB[r.channel] : null,
+    saleTime: r.saleTime ?? null,
+    salesCount: r.salesCount ?? null,
     notes: r.description ?? null,
     ...(r.items?.length ? { items: r.items.map((i) => ({ ...i })) } : {}),
     ...(r.transferId
@@ -244,6 +262,10 @@ export interface MovementInput {
   paymentMethod: PaymentMethod;
   status: MovStatus;
   channel?: Channel | null;
+  /** Hora da venda (`HH:MM`). Só em entradas; null limpa. */
+  saleTime?: string | null;
+  /** Quantas vendas o lançamento soma. Só em entradas; null volta a 1. */
+  salesCount?: number | null;
   notes: string | null;
   /** Pratos vendidos (prato e quantidade; o servidor copia nome e preço do cardápio). Só em entradas. */
   items?: { menuItemId: string; qty: number }[];
@@ -455,6 +477,8 @@ export class MovimentacoesService {
         accountId: input.accountId,
         paymentMethod: input.paymentMethod,
         channel: input.channel ?? null,
+        saleTime: input.saleTime ?? null,
+        salesCount: input.salesCount ?? null,
         notes: input.notes,
         createdBy: this.by,
         createdAt: now,
@@ -476,6 +500,8 @@ export class MovimentacoesService {
       status: fromMovStatus(input.status),
       ...(input.subcategoryId ? { subcategoryId: input.subcategoryId } : {}),
       ...(input.channel ? { channel: CHANNEL_TO_LIB[input.channel] } : {}),
+      ...(input.saleTime ? { saleTime: input.saleTime } : {}),
+      ...(input.salesCount ? { salesCount: input.salesCount } : {}),
       ...(input.notes ? { description: input.notes } : {}),
       ...(input.items?.length ? { items: input.items } : {}),
       ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
@@ -505,6 +531,8 @@ export class MovimentacoesService {
       mov.subcategoryId = input.subcategoryId ?? null;
       mov.paymentMethod = input.paymentMethod;
       mov.channel = input.channel ?? null;
+      mov.saleTime = input.saleTime ?? null;
+      mov.salesCount = input.salesCount ?? null;
       mov.notes = input.notes;
       mov.updatedBy = this.by;
       mov.updatedAt = new Date().toISOString();
@@ -524,6 +552,8 @@ export class MovimentacoesService {
       ...(input.items ? { items: input.items } : {}),
       subcategoryId: input.subcategoryId ?? null,
       channel: input.channel ? CHANNEL_TO_LIB[input.channel] : null,
+      saleTime: input.saleTime || null,
+      salesCount: input.salesCount || null,
       ...(input.dueDate ? { dueDate: input.dueDate } : {}),
     } satisfies UpdateMovementRequest;
     await this.call((headers) => this.movementClient.updateMovement(id, body, headers));

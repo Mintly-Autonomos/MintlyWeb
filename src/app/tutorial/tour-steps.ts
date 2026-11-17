@@ -67,12 +67,12 @@ export const PAGE_STEPS: Record<string, TourStep[]> = {
     {
       target: 'kpis',
       title: 'Números principais',
-      text: 'Receita bruta, o que sobra depois das taxas, ticket médio e número de pedidos, cada um comparado com o período anterior.',
+      text: 'Receita bruta, o que sobra depois das taxas, ticket médio e número de vendas, cada um comparado com o período anterior.',
     },
     {
       target: 'quando-vende',
       title: 'Quando você mais vende',
-      text: 'Um mapa por dia da semana e horário: quanto mais escuro o quadrado, mais você vende naquele momento. Use para planejar equipe e compras.',
+      text: 'Um mapa por dia da semana e horário: quanto mais escuro o quadrado, mais você vende naquele momento. Conta as vendas com a hora informada no lançamento. Use para planejar equipe e compras.',
     },
   ],
   custos: [

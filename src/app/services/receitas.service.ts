@@ -84,15 +84,19 @@ export class ReceitasService {
     const delivery =
       m.channel === 'delivery' ||
       ((m.channel === null || m.channel === 'shared') && /delivery/i.test(category));
+    const canal = m.channel === 'orders' ? 'encomendas' : delivery ? 'delivery' : 'salao';
     return {
       date: m.settledAt ?? m.dueDate ?? m.date,
       gross: m.value,
       net: m.net ?? m.value,
       item: sub?.name ?? m.title,
       category,
-      canal: delivery ? 'delivery' : 'salao',
+      canal,
       payment: m.paymentMethod ?? 'Outros',
       ...(m.items?.length ? { pratos: m.items } : {}),
+      saleDate: m.date,
+      ...(m.saleTime ? { saleTime: m.saleTime } : {}),
+      ...(m.salesCount ? { salesCount: m.salesCount } : {}),
     };
   }
 

@@ -756,6 +756,70 @@
           </div>
         </div>
 
+        <!-- Canal, hora da venda e número de vendas (S3.4): só em entrada -->
+        @if (form().type === 'income') {
+          <div class="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr] gap-4">
+            <label class="block">
+              <span class="text-[13px] font-medium block mb-1.5">Canal</span>
+              <select
+                data-testid="campo-canal"
+                (change)="setFormField('channel', $any($event.target).value)"
+                class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition cursor-pointer"
+              >
+                <option value="" [selected]="form().channel === ''">Automático</option>
+                @for (c of channelOptions; track c.value) {
+                  <option [value]="c.value" [selected]="form().channel === c.value">
+                    {{ c.label }}
+                  </option>
+                }
+              </select>
+              <p class="text-muted-foreground text-[12px] mt-1">{{ channelHint }}</p>
+            </label>
+            <label class="block">
+              <span class="text-[13px] font-medium block mb-1.5"
+                >Hora da venda <span class="text-muted-foreground">(opcional)</span></span
+              >
+              <input
+                data-testid="campo-hora"
+                type="time"
+                [value]="form().saleTime"
+                (input)="setFormField('saleTime', $any($event.target).value)"
+                class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition"
+              />
+              @if (saleTimeError) {
+                <p class="text-error text-[12px] mt-1">{{ saleTimeError }}</p>
+              } @else {
+                <p class="text-muted-foreground text-[12px] mt-1">
+                  Mostra em que horário você mais vende.
+                </p>
+              }
+            </label>
+            <label class="block">
+              <span class="text-[13px] font-medium block mb-1.5"
+                >Quantas vendas <span class="text-muted-foreground">(opcional)</span></span
+              >
+              <input
+                data-testid="campo-qtd-vendas"
+                type="number"
+                inputmode="numeric"
+                min="1"
+                step="1"
+                placeholder="1"
+                [value]="form().salesCount"
+                (input)="setFormField('salesCount', $any($event.target).value)"
+                class="w-full h-12 rounded-xl border border-border bg-card px-3.5 text-sm outline-none focus:ring-2 focus:ring-mint/40 focus:border-mint transition tabular-nums placeholder:text-muted-foreground"
+              />
+              @if (salesCountError) {
+                <p class="text-error text-[12px] mt-1">{{ salesCountError }}</p>
+              } @else {
+                <p class="text-muted-foreground text-[12px] mt-1">
+                  No fechamento do dia, quantas vendas ele soma. Serve para o ticket médio.
+                </p>
+              }
+            </label>
+          </div>
+        }
+
         <!-- Observações -->
         <label class="block">
           <span class="text-[13px] font-medium block mb-1.5"
@@ -913,6 +977,24 @@
           <div class="p-3 rounded-xl bg-muted/60 col-span-2">
             <span class="text-muted-foreground block mb-0.5">Forma de pagamento</span>
             <span class="font-medium">{{ details()!.paymentMethod }}</span>
+          </div>
+        }
+        @if (details()!.channel) {
+          <div class="p-3 rounded-xl bg-muted/60" data-testid="detalhe-canal">
+            <span class="text-muted-foreground block mb-0.5">Canal</span>
+            <span class="font-medium">{{ channelLabel[details()!.channel!] }}</span>
+          </div>
+        }
+        @if (details()!.saleTime) {
+          <div class="p-3 rounded-xl bg-muted/60" data-testid="detalhe-hora">
+            <span class="text-muted-foreground block mb-0.5">Hora da venda</span>
+            <span class="font-medium tabular-nums">{{ details()!.saleTime }}</span>
+          </div>
+        }
+        @if (details()!.salesCount) {
+          <div class="p-3 rounded-xl bg-muted/60" data-testid="detalhe-qtd-vendas">
+            <span class="text-muted-foreground block mb-0.5">Vendas no lançamento</span>
+            <span class="font-medium tabular-nums">{{ details()!.salesCount }}</span>
           </div>
         }
         @if (details()!.notes) {

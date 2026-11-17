@@ -96,7 +96,7 @@
           <app-hint slot="hint" text="O que sobra da receita após impostos sobre venda." />
         </app-stat-card>
         <app-stat-card
-          label="Valor médio por lançamento"
+          label="Ticket médio"
           [value]="fmtBRL(d.ticketMedio)"
           [delta]="{
             value: d.deltas.ticketMedio,
@@ -107,7 +107,12 @@
           icon="receipt_long"
           status="neutral"
           [spark]="d.sparks.ticketMedio"
-        />
+        >
+          <app-hint
+            slot="hint"
+            text='Receita bruta dividida pelo número de vendas. Num fechamento do dia, informe quantas vendas ele soma no campo "Quantas vendas"; sem isso, cada lançamento conta como uma venda.'
+          />
+        </app-stat-card>
         <app-stat-card
           [label]="d.pedidosLabel"
           [value]="d.pedidos.toLocaleString('pt-BR')"
@@ -157,12 +162,17 @@
             <h3 class="text-[15px] font-bold tracking-tight inline-flex items-center gap-1.5">
               Quando você mais vende
               <app-hint
-                text="Mostra como costumam ser seus dias e horários em geral — não um dia específico. Útil para planejar equipe e estoque."
+                text="Soma das vendas com hora informada no período, por dia da semana e faixa do dia (manhã até 11h, almoço até 15h, tarde até 18h, noite depois). Útil para planejar equipe e estoque."
               />
             </h3>
             <p class="text-[12.5px] text-muted-foreground mt-0.5">
-              Padrão típico de vendas por dia da semana e horário (média das últimas semanas)
+              Vendas por dia da semana e horário no período
             </p>
+            @if (d.heatmap && d.heatmapCobertura) {
+              <p class="text-[12px] text-muted-foreground mt-0.5" data-testid="mapa-cobertura">
+                {{ d.heatmapCobertura }}
+              </p>
+            }
           </div>
         </div>
         @if (loading()) {
@@ -177,7 +187,7 @@
                 className="text-muted-foreground"
                 [style]="{ fontSize: '28px' }"
               />
-              <p class="mt-2 text-[13px] font-semibold">Sem padrão semanal neste período</p>
+              <p class="mt-2 text-[13px] font-semibold">Nenhuma venda com hora neste período</p>
               <p class="mt-1 text-[12px] text-muted-foreground max-w-[380px] mx-auto">
                 {{ d.heatmapVazioMsg }}
               </p>
@@ -297,7 +307,7 @@
         </app-chart-card>
 
         <app-chart-card
-          title="Salão vs. Delivery"
+          [title]="d.temEncomendas ? 'Salão, Delivery e Encomendas' : 'Salão vs. Delivery'"
           description="Receita por canal e o que sobra depois das taxas"
           [loading]="loading()"
           [height]="300"
@@ -320,10 +330,7 @@
             <div class="mt-3 space-y-1.5">
               @for (c of d.canais; track c.canal) {
                 <div class="flex items-center gap-2 text-[12px]">
-                  <app-chip
-                    [tone]="c.canal === 'Salão' ? 'mint' : 'warning'"
-                    [icon]="c.canal === 'Salão' ? 'storefront' : 'delivery_dining'"
-                  >
+                  <app-chip [tone]="canalChip(c.canal).tone" [icon]="canalChip(c.canal).icon">
                     {{ c.canal }}
                   </app-chip>
                   <span class="text-muted-foreground truncate">{{ c.nota }}</span>
@@ -385,7 +392,7 @@
         <app-line-chart
           [data]="d.tendencia"
           categoryKey="mes"
-          [series]="trendMode() === 'total' ? tendenciaSeriesTotal : tendenciaSeriesCanal"
+          [series]="trendMode() === 'total' ? tendenciaSeriesTotal : tendenciaSeriesCanal()"
           [valueFormatter]="abrev"
         />
       </app-chart-card>
