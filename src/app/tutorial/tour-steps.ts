@@ -55,7 +55,7 @@ export const PAGE_STEPS: Record<string, TourStep[]> = {
     {
       target: 'vencimentos',
       title: 'Próximos vencimentos',
-      text: 'A lista do que vence nos próximos dias. Filtre por “A receber”, “A pagar” ou “Vencidos” para saber o que cobrar e o que pagar primeiro.',
+      text: 'O calendário mostra, em cada dia, o que entra, o que sai e o saldo previsto; os dias abaixo do caixa mínimo ficam em vermelho. Em “Lista”, filtre por “A receber”, “A pagar” ou “Vencidos” para saber o que cobrar e o que pagar primeiro.',
     },
   ],
   receitas: [

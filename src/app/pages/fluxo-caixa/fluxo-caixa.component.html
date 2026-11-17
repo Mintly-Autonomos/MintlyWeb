@@ -151,7 +151,7 @@
       <app-area-chart
         [data]="serie()"
         categoryKey="rotulo"
-        [series]="areaSeries"
+        [series]="areaSeries()"
         [valueFormatter]="abrev"
         [zeroLine]="true"
         [todayLabel]="hojeRotulo()"
@@ -170,13 +170,30 @@
       [height]="300"
     >
       <span slot="title-extra"><app-hint [text]="h.entradasSaidas" /></span>
-      <app-bar-chart
-        [data]="blocos()"
-        categoryKey="semana"
-        [series]="blocosSeries"
-        orientation="columns"
-        [valueFormatter]="abrev"
-      />
+      <div class="h-full flex flex-col">
+        <div class="flex-1 min-h-0">
+          <app-bar-chart
+            [data]="blocos()"
+            categoryKey="semana"
+            [series]="blocosSeries"
+            orientation="columns"
+            [valueFormatter]="abrev"
+          />
+        </div>
+        @if (saldosDosBlocos().length > 0) {
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px]" data-testid="saldo-blocos">
+            <span class="text-muted-foreground">Saldo no fim:</span>
+            @for (s of saldosDosBlocos(); track $index) {
+              <span class="tabular-nums">
+                <span class="text-muted-foreground">{{ blocos()[$index]?.semana }}</span>
+                <span [class]="'font-semibold ml-1 ' + (s < caixaMinimo() ? 'text-error' : '')">{{
+                  abrev(s)
+                }}</span>
+              </span>
+            }
+          </div>
+        }
+      </div>
     </app-chart-card>
 
     <!-- 6 — Próximos vencimentos -->
@@ -187,29 +204,121 @@
           'Tudo que entra e sai dentro do horizonte de ' + label().replace('até ', '') + '.'
         "
       >
-        <div
-          slot="action"
-          class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
-        >
-          @for (t of tabOpts; track t.key) {
-            <button
-              type="button"
-              (click)="setTab(t.key)"
-              [attr.aria-pressed]="tab() === t.key"
-              [class]="
-                'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
-                (tab() === t.key
-                  ? 'bg-mint-soft text-ocean'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground')
-              "
+        <div slot="action" class="flex flex-wrap items-center gap-2">
+          <div
+            class="inline-flex items-center gap-1 p-1 rounded-full border border-border bg-card"
+            role="group"
+            aria-label="Ver vencimentos como"
+          >
+            @for (v of ['calendario', 'lista']; track v) {
+              <button
+                type="button"
+                (click)="visao.set($any(v))"
+                [attr.aria-pressed]="visao() === v"
+                [attr.data-testid]="'visao-' + v"
+                [class]="
+                  'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
+                  (visao() === v
+                    ? 'bg-mint-soft text-ocean'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+                "
+              >
+                {{ v === 'calendario' ? 'Calendário' : 'Lista' }}
+              </button>
+            }
+          </div>
+          @if (visao() === 'lista') {
+            <div
+              class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
             >
-              {{ t.label }}
-            </button>
+              @for (t of tabOpts; track t.key) {
+                <button
+                  type="button"
+                  (click)="setTab(t.key)"
+                  [attr.aria-pressed]="tab() === t.key"
+                  [class]="
+                    'h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-colors duration-150 cursor-pointer ' +
+                    (tab() === t.key
+                      ? 'bg-mint-soft text-ocean'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground')
+                  "
+                >
+                  {{ t.label }}
+                </button>
+              }
+            </div>
           }
         </div>
       </app-section-header>
 
-      @if (grupos().length === 0) {
+      @if (visao() === 'calendario') {
+        <div class="m3-card rounded-2xl p-4 overflow-x-auto" data-testid="calendario">
+          <div class="min-w-[560px]">
+            <div class="grid grid-cols-7 gap-1.5 mb-1.5">
+              @for (d of diasDaSemana; track d) {
+                <div class="text-[11.5px] font-semibold text-muted-foreground text-center">
+                  {{ d }}
+                </div>
+              }
+            </div>
+            @for (semana of calendario(); track $index) {
+              <div class="grid grid-cols-7 gap-1.5 mb-1.5">
+                @for (c of semana; track $index) {
+                  @if (c) {
+                    <div
+                      [class]="
+                        'rounded-xl border p-2 min-h-[74px] text-[11.5px] tabular-nums ' +
+                        (c.hoje ? 'border-mint ring-1 ring-mint' : 'border-border') +
+                        (c.saldo < caixaMinimo() ? ' bg-error/5' : '')
+                      "
+                      [attr.data-testid]="'dia-' + c.date"
+                      [title]="
+                        c.date +
+                        ': entra ' +
+                        fmtBRL(c.entradas) +
+                        ', sai ' +
+                        fmtBRL(c.saidas) +
+                        ', saldo ' +
+                        fmtBRL(c.saldo)
+                      "
+                    >
+                      <div class="font-semibold text-[12px]" [class.text-mint]="c.hoje">
+                        {{ c.dia }}
+                      </div>
+                      @if (c.entradas > 0) {
+                        <div class="text-success">+{{ abrev(c.entradas) }}</div>
+                      }
+                      @if (c.saidas > 0) {
+                        <div class="text-error">−{{ abrev(c.saidas) }}</div>
+                      }
+                      <div
+                        [class]="
+                          'mt-0.5 ' +
+                          (c.saldo < caixaMinimo()
+                            ? 'text-error font-semibold'
+                            : 'text-muted-foreground')
+                        "
+                      >
+                        {{ abrev(c.saldo) }}
+                      </div>
+                    </div>
+                  } @else {
+                    <div></div>
+                  }
+                }
+              </div>
+            }
+            <p class="mt-2 text-[11.5px] text-muted-foreground">
+              Em cada dia: o que entra (verde), o que sai (vermelho) e o saldo previsto no fim do
+              dia.
+              @if (caixaMinimo() > 0) {
+                Dias com saldo abaixo do caixa mínimo ({{ fmtBRL(caixaMinimo()) }}) ficam em
+                vermelho.
+              }
+            </p>
+          </div>
+        </div>
+      } @else if (grupos().length === 0) {
         <div class="m3-card rounded-2xl">
           <app-empty-state
             [icon]="emptyState[tab()].icon"

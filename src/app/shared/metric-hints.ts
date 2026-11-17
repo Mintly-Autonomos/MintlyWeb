@@ -76,8 +76,8 @@ export const METRIC_HINTS = {
     'caixa hoje + a receber − a pagar.',
   ),
   entradasSaidas: calc(
-    'O que entra e o que sai em cada semana do período.',
-    'soma das entradas e das saídas pendentes com vencimento em cada semana.',
+    'O que entra e o que sai em cada semana do período, e o saldo previsto no fim de cada uma (em vermelho quando fica abaixo do caixa mínimo).',
+    'soma das entradas e das saídas pendentes com vencimento em cada semana; saldo no fim = saldo previsto no último dia da semana.',
   ),
 
   // ── Receitas (pela data em que o dinheiro entrou) ──
