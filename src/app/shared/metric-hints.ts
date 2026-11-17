@@ -94,12 +94,12 @@ export const METRIC_HINTS = {
     'soma do campo "Quantas vendas" de cada lançamento; lançamento sem esse número conta como 1.',
   ),
   brutaLiquida: calc(
-    'Da receita bruta até a líquida, passo a passo.',
-    'receita bruta − taxas − impostos sobre a venda = receita líquida.',
+    'Quanto de cada R$ 100 vendidos fica com você, e quanto vai para taxas e impostos.',
+    'fica com você = receita bruta − taxas dos apps e da maquininha − impostos sobre a venda; cada parte ÷ receita bruta × 100.',
   ),
   itensMaisVendidos: calc(
-    'Os pratos que mais faturaram (ou mais saíram) no período.',
-    'preço do prato no dia da venda × quantidade, só das vendas em que os pratos foram informados.',
+    'Os pratos que mais faturaram, mais saíram ou mais deram lucro no período.',
+    'receita = preço do prato no dia da venda × quantidade; lucro = (preço − custo atual do prato no cardápio) × quantidade. Só entram as vendas com os pratos informados; no lucro, só os pratos que têm custo.',
   ),
   receitaPorCategoria: calc(
     'Como a receita se divide entre as categorias de venda.',
@@ -110,12 +110,12 @@ export const METRIC_HINTS = {
     'receita do canal; líquida = receita do canal − taxas desse canal − impostos sobre a venda.',
   ),
   formasPagamento: calc(
-    'Como seus clientes pagaram.',
-    'soma das vendas por forma de pagamento no período; débito e crédito aparecem juntos como Cartão.',
+    'Como seus clientes pagaram e quanto cada forma custou em taxa.',
+    'soma das vendas por forma de pagamento no período; o % é (bruto − líquido) ÷ bruto, a taxa que a conta cobrou nessas vendas.',
   ),
   tendenciaReceita: calc(
     'Como a receita evolui.',
-    'soma das vendas por mês (últimos 6 meses), por dia ou por semana, conforme o período escolhido. Em "Por canal", separada em salão, delivery e encomendas.',
+    'soma das vendas por mês nos últimos 12 meses, com o mesmo mês do ano anterior (tracejado) e a média dos últimos 3 meses; em períodos curtos, por dia ou por semana. Em "Por canal", separada em salão, delivery e encomendas.',
   ),
 
   // ── Custos (por competência) ──

@@ -7,6 +7,7 @@ import { apiErrorInfo } from '../shared/api-error';
 import { CategoriasService } from './categorias.service';
 import { MintlyClientService } from './mintly-client.service';
 import { MovimentacoesService, Movement } from './movimentacoes.service';
+import { CardapioService } from './cardapio.service';
 import {
   PeriodKey,
   ReceitaMov,
@@ -33,6 +34,7 @@ export class ReceitasService {
   private router = inject(Router);
   private movimentacoes = inject(MovimentacoesService);
   private categorias = inject(CategoriasService);
+  private cardapio = inject(CardapioService);
   private reportClient = inject(MintlyClientService).client.reportClient;
 
   readonly data = signal<ReceitasDataset | null>(null);
@@ -109,7 +111,12 @@ export class ReceitasService {
   async refresh(period: PeriodKey, from?: string, to?: string): Promise<void> {
     this.loading.set(true);
     try {
-      await Promise.all([this.movimentacoes.refresh(), this.categorias.refresh()]);
+      await Promise.all([
+        this.movimentacoes.refresh(),
+        this.categorias.refresh(),
+        // O custo dos pratos é só para o "Por lucro" do ranking: sem ele, o resto da tela segue.
+        this.cardapio.refreshPratos().catch(() => undefined),
+      ]);
       const today = hoje();
       const win = resolveWindow(period, from, to, today);
       const movs = this.movimentacoes
@@ -121,7 +128,8 @@ export class ReceitasService {
         )
         .map((m) => this.toReceita(m));
       const ratio = await this.taxRatio(win.end.slice(0, 7));
-      this.data.set(buildReceitas(movs, win, ratio));
+      const custos = new Map(this.cardapio.pratos().map((p) => [p.id, p.cost]));
+      this.data.set(buildReceitas(movs, win, ratio, custos));
     } finally {
       this.loading.set(false);
     }

@@ -118,7 +118,7 @@ describe('buildReceitas', () => {
     expect(d.ticketMedio).toBe(0);
     expect(d.deltas.receitaBruta).toBe('—');
     expect(d.canais.map((c) => c.receita)).toEqual([0, 0]);
-    expect(d.tendencia).toHaveLength(6);
+    expect(d.tendencia).toHaveLength(12);
     expect(Number.isNaN(d.receitaLiquida)).toBe(false);
   });
 
@@ -190,9 +190,10 @@ describe('buildReceitas', () => {
     expect(d.itens).toEqual([]);
     expect(d.semPratos).toBe(3);
     expect(d.porCategoria.map((c) => c.categoria)).toEqual(['Venda Balcão', 'Venda Delivery']);
-    expect(d.formasPagamento).toEqual([
-      { forma: 'Cartão', valor: 400 },
-      { forma: 'Pix', valor: 150 },
+    expect(d.formasPagamento.map((f) => [f.forma, f.valor])).toEqual([
+      ['Débito', 300],
+      ['Pix', 150],
+      ['Crédito', 100],
     ]);
   });
 });

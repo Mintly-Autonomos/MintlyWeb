@@ -36,6 +36,8 @@ export interface ItemReceita {
   categoria: string;
   qtd: number;
   receita: number;
+  /** (preço − custo atual do prato) × quantidade. `null`: o prato não tem custo no cardápio (P.9). */
+  lucro: number | null;
 }
 
 export interface ReceitasDataset {
@@ -75,7 +77,8 @@ export interface ReceitasDataset {
   semPratos: number;
   porCategoria: { categoria: string; receita: number }[];
   canais: { canal: string; receita: number; liquida: number; nota: string }[];
-  formasPagamento: { forma: string; valor: number }[];
+  /** Volume e quanto cada forma custa em taxa (P.9: "vale incentivar o Pix?"). */
+  formasPagamento: { forma: string; valor: number; taxaPct: number; rotulo: string }[];
   heatmap: { dia: string; faixa: string; valor: number }[] | null;
   heatmapMax: number;
   heatmapVazioMsg?: string;
@@ -83,7 +86,16 @@ export interface ReceitasDataset {
   heatmapCobertura?: string;
   /** Alguma entrada (em qualquer período) é encomenda: a tela mostra o canal. */
   temEncomendas: boolean;
-  tendencia: { mes: string; total: number; salao: number; delivery: number; encomendas: number }[];
+  /** Na visão por mês (12 meses): `anoAnterior` = mesmo mês do ano anterior e `media3` = média dos últimos 3 meses. */
+  tendencia: {
+    mes: string;
+    total: number;
+    salao: number;
+    delivery: number;
+    encomendas: number;
+    anoAnterior?: number;
+    media3?: number;
+  }[];
   tendenciaDescricao: string;
   pedidosLabel: string;
 }
@@ -351,17 +363,21 @@ function porGrupo<T extends string>(
     .sort((a, b) => b.receita - a.receita);
 }
 
-const formaLabel = (p: string) =>
-  /^(débito|crédito)$/i.test(p) ? 'Cartão' : p === 'PIX' ? 'Pix' : p;
+const formaLabel = (p: string) => (p === 'PIX' ? 'Pix' : p);
 
 /**
  * @param taxRatio fração de imposto sobre a venda (0–1), vinda do DRE do mês; 0 quando o regime
  *   tributário ainda não foi configurado.
  */
+/**
+ * @param custos custo unitário atual de cada prato do cardápio (id → R$). Prato sem custo (0 ou ausente) fica
+ *   sem lucro no ranking.
+ */
 export function buildReceitas(
   movs: ReceitaMov[],
   win: PeriodWindow,
   taxRatio: number,
+  custos: ReadonlyMap<string, number> = new Map(),
 ): ReceitasDataset {
   const cur = totals(movs, win.start, win.end);
   const prev = totals(movs, win.prevStart, win.prevEnd);
@@ -426,12 +442,20 @@ export function buildReceitas(
     tendencia.push({ mes, total, salao, encomendas, delivery: money(total - salao - encomendas) });
   };
   if (win.trend === 'month') {
+    // P.9: 12 meses, com o mesmo mês do ano anterior e a média móvel de 3 meses.
     const base = monthStart(win.end);
-    for (let i = 5; i >= 0; i--) {
+    const totalDoMes = (ms: string) =>
+      money(sum(movs.filter((m) => within(m, ms, monthEnd(ms))).map((m) => m.gross)));
+    for (let i = 11; i >= 0; i--) {
       const ms = addMonths(base, -i);
       parte(ms, monthEnd(ms), MESES[Number(ms.slice(5, 7)) - 1].slice(0, 3));
+      const ponto = tendencia[tendencia.length - 1];
+      ponto.anoAnterior = totalDoMes(addMonths(ms, -12));
+      ponto.media3 = money(
+        (totalDoMes(ms) + totalDoMes(addMonths(ms, -1)) + totalDoMes(addMonths(ms, -2))) / 3,
+      );
     }
-    tendenciaDescricao = 'Últimos 6 meses';
+    tendenciaDescricao = 'Últimos 12 meses, com o ano anterior e a média de 3 meses';
   } else if (win.trend === 'day') {
     const dias = diffDays(win.start, win.end) + 1;
     for (let i = 0; i < dias; i++) {
@@ -449,14 +473,17 @@ export function buildReceitas(
   const porPrato = new Map<string, ItemReceita>();
   for (const m of sel) {
     for (const p of m.pratos ?? []) {
+      const custo = custos.get(p.menuItemId) ?? 0;
       const cur = porPrato.get(p.menuItemId) ?? {
         nome: p.name,
         categoria: m.category,
         qtd: 0,
         receita: 0,
+        lucro: custo > 0 ? 0 : null,
       };
       cur.qtd += p.qty;
       cur.receita = money(cur.receita + p.qty * p.unitPrice);
+      if (cur.lucro !== null) cur.lucro = money(cur.lucro + p.qty * (p.unitPrice - custo));
       porPrato.set(p.menuItemId, cur);
     }
   }
@@ -472,9 +499,15 @@ export function buildReceitas(
 
   const mapa = mapaDeVendas(sel);
 
-  const pagamentos = new Map<string, number>();
-  for (const m of sel)
-    pagamentos.set(formaLabel(m.payment), (pagamentos.get(formaLabel(m.payment)) ?? 0) + m.gross);
+  // P.9: débito e crédito separados, cada forma com o quanto custa em taxa.
+  const pagamentos = new Map<string, { gross: number; net: number }>();
+  for (const m of sel) {
+    const forma = formaLabel(m.payment);
+    const cur = pagamentos.get(forma) ?? { gross: 0, net: 0 };
+    cur.gross += m.gross;
+    cur.net += m.net;
+    pagamentos.set(forma, cur);
+  }
 
   return {
     key: win.key,
@@ -516,7 +549,15 @@ export function buildReceitas(
     porCategoria,
     canais,
     formasPagamento: [...pagamentos.entries()]
-      .map(([forma, valor]) => ({ forma, valor: money(valor) }))
+      .map(([forma, v]) => {
+        const taxaPct = v.gross > 0 ? Math.round(((v.gross - v.net) / v.gross) * 1000) / 10 : 0;
+        return {
+          forma,
+          valor: money(v.gross),
+          taxaPct,
+          rotulo: `${forma} · ${String(taxaPct).replace('.', ',')}%`,
+        };
+      })
       .sort((a, b) => b.valor - a.valor),
     heatmap: mapa.heatmap,
     heatmapMax: mapa.max,

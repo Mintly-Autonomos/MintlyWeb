@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import { CardapioService } from './cardapio.service';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { environment } from '../../environments/environment';
@@ -37,6 +38,10 @@ describe('ReceitasService: empréstimo e aporte (Não operacional) não são ven
         {
           provide: AuthService,
           useValue: { getAccessToken: () => 't', refresh: vi.fn(), onApiError: vi.fn() },
+        },
+        {
+          provide: CardapioService,
+          useValue: { refreshPratos: vi.fn().mockResolvedValue(undefined), pratos: signal([]) },
         },
         {
           provide: MovimentacoesService,
