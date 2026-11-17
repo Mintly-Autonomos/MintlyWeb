@@ -42,8 +42,12 @@ export const METRIC_HINTS = {
     'vendas − impostos sobre a venda − taxas − CMV − mão de obra − outras despesas = resultado do mês (na Visão geral, taxas e mão de obra ficam dentro das despesas operacionais).',
   ),
   historicoResultado: calc(
-    'O lucro de cada mês (barras) e a margem (linha).',
+    'O lucro de cada mês (barras verdes) ou o prejuízo (barras vermelhas, abaixo do zero), e a margem.',
     'margem = resultado do mês ÷ receita bruta do mesmo mês × 100.',
+  ),
+  vendaAcumulada: calc(
+    'Quanto você já vendeu no mês, dia a dia, contra o quanto precisa vender para pagar as contas. Onde a linha azul passa a tracejada, o mês começa a dar lucro.',
+    'soma das vendas do dia 1 até cada dia, pela data da venda (sem empréstimo, aporte nem transferência); ponto de equilíbrio = custos fixos ÷ margem de contribuição. O ritmo é o vendido ÷ dias que já passaram.',
   ),
   receitaVsCustos: calc(
     'A receita e os custos de cada mês, lado a lado.',

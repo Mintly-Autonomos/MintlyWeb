@@ -20,8 +20,17 @@ import { LineChartComponent, LineSeries } from '../../shared/line-chart.componen
 import { ToastService } from '../../shared/toast.service';
 import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
 import { CmvAvisoComponent, DespesaForaDoCmv } from '../../shared/cmv-aviso.component';
-import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
+import {
+  formatBRL,
+  fmtMonthLong,
+  fmtMonthShort,
+  formatCompact,
+  localISODate,
+} from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
+import { MovimentacoesService } from '../../services/movimentacoes.service';
+import { CategoriasService } from '../../services/categorias.service';
+import { vendaAcumulada } from './venda-acumulada';
 
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
@@ -98,6 +107,8 @@ export class ResultadoComponent implements OnInit {
   private svc = inject(ResultadoService);
   private restauranteSvc = inject(RestauranteService);
   private toast = inject(ToastService);
+  private movimentacoes = inject(MovimentacoesService);
+  private categorias = inject(CategoriasService);
 
   protected data = this.svc.data;
   protected loading = this.svc.loading;
@@ -120,7 +131,7 @@ export class ResultadoComponent implements OnInit {
   /** Até 12 meses à frente, como a API aceita. */
   protected readonly mesMaximo = monthStr(12);
   /** Meses do gráfico de histórico: 6 ou 12. */
-  protected mesesHistorico = signal<ResultHistoryMonths>(6);
+  protected mesesHistorico = signal<ResultHistoryMonths>(12);
   /** Mesmo mês do ano anterior (U.4): receita e lucro com a variação. null = sem lançamento lá. */
   protected anoAnterior = computed(() => {
     const py = this.data()?.previousYear;
@@ -333,7 +344,52 @@ export class ResultadoComponent implements OnInit {
 
   protected lucroSpark = computed(() => this.historicoView().map((h) => h.lucro));
 
-  protected lucroSeries: BarSeries[] = [{ key: 'lucro', name: 'Lucro', color: 'var(--mint)' }];
+  protected lucroSeries: BarSeries[] = [{ key: 'lucro', name: 'Lucro', color: 'var(--success)' }];
+  /** P.9: mês com prejuízo em vermelho (antes todos saíam verdes). */
+  protected lucroCor = (datum: unknown): string =>
+    ((datum as { lucro: number }).lucro ?? 0) < 0 ? 'var(--error)' : 'var(--success)';
+
+  /** P.9: venda acumulada do mês contra o ponto de equilíbrio. null sem ponto de equilíbrio ou sem dados. */
+  protected acumulada = computed(() => {
+    const d = this.data();
+    const alvo = d?.breakEven.breakEvenRevenue;
+    if (!d || !alvo) return null;
+    const cats = this.categorias.categories();
+    const fora = new Set(
+      cats.filter((c) => c.system || c.nature === 'non-operational').map((c) => c.id),
+    );
+    const vendas = this.movimentacoes
+      .movements()
+      .filter(
+        (m) =>
+          m.type === 'income' &&
+          m.status !== 'cancelled' &&
+          !m.transfer &&
+          !(m.categoryId && fora.has(m.categoryId)),
+      )
+      .map((m) => ({ date: m.date, gross: m.value }));
+    const r = vendaAcumulada(vendas, d.referenceMonth, alvo, localISODate());
+    return r.pontos.length > 0 ? r : null;
+  });
+
+  protected acumuladaSeries: LineSeries[] = [
+    { key: 'acumulado', name: 'Vendido no mês', color: 'var(--ocean)' },
+    { key: 'equilibrio', name: 'Ponto de equilíbrio', color: 'var(--warning)', dashed: true },
+  ];
+
+  protected acumuladaTexto = computed(() => {
+    const a = this.acumulada();
+    if (!a) return '';
+    if (a.cruzouNoDia !== null)
+      return `Passou do ponto de equilíbrio no dia ${a.cruzouNoDia}. Daí em diante, o que sobra de cada venda vira lucro.`;
+    const ritmo = `${formatBRL(a.ritmoDia)} por dia`;
+    if (a.ateDia < a.diasNoMes) {
+      return a.previsaoDia !== null
+        ? `No ritmo atual (${ritmo}), você passa do ponto de equilíbrio no dia ${a.previsaoDia}.`
+        : `No ritmo atual (${ritmo}), o mês não chega ao ponto de equilíbrio: faltam ${formatBRL(a.falta)}.`;
+    }
+    return `O mês fechou sem chegar ao ponto de equilíbrio: faltaram ${formatBRL(a.falta)}.`;
+  });
   protected margemSeries: LineSeries[] = [{ key: 'margem', name: 'Margem', color: 'var(--ocean)' }];
 
   protected margemLiquida = computed(() => (this.data()?.current.netMargin ?? 0) * 100);
@@ -355,6 +411,10 @@ export class ResultadoComponent implements OnInit {
   }
 
   private load(): Promise<void> {
+    // Venda acumulada do mês (P.9): sai das movimentações; sem elas, só o gráfico some.
+    void Promise.all([this.movimentacoes.refresh(), this.categorias.refresh()]).catch(
+      () => undefined,
+    );
     return this.svc
       .refresh(this.monthQuery(), this.mesesHistorico())
       .catch(() => this.toast.error('Não foi possível carregar o resultado do mês.'));

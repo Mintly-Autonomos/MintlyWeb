@@ -1,4 +1,6 @@
 import { signal } from '@angular/core';
+import { MovimentacoesService } from '../../services/movimentacoes.service';
+import { CategoriasService } from '../../services/categorias.service';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ResultadoComponent } from './resultado.component';
@@ -76,6 +78,15 @@ describe('ResultadoComponent', () => {
   function render(data: ResultReport) {
     TestBed.configureTestingModule({
       providers: [
+        // Venda acumulada (P.9): sem movimentações, o gráfico não aparece.
+        {
+          provide: MovimentacoesService,
+          useValue: { refresh: vi.fn().mockResolvedValue(undefined), movements: signal([]) },
+        },
+        {
+          provide: CategoriasService,
+          useValue: { refresh: vi.fn().mockResolvedValue(undefined), categories: signal([]) },
+        },
         provideRouter([]),
         {
           provide: ResultadoService,
