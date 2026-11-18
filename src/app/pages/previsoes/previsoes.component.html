@@ -141,12 +141,58 @@
             </div>
             <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <app-icon name="query_stats" [style]="{ fontSize: '14px' }" />
-              Estimativa: o que já está lançado + ritmo dos últimos 30 dias
+              Estimativa: o que já está lançado +
+              {{ metodo()?.curto ?? 'ritmo dos últimos 30 dias' }}
               <app-hint
-                text="Estimativa: lançamentos já registrados (a receber e a pagar, no dia do vencimento) mais o ritmo médio dos últimos 30 dias. A faixa é a margem de incerteza."
+                [text]="
+                  'Estimativa: lançamentos já registrados (a receber e a pagar, no dia do vencimento) mais as vendas previstas e os custos que acompanham. ' +
+                  (metodo()?.texto ?? '') +
+                  ' A faixa é a margem de incerteza.'
+                "
               />
             </span>
           </div>
+
+          @if (metodo(); as mt) {
+            <div
+              class="mb-5 rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row gap-4"
+              data-testid="metodo-previsao"
+            >
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <app-icon name="insights" [style]="{ fontSize: '16px' }" class="text-ocean" />
+                  <span class="text-[13px] font-semibold" data-testid="metodo-titulo">{{
+                    mt.titulo
+                  }}</span>
+                  @if (mt.nivel === 'ritmo') {
+                    <span
+                      class="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-warning/15 text-warning"
+                      >pouco histórico</span
+                    >
+                  }
+                </div>
+                <p class="mt-1 text-[12px] text-muted-foreground leading-relaxed">{{ mt.texto }}</p>
+                @if (mt.erro) {
+                  <p class="mt-1 text-[12px] text-muted-foreground" data-testid="metodo-erro">
+                    {{ mt.erro }}
+                  </p>
+                }
+              </div>
+              <ul class="flex flex-wrap lg:flex-nowrap gap-2 shrink-0" data-testid="metodo-meses">
+                @for (ms of mt.meses; track ms.mes) {
+                  <li class="rounded-xl border border-border px-3 py-2 min-w-[112px]">
+                    <div class="text-[11px] text-muted-foreground">{{ ms.mes }} previsto</div>
+                    <div class="text-[14px] font-bold tabular-nums">{{ fmtBRL(ms.previsto) }}</div>
+                    @if (ms.anoAnterior !== null) {
+                      <div class="text-[11px] text-muted-foreground tabular-nums">
+                        ano anterior {{ abrev(ms.anoAnterior) }}
+                      </div>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          }
 
           <div class="grid grid-cols-1 lg:grid-cols-5 gap-5 lg:gap-6">
             <!-- Simulador -->
@@ -204,7 +250,7 @@
                     >
                   </div>
                   <div class="mt-2 text-[11.5px] text-muted-foreground">
-                    sobre o ritmo dos últimos 30 dias
+                    sobre as vendas previstas
                   </div>
                 </div>
               }
@@ -667,7 +713,9 @@
               <h3 class="text-[15px] font-semibold">Por que é diferente do Fluxo de caixa?</h3>
               <p class="text-[12.5px] text-muted-foreground mt-0.5">
                 O Fluxo de caixa e a Visão Geral só contam o que já está lançado. Aqui entram também
-                as vendas e os custos que ainda vão acontecer, no ritmo dos últimos 30 dias.
+                as vendas e os custos que ainda vão acontecer ({{
+                  metodo()?.curto ?? 'ritmo dos últimos 30 dias'
+                }}).
               </p>
             </div>
             <dl class="text-[13px] tabular-nums divide-y divide-border/60">
@@ -676,11 +724,11 @@
                 <dd class="font-semibold" data-testid="conc-lancado">{{ fmtBRL(c.lancado) }}</dd>
               </div>
               <div class="flex justify-between gap-3 py-1.5">
-                <dt>+ vendas no ritmo atual</dt>
+                <dt>+ vendas previstas</dt>
                 <dd class="text-success">+{{ fmtBRL(c.ritmoVendas) }}</dd>
               </div>
               <div class="flex justify-between gap-3 py-1.5">
-                <dt>− custos no ritmo atual</dt>
+                <dt>− custos previstos</dt>
                 <dd class="text-error">−{{ fmtBRL(c.ritmoCustos) }}</dd>
               </div>
               <div class="flex justify-between gap-3 py-1.5">
@@ -706,8 +754,8 @@
         }
 
         <p class="text-[11.5px] text-muted-foreground leading-relaxed pb-2">
-          As previsões usam o que você já lançou e o ritmo recente para estimar o futuro. São
-          estimativas, não garantias. Caixa de hoje considerado: {{ fmtBRL(caixaHoje()) }}.
+          As previsões usam o que você já lançou e o seu histórico de vendas para estimar o futuro.
+          São estimativas, não garantias. Caixa de hoje considerado: {{ fmtBRL(caixaHoje()) }}.
         </p>
       </div>
     }
