@@ -23,6 +23,7 @@ import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 import { EstouDevendoComponent } from './estou-devendo.component';
+import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
@@ -73,6 +74,7 @@ function pillarDetail(key: string, value: number | null, mesPassado = false): st
   selector: 'app-visao-geral',
   standalone: true,
   imports: [
+    BarChartComponent,
     EstouDevendoComponent,
     IconComponent,
     ChipComponent,
@@ -117,6 +119,33 @@ export class VisaoGeralComponent implements OnInit {
   protected readonly pillarLabel = PILLAR_LABEL;
   protected readonly pillarDetail = pillarDetail;
   protected readonly pillarColor = pillarColor;
+
+  /** P.9: "Dívidas e vencidos" ao lado dos 4 pilares. Não entra na média: conta vencida trava a nota. */
+  protected dividas = computed(() => {
+    const cap = this.data()?.health.cap;
+    const vencido = !!cap?.reasons.includes('overduePayables');
+    return {
+      vencido,
+      texto: vencido ? 'Conta a pagar vencida: trava a nota' : 'Nada vencido',
+      cor: vencido ? 'var(--error)' : 'var(--success)',
+    };
+  });
+
+  /** P.9: o gráfico principal mostra o resultado de cada mês (verde lucro, vermelho prejuízo). */
+  protected graficoPrincipal = signal<'resultado' | 'linhas'>('resultado');
+  protected resultadoMensal = computed(() =>
+    (this.data()?.revenueVsExpense ?? [])
+      .filter((p) => !p.projected)
+      .map((p) => ({
+        mes: fmtMonthShort(p.month),
+        resultado: Math.round((p.revenue - p.expense) * 100) / 100,
+      })),
+  );
+  protected readonly resultadoSeries: BarSeries[] = [
+    { key: 'resultado', name: 'Receita − custos e despesas', color: 'var(--success)' },
+  ];
+  protected resultadoCor = (d: unknown): string =>
+    ((d as { resultado: number }).resultado ?? 0) < 0 ? 'var(--error)' : 'var(--success)';
   protected readonly statDelta = statDelta;
   /** Legenda das variações: "vs. dias 1 a 4 de Outubro/2026" no mês em andamento. */
   protected notaComparacao = computed(() => {

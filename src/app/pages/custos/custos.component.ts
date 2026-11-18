@@ -18,7 +18,7 @@ import { CmvAvisoComponent, DespesaForaDoCmv } from '../../shared/cmv-aviso.comp
 import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 import { StackedBarsComponent, StackedSeries } from '../../shared/stacked-bars.component';
-import { GRUPOS, SEM_DETALHE, custosPorGrupo, percentuaisMensais } from './custos-grupos';
+import { GRUPOS, SEM_DETALHE, custosPorGrupo, grupoDe, percentuaisMensais } from './custos-grupos';
 
 const pctFmt = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
@@ -133,6 +133,38 @@ export class CustosComponent implements OnInit {
       }))
       .sort((a, b) => b.amount - a.amount);
   });
+
+  // ── P.9: tabela agrupada ──
+  private gruposFechados = signal<ReadonlySet<string>>(new Set());
+  /** As linhas da tabela, em grupos (CMV, mão de obra, taxas, impostos, outras), na ordem do maior total. */
+  protected gruposTabela = computed(() => {
+    const total = this.totalLinhas() || 1;
+    return GRUPOS.map((g) => {
+      const itens = this.linhas().filter((l) => grupoDe(l) === g.key);
+      const soma = itens.reduce((a, l) => a + l.amount, 0);
+      return {
+        key: g.key,
+        nome: g.nome,
+        cor: g.cor,
+        itens,
+        total: soma,
+        pct: (soma / total) * 100,
+      };
+    })
+      .filter((g) => g.itens.length > 0)
+      .sort((a, b) => b.total - a.total);
+  });
+  protected grupoAberto(key: string): boolean {
+    return !this.gruposFechados().has(key);
+  }
+  protected alternarGrupo(key: string): void {
+    this.gruposFechados.update((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  }
 
   protected maxMetric = computed(() => Math.max(...this.linhas().map((l) => l.metric), 1));
   protected totalLinhas = computed(() => this.linhas().reduce((acc, l) => acc + l.amount, 0));

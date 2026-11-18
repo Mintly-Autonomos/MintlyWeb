@@ -283,6 +283,21 @@
             text="Cruzamos quanto cada item vende com quanto ele deixa por unidade, em R$, para mostrar o que proteger, promover ou repensar. Método de menu engineering de Kasavana & Smith (1982): a linha vertical é 70% da média de vendidos por prato; a horizontal, a margem média do cardápio ponderada pelas vendas."
           />
         </span>
+        @if (categoriasMatriz().length > 1) {
+          <div slot="action">
+            <select
+              class="h-8 rounded-full border border-border bg-card px-3 text-[12px] font-semibold cursor-pointer"
+              aria-label="Filtrar por categoria"
+              data-testid="matriz-categoria"
+              (change)="categoriaFiltro.set($any($event.target).value)"
+            >
+              <option value="">Todas as categorias</option>
+              @for (c of categoriasMatriz(); track c) {
+                <option [value]="c" [selected]="categoriaFiltro() === c">{{ c }}</option>
+              }
+            </select>
+          </div>
+        }
         <app-scatter-chart
           [points]="pontos()"
           [ghost]="fantasma()"

@@ -1,5 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { IconComponent } from './icon.component';
+import { formatCompact } from './format';
 
 export interface StatDelta {
   value: string;
@@ -76,6 +77,14 @@ export interface StatDelta {
               vector-effect="non-scaling-stroke"
             />
           </svg>
+          <!-- P.9: o menor e o maior valor do minigráfico, para a linha ter escala. -->
+          <div
+            class="flex justify-between text-[10.5px] text-muted-foreground tabular-nums"
+            data-testid="spark-faixa"
+          >
+            <span>mín {{ sparkFormatter(sparkMin) }}</span>
+            <span>máx {{ sparkFormatter(sparkMax) }}</span>
+          </div>
         }
         <ng-content select="[slot=footer]" />
       </div>
@@ -89,6 +98,16 @@ export class StatCardComponent {
   @Input() delta: StatDelta | null = null;
   @Input() status: 'positive' | 'warning' | 'negative' | 'neutral' = 'neutral';
   @Input() spark: number[] | null = null;
+  /** Formato do mínimo e do máximo do minigráfico (padrão: compacto, ex. 1,2 mil). */
+  @Input() sparkFormatter: (v: number) => string = formatCompact;
+
+  get sparkMin(): number {
+    return Math.min(...(this.spark ?? [0]));
+  }
+
+  get sparkMax(): number {
+    return Math.max(...(this.spark ?? [0]));
+  }
   @Input() subtext = '';
 
   /** Sem número (sem dado para comparar) não há o que mostrar: nada de legenda solta. */
