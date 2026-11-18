@@ -9,8 +9,12 @@
  *              fator = média dos últimos 6 meses ÷ média dos 6 meses anteriores; o total do mês se espalha pelos
  *              dias pelo efeito do dia da semana.
  * O erro médio sai de testar o mesmo método nos meses já fechados (backtest), em vez de uma faixa fixa.
- * Feriados ainda não entram (o app não tem o calendário de feriados).
+ * Feriados nacionais (feriados.ts) entram nos níveis "media" e "sazonal", com o efeito medido no histórico: no
+ * "sazonal" eles só redistribuem o total do mês entre os dias (o mês do ano anterior já tinha o feriado); no
+ * "media" a venda do dia do feriado é multiplicada pelo fator medido.
  */
+
+import { feriadosEntre, medirEfeitoFeriados } from './feriados';
 
 export type NivelPrevisao = 'ritmo' | 'media' | 'sazonal';
 
@@ -30,6 +34,8 @@ export interface PrevisaoVendas {
   crescimento: number | null;
   /** Erro médio do método nos meses já fechados (0,08 = costuma errar ±8%); null sem meses para testar. */
   erroMedio: number | null;
+  /** Feriados nacionais no horizonte, com o fator usado (1 = sem efeito medido). */
+  feriados: { data: string; nome: string; fator: number; medido: boolean }[];
   /** Previsão de cada mês que o horizonte toca ("Dez/26" → total previsto no mês inteiro). */
   meses: { ym: string; mes: string; previsto: number; anoAnterior: number | null }[];
 }
@@ -109,6 +115,7 @@ export function preverVendas(
 
   const futuros = Array.from({ length: dias }, (_, i) => addDays(hoje, i + 1));
   const mesesTocados = [...new Set(futuros.map((d) => d.slice(0, 7)))];
+  const feriadosHorizonte = feriadosEntre(futuros[0], futuros[futuros.length - 1]);
 
   // ── nível "ritmo" ────────────────────────────────────────────────────
   if (mesesHistorico < 3) {
@@ -118,6 +125,8 @@ export function preverVendas(
       mesesHistorico,
       crescimento: null,
       erroMedio: null,
+      // Pouco histórico: os feriados aparecem, mas sem efeito (nada para medir).
+      feriados: feriadosHorizonte.map((f) => ({ ...f, fator: 1, medido: false })),
       meses: mesesTocados.map((ym) => ({
         ym,
         mes: rotuloMes(ym),
@@ -128,6 +137,22 @@ export function preverVendas(
   }
 
   const efeito = efeitoDiaDaSemana(vendas, hoje);
+  // Feriados: fator medido por nome (ou a média dos medidos); sem medida, 1.
+  const porDiaHist = new Map<string, number>();
+  for (const v of vendas) porDiaHist.set(v.data, (porDiaHist.get(v.data) ?? 0) + v.valor);
+  const efeitoFer = medirEfeitoFeriados(porDiaHist, hoje);
+  const feriadoNoDia = new Map<string, { nome: string; fator: number; medido: boolean }>();
+  for (const f of feriadosEntre(`${mesAtual}-01`, addDays(futuros[futuros.length - 1], 31))) {
+    const medido = efeitoFer.porNome.get(f.nome) ?? efeitoFer.geral;
+    feriadoNoDia.set(f.data, { nome: f.nome, fator: medido ?? 1, medido: medido !== null });
+  }
+  const fatorDia = (d: string) => feriadoNoDia.get(d)?.fator ?? 1;
+  const peso = (d: string) => efeito[diaSemana(d)] * fatorDia(d);
+  const feriados = feriadosHorizonte.map((f) => ({
+    ...f,
+    ...feriadoNoDia.get(f.data)!,
+    data: f.data,
+  }));
   const temAnoAnterior = mesesTocados.every((ym) => (tot.get(addMes(ym, -12)) ?? 0) > 0);
   const crescimento = mesesHistorico >= 12 ? crescimentoAte(tot, mesAtual) : null;
 
@@ -139,7 +164,7 @@ export function preverVendas(
     const pesoMes = new Map(
       mesesTocados.map((ym) => {
         let p = 0;
-        for (let d = 1; d <= diasNoMes(ym); d++) p += efeito[diaSemana(`${ym}-${pad(d)}`)];
+        for (let d = 1; d <= diasNoMes(ym); d++) p += peso(`${ym}-${pad(d)}`);
         return [ym, p];
       }),
     );
@@ -158,11 +183,12 @@ export function preverVendas(
       porDia: futuros.map((d) => {
         const ym = d.slice(0, 7);
         const p = pesoMes.get(ym) || 1;
-        return (previstoMes.get(ym)! * efeito[diaSemana(d)]) / p;
+        return (previstoMes.get(ym)! * peso(d)) / p;
       }),
       mesesHistorico,
       crescimento: Math.round(crescimento * 100) / 100,
       erroMedio: erros.length ? Math.round(media(erros) * 100) / 100 : null,
+      feriados,
       meses: mesesTocados.map((ym) => ({
         ym,
         mes: rotuloMes(ym),
@@ -190,17 +216,17 @@ export function preverVendas(
         .reduce((a, v) => a + v.valor, 0) / 90;
     erros.push(Math.abs(b * diasNoMes(ym) - real) / real);
   }
-  const porDia = futuros.map((d) => base * efeito[diaSemana(d)]);
+  const porDia = futuros.map((d) => base * peso(d));
   return {
     nivel: 'media',
     porDia,
     mesesHistorico,
     crescimento: null,
     erroMedio: erros.length ? Math.round(media(erros) * 100) / 100 : null,
+    feriados,
     meses: mesesTocados.map((ym) => {
       let previsto = 0;
-      for (let d = 1; d <= diasNoMes(ym); d++)
-        previsto += base * efeito[diaSemana(`${ym}-${pad(d)}`)];
+      for (let d = 1; d <= diasNoMes(ym); d++) previsto += base * peso(`${ym}-${pad(d)}`);
       return { ym, mes: rotuloMes(ym), previsto: money(previsto), anoAnterior: null };
     }),
   };

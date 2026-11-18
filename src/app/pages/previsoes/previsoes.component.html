@@ -172,6 +172,18 @@
                   }
                 </div>
                 <p class="mt-1 text-[12px] text-muted-foreground leading-relaxed">{{ mt.texto }}</p>
+                @if (mt.feriados.length) {
+                  <p class="mt-1 text-[12px] text-muted-foreground" data-testid="metodo-feriados">
+                    Feriados no período:
+                    @for (f of mt.feriados; track f.data; let ult = $last) {
+                      <span class="whitespace-nowrap"
+                        ><b class="text-foreground font-medium">{{ f.rotulo }}</b> ({{
+                          f.efeito
+                        }})</span
+                      >{{ ult ? '.' : '; ' }}
+                    }
+                  </p>
+                }
                 @if (mt.erro) {
                   <p class="mt-1 text-[12px] text-muted-foreground" data-testid="metodo-erro">
                     {{ mt.erro }}
