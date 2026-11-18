@@ -81,6 +81,11 @@ export interface PrevBase {
   }[];
   /** Resultado de caixa (entradas − saídas) liquidado em cada um dos últimos 30 dias. */
   realizado: Record<string, number>;
+  /**
+   * P.9: lucro de cada um dos últimos 30 dias pela data da VENDA (vendas − imposto − saídas operacionais pagas),
+   * para o gráfico de lucro não mostrar variação de caixa. Ausente: usa `realizado`.
+   */
+  realizadoLucro?: Record<string, number>;
   temDados: boolean;
 }
 
@@ -110,6 +115,7 @@ export function buildBase(
   let custoVar = 0;
   let custoFixo = 0;
   const realizado: Record<string, number> = {};
+  const realizadoLucro: Record<string, number> = {};
   const pendentes: PrevBase['pendentes'] = [];
   const vendasPorPrazo = new Map<number, number>();
   const historico: VendaHist[] = [];
@@ -117,6 +123,8 @@ export function buildBase(
   for (const m of movs) {
     if (m.tipo === 'in' && !m.naoOperacional && m.lancamento <= hoje)
       historico.push({ data: m.lancamento, valor: m.valor });
+    if (m.tipo === 'in' && !m.naoOperacional && m.lancamento >= ini && m.lancamento <= hoje)
+      realizadoLucro[m.lancamento] = (realizadoLucro[m.lancamento] ?? 0) + m.valor * (1 - aliquota);
     // Ritmo de vendas pela data da venda, pendente ou já recebida (cartão e iFood ficam pendentes até o repasse).
     if (m.tipo === 'in' && !m.naoOperacional && m.lancamento >= ini && m.lancamento <= hoje) {
       const prazo = Math.max(0, Math.round(m.prazo));
@@ -135,6 +143,8 @@ export function buildBase(
     }
     if (m.date < ini || m.date > hoje) continue;
     realizado[m.date] = (realizado[m.date] ?? 0) + (m.tipo === 'in' ? m.valor : -m.valor);
+    if (m.tipo === 'out' && !m.naoOperacional)
+      realizadoLucro[m.date] = (realizadoLucro[m.date] ?? 0) - m.valor;
     if (!m.aVista || m.tipo === 'in' || m.naoOperacional) continue;
     custoVar += m.valor * m.variavel;
     custoFixo += m.valor * (1 - m.variavel);
@@ -155,6 +165,7 @@ export function buildBase(
     previsao: preverVendas(historico, hoje, receita / PASSADO),
     pendentes,
     realizado,
+    realizadoLucro,
     temDados: movs.length > 0,
   };
 }
@@ -208,8 +219,18 @@ export interface SimPonto {
   faixa: [number, number] | null;
 }
 
+/**
+ * P.9: receita, custos, impostos, lucro e margem são pela data da VENDA (o que o período fatura e quanto sobra).
+ * O caixa (`caixaFim`, `entradas`) é pela data do dinheiro: conta repasses de vendas antigas, o prazo do cartão
+ * e o que é não operacional (empréstimo, aporte).
+ */
 export interface ResultadoSim {
+  /** Vendas previstas no período (faturamento). */
   receita: number;
+  /** Dinheiro que entra no período: vendas que viram dinheiro + recebimentos já lançados. */
+  entradas: number;
+  /** Imposto sobre as entradas de caixa (para conciliar com o Fluxo). */
+  impostosCaixa: number;
   custoVariavel: number;
   custoFixo: number;
   impostos: number;
@@ -235,6 +256,10 @@ interface DiaSim {
   lucroBase: number;
   lucroSim: number;
   rec: number;
+  /** Vendas do dia (pela data da venda) e o lucro delas. */
+  vendas: number;
+  lucroComp: number;
+  lucroCompBase: number;
   cv: number;
   cf: number;
   /** Entradas − saídas não operacionais do dia (empréstimo, parcelas, equipamento): mexem no caixa, não no lucro. */
@@ -261,6 +286,11 @@ export function ritmoVendasNoDia(base: PrevBase, k: number): number {
   return base.receitaPrazos
     ? base.receitaPrazos.reduce((s, r) => s + (k > r.prazo ? r.porDia : 0), 0)
     : base.receitaDia;
+}
+
+/** Venda prevista no dia k do futuro, pela data da venda (P.5; sem previsão, o ritmo de 30 dias). */
+export function vendasPrevistasNoDia(base: PrevBase, k: number): number {
+  return base.previsao ? (base.previsao.porDia[k - 1] ?? 0) : base.receitaDia;
 }
 
 /** P.5: o custo variável do dia k acompanha a venda prevista do dia (contra o ritmo dos últimos 30 dias). */
@@ -301,12 +331,16 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     const fIdx = i - PASSADO + 1;
     if (!futuro) {
       const lucro = base.realizado[date] ?? 0;
+      const lucroComp = base.realizadoLucro ? (base.realizadoLucro[date] ?? 0) : lucro;
       serie.push({
         label: label(date),
         futuro,
         fIdx,
         lucroBase: lucro,
         lucroSim: lucro,
+        lucroComp,
+        lucroCompBase: lucroComp,
+        vendas: 0,
         rec: 0,
         cv: 0,
         cf: 0,
@@ -324,12 +358,20 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     const cvSim = cvDia * (1 + v) * (1 + c) + pend.outVar;
     const lucroBase = recBase - cvBase - cfBase - recBase * base.aliquota;
     const lucroSim = recSim - cvSim - cfBase - recSim * base.aliquota;
+    // P.9: o lucro do dia é pela venda do dia, sem repasses de vendas antigas nem o atraso do cartão.
+    const vendasBase = vendasPrevistasNoDia(base, fIdx);
+    const vendasSim = vendasBase * (1 + p) * (1 + v);
+    const lucroCompBase = vendasBase * (1 - base.aliquota) - cvBase - cfBase;
+    const lucroComp = vendasSim * (1 - base.aliquota) - cvSim - cfBase;
     serie.push({
       label: label(date),
       futuro,
       fIdx,
       lucroBase,
       lucroSim,
+      lucroComp,
+      lucroCompBase,
+      vendas: vendasSim,
       rec: recSim,
       cv: cvSim,
       cf: cfBase,
@@ -349,6 +391,7 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
   let caixaMinimo = Number.POSITIVE_INFINITY;
   let caixaMinimoLabel = '';
   let receita = 0;
+  let entradas = 0;
   let custoVariavel = 0;
   let custoFixo = 0;
 
@@ -367,12 +410,13 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     if (d.futuro) {
       acumSim += d.lucroSim;
       acumBase += d.lucroBase;
-      receita += d.rec;
+      receita += d.vendas;
+      entradas += d.rec;
       custoVariavel += d.cv;
       custoFixo += d.cf;
     }
-    mmWin.push(d.lucroSim);
-    mmWinBase.push(d.lucroBase);
+    mmWin.push(d.lucroComp);
+    mmWinBase.push(d.lucroCompBase);
     if (mmWin.length > 7) mmWin.shift();
     if (mmWinBase.length > 7) mmWinBase.shift();
 
@@ -424,6 +468,8 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
 
   const resultado: ResultadoSim = {
     receita: money(receita),
+    entradas: money(entradas),
+    impostosCaixa: money(entradas * base.aliquota),
     custoVariavel: money(custoVariavel),
     custoFixo: money(custoFixo),
     impostos: money(impostos),
@@ -458,7 +504,7 @@ export function conciliar(base: PrevBase, horizonte: Horizonte, lancado: number)
   for (let k = 1; k <= horizonte; k++) ritmoVendas += ritmoVendasNoDia(base, k);
   let ritmoCustos = 0;
   for (let k = 1; k <= horizonte; k++) ritmoCustos += custoVarNoDia(base, k) + base.custoFixoDia;
-  const imposto = resultado.impostos;
+  const imposto = resultado.impostosCaixa;
   const previsao = resultado.caixaFim;
   const ajustes = previsao - (lancado + ritmoVendas - ritmoCustos - imposto);
   return {
