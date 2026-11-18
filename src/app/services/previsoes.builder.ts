@@ -5,13 +5,17 @@
  * Modelo (datas "AAAA-MM-DD", dinheiro em reais):
  *  - Já lançado e ainda não liquidado (pendente) entra no dia do vencimento — é o "dinheiro que
  *    está em Movimentações" (ex.: venda do iFood que cai em 30 dias).
- *  - Vendas: o ritmo é tudo o que foi VENDIDO nos últimos 30 dias (pela data do lançamento), à vista ou com
- *    repasse (cartão, iFood). Na projeção, a venda com repasse só vira dinheiro depois do prazo dela; antes
- *    disso o caixa já tem os repasses pendentes, então nada conta em dobro.
+ *  - Vendas: P.5 — a venda prevista de cada dia vem de `preverVendas` (previsoes-sazonal.ts): com menos de 3 meses de
+ *    histórico, o ritmo dos últimos 30 dias; de 3 a 11, a média de 90 dias × dia da semana; com 12 ou mais, o mesmo
+ *    mês do ano anterior × crescimento. A divisão por prazo do repasse (cartão, iFood) segue a dos últimos 30 dias:
+ *    a venda com repasse só vira dinheiro depois do prazo dela; antes disso o caixa já tem os repasses pendentes.
+ *  - O custo variável acompanha as vendas previstas (mais vendas, mais insumo); o fixo segue o ritmo de 30 dias.
  *  - Custos: o que costuma sair à vista (liquidado sem prazo) segue o ritmo médio dos últimos 30 dias.
  *  - Não operacional (empréstimo, aporte, equipamento) não entra no ritmo: não se repete todo mês.
  *  - O simulador mexe só no ritmo (vendas, preço, custo); o que já está lançado não muda.
  */
+
+import { PrevisaoVendas, VendaHist, preverVendas } from './previsoes-sazonal';
 
 export type Horizonte = 30 | 60 | 90;
 export type Metric = 'caixa' | 'receita' | 'lucro';
@@ -65,6 +69,8 @@ export interface PrevBase {
   receitaPrazos?: { prazo: number; porDia: number }[];
   custoVarDia: number;
   custoFixoDia: number;
+  /** P.5: venda prevista em cada dia futuro e o nível do modelo. Ausente: ritmo de 30 dias em todo dia. */
+  previsao?: PrevisaoVendas;
   /** Lançamentos pendentes (vencimento dentro do horizonte), já com data ajustada (vencidos → amanhã). */
   pendentes: {
     date: string;
@@ -106,8 +112,11 @@ export function buildBase(
   const realizado: Record<string, number> = {};
   const pendentes: PrevBase['pendentes'] = [];
   const vendasPorPrazo = new Map<number, number>();
+  const historico: VendaHist[] = [];
 
   for (const m of movs) {
+    if (m.tipo === 'in' && !m.naoOperacional && m.lancamento <= hoje)
+      historico.push({ data: m.lancamento, valor: m.valor });
     // Ritmo de vendas pela data da venda, pendente ou já recebida (cartão e iFood ficam pendentes até o repasse).
     if (m.tipo === 'in' && !m.naoOperacional && m.lancamento >= ini && m.lancamento <= hoje) {
       const prazo = Math.max(0, Math.round(m.prazo));
@@ -143,6 +152,7 @@ export function buildBase(
     receitaPrazos,
     custoVarDia: custoVar / PASSADO,
     custoFixoDia: custoFixo / PASSADO,
+    previsao: preverVendas(historico, hoje, receita / PASSADO),
     pendentes,
     realizado,
     temDados: movs.length > 0,
@@ -228,9 +238,28 @@ interface DiaSim {
  * (as vendas de antes disso já estão nos repasses pendentes). Sem a separação por prazo, vale o ritmo todo.
  */
 export function ritmoVendasNoDia(base: PrevBase, k: number): number {
+  const prev = base.previsao;
+  if (prev) {
+    // P.5: o dinheiro do dia k é a venda prevista do dia k − P, para cada prazo P, na proporção dos últimos 30 dias.
+    const partes =
+      base.receitaPrazos && base.receitaDia > 0
+        ? base.receitaPrazos.map((r) => ({ prazo: r.prazo, fracao: r.porDia / base.receitaDia }))
+        : [{ prazo: 0, fracao: 1 }];
+    return partes.reduce(
+      (s, r) => s + (k > r.prazo ? r.fracao * (prev.porDia[k - r.prazo - 1] ?? 0) : 0),
+      0,
+    );
+  }
   return base.receitaPrazos
     ? base.receitaPrazos.reduce((s, r) => s + (k > r.prazo ? r.porDia : 0), 0)
     : base.receitaDia;
+}
+
+/** P.5: o custo variável do dia k acompanha a venda prevista do dia (contra o ritmo dos últimos 30 dias). */
+export function custoVarNoDia(base: PrevBase, k: number): number {
+  const prev = base.previsao;
+  if (!prev || base.receitaDia <= 0) return base.custoVarDia;
+  return base.custoVarDia * ((prev.porDia[k - 1] ?? base.receitaDia) / base.receitaDia);
 }
 
 export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase): Simulacao {
@@ -280,10 +309,11 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     const pend = porDia.get(date) ?? vazio();
     const ritmo = ritmoNoDia(fIdx);
     const recBase = ritmo + pend.in;
-    const cvBase = base.custoVarDia + pend.outVar;
+    const cvDia = custoVarNoDia(base, fIdx);
+    const cvBase = cvDia + pend.outVar;
     const cfBase = base.custoFixoDia + pend.outFixo;
     const recSim = ritmo * (1 + p) * (1 + v) + pend.in;
-    const cvSim = base.custoVarDia * (1 + v) * (1 + c) + pend.outVar;
+    const cvSim = cvDia * (1 + v) * (1 + c) + pend.outVar;
     const lucroBase = recBase - cvBase - cfBase - recBase * base.aliquota;
     const lucroSim = recSim - cvSim - cfBase - recSim * base.aliquota;
     serie.push({
@@ -343,7 +373,13 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
       caixaMinimoLabel = d.label;
     }
 
-    const inc = d.futuro ? Math.min(0.18, 0.04 + 0.0035 * d.fIdx) : 0;
+    // P.5: com erro medido nos meses fechados, a faixa cresce até ele no primeiro mês; sem ele, a faixa fixa de antes.
+    const erro = base.previsao?.erroMedio ?? null;
+    const inc = !d.futuro
+      ? 0
+      : erro !== null
+        ? Math.min(0.5, erro * Math.min(1, d.fIdx / 30))
+        : Math.min(0.18, 0.04 + 0.0035 * d.fIdx);
     const mostra = !d.futuro
       ? i % 3 === 0 || i === PASSADO - 1
       : d.fIdx % step === 0 || d.fIdx === horizonte;
@@ -412,7 +448,8 @@ export function conciliar(base: PrevBase, horizonte: Horizonte, lancado: number)
   const { resultado } = simular(AJUSTES_ZERO, horizonte, base);
   let ritmoVendas = 0;
   for (let k = 1; k <= horizonte; k++) ritmoVendas += ritmoVendasNoDia(base, k);
-  const ritmoCustos = (base.custoVarDia + base.custoFixoDia) * horizonte;
+  let ritmoCustos = 0;
+  for (let k = 1; k <= horizonte; k++) ritmoCustos += custoVarNoDia(base, k) + base.custoFixoDia;
   const imposto = resultado.impostos;
   const previsao = resultado.caixaFim;
   const ajustes = previsao - (lancado + ritmoVendas - ritmoCustos - imposto);

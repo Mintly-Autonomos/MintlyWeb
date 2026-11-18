@@ -94,6 +94,50 @@ export class PrevisoesComponent implements OnInit {
   protected readonly Math = Math;
   protected dados = this.svc.base;
   protected caixaHoje = computed(() => this.dados().caixaHoje);
+
+  /** P.5: como as vendas futuras foram previstas (o nível depende do histórico), para a tela explicar. */
+  protected metodo = computed(() => {
+    const p = this.dados().previsao;
+    if (!p) return null;
+    const fator = (n: number) => `${n.toFixed(2).replace('.', ',')}×`;
+    // Meses que o horizonte escolhido toca.
+    const hoje = this.dados().hoje;
+    const [y, m, d] = hoje.split('-').map(Number);
+    const fim = new Date(y, m - 1, d + this.horizonte());
+    const nMeses = (fim.getFullYear() - y) * 12 + fim.getMonth() - (m - 1) + 1;
+    const meses = p.meses.slice(0, nMeses);
+    const erro =
+      p.erroMedio !== null
+        ? `Testado nos meses já fechados, o método costuma errar ±${Math.round(p.erroMedio * 100)}%; é essa a faixa do gráfico.`
+        : null;
+    if (p.nivel === 'sazonal')
+      return {
+        nivel: p.nivel,
+        titulo: 'Previsão sazonal',
+        curto: 'previsão sazonal das vendas',
+        texto: `Cada mês = o mesmo mês do ano anterior × ${fator(p.crescimento ?? 1)}, o crescimento (média dos últimos 6 meses ÷ média dos 6 anteriores). O total do mês se espalha pelos dias conforme o dia da semana que mais vende.`,
+        erro,
+        meses,
+      };
+    if (p.nivel === 'media')
+      return {
+        nivel: p.nivel,
+        titulo: 'Média dos últimos 90 dias',
+        curto: 'média de vendas dos últimos 90 dias',
+        texto: `Com ${p.mesesHistorico} meses de histórico, as vendas seguem a média por dia dos últimos 90 dias, ajustada pelo dia da semana (sábado forte pesa mais, dia fechado pesa zero). Com 12 meses, a previsão passa a usar o mesmo mês do ano anterior.`,
+        erro,
+        meses,
+      };
+    return {
+      nivel: p.nivel,
+      titulo: 'Pouco histórico',
+      curto: 'ritmo dos últimos 30 dias',
+      texto:
+        'Ainda há menos de 3 meses completos de vendas, então a previsão segue o ritmo dos últimos 30 dias, igual em todo dia. Com 3 meses ela passa a considerar o dia da semana; com 12, a sazonalidade do ano.',
+      erro,
+      meses,
+    };
+  });
   /** Do saldo do Fluxo de caixa (só o lançado) até o caixa projetado aqui (sem as alavancas do simulador). */
   protected conciliacao = computed(() => {
     const saldos = this.svc.saldoLancado();
