@@ -224,13 +224,6 @@ describe('simular', () => {
   });
 });
 
-describe('ajustesDe', () => {
-  it('cenário fraco/cheio vira ±25% de vendas', () => {
-    expect(ajustesDe({ ...ALAVANCAS_ZERO, cenario: 'fraco' }, 'cenario').volume).toBe(-25);
-    expect(ajustesDe({ ...ALAVANCAS_ZERO, cenario: 'cheio' }, 'cenario').volume).toBe(25);
-  });
-});
-
 describe('lucro pela venda, caixa pelo dinheiro (P.9)', () => {
   it('o lucro realizado dos últimos 30 dias é pela data da venda; o caixa, pela data do dinheiro', () => {
     const base = buildBase(
@@ -272,5 +265,12 @@ describe('lucro pela venda, caixa pelo dinheiro (P.9)', () => {
     expect(r.impostosCaixa).toBe(0);
     expect(r.impostos).toBeCloseTo(300, 6);
     expect(conciliar(base, 30, 0).imposto).toBe(0);
+  });
+});
+
+describe('ajustesDe', () => {
+  it('cenário fraco/cheio vira ±25% de vendas', () => {
+    expect(ajustesDe({ ...ALAVANCAS_ZERO, cenario: 'fraco' }, 'cenario').volume).toBe(-25);
+    expect(ajustesDe({ ...ALAVANCAS_ZERO, cenario: 'cheio' }, 'cenario').volume).toBe(25);
   });
 });
