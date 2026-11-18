@@ -330,6 +330,93 @@
           </button>
         </section>
 
+        <!-- Equipe e horas (P.4) -->
+        <section class="rounded-2xl border border-border p-4 space-y-3" data-testid="secao-equipe">
+          <div>
+            <h4 class="text-[14px] font-bold">Equipe e horas</h4>
+            <p class="text-[13px] text-muted-foreground">
+              Quem trabalha no restaurante e quantas horas por semana, pelo contrato. Inclua você e
+              quem não usa o Mintly. Não é login: serve para as Previsões dizerem quando reforçar a
+              equipe e quando segurar.
+            </p>
+          </div>
+          @if (equipeEdit().length > 0) {
+            <ul class="space-y-2">
+              @for (p of equipeLinhas(); track $index; let i = $index) {
+                <li class="grid grid-cols-[minmax(0,1fr)_96px_36px] items-start gap-2">
+                  <input
+                    type="text"
+                    maxlength="80"
+                    [value]="p.nome"
+                    (input)="setPessoa(i, 'nome', valor($event))"
+                    placeholder="Nome"
+                    [attr.aria-label]="'Nome da pessoa ' + (i + 1)"
+                    [attr.data-testid]="'equipe-nome-' + i"
+                    [class]="inputClass + (p.nomeOk || !p.nome ? '' : ' border-error')"
+                  />
+                  <div>
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      [value]="p.horas"
+                      (input)="setPessoa(i, 'horas', valor($event))"
+                      [attr.aria-label]="'Horas por semana de ' + (p.nome || 'pessoa ' + (i + 1))"
+                      [attr.data-testid]="'equipe-horas-' + i"
+                      [class]="
+                        inputClass + ' text-right tabular-nums' + (p.horasOk ? '' : ' border-error')
+                      "
+                    />
+                    <span class="block text-[11px] text-muted-foreground text-right mt-0.5"
+                      >h/semana</span
+                    >
+                  </div>
+                  <button
+                    type="button"
+                    (click)="removerPessoa(i)"
+                    class="h-10 w-9 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted hover:text-error cursor-pointer"
+                    [attr.aria-label]="'Remover ' + (p.nome || 'pessoa ' + (i + 1))"
+                    [attr.data-testid]="'equipe-remover-' + i"
+                  >
+                    <app-icon name="delete" [style]="{ fontSize: '18px' }" />
+                  </button>
+                </li>
+              }
+            </ul>
+            <p class="text-[12.5px] text-muted-foreground tabular-nums" data-testid="equipe-total">
+              Total: {{ fmtHoras(equipeTotalSemana()) }} h por semana (≈
+              {{ Math.round((equipeTotalSemana() * 30.4) / 7) }} h por mês).
+            </p>
+          }
+          @if (!equipeValida()) {
+            <p class="text-[12.5px] text-error" role="alert">
+              Cada pessoa precisa de nome e de 1 a {{ TEAM_MAX_WEEKLY_HOURS }} horas por semana.
+            </p>
+          }
+          @if (erros().equipe; as e) {
+            <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+          }
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              (click)="addPessoa()"
+              [disabled]="equipeEdit().length >= TEAM_MAX_MEMBERS"
+              class="h-10 px-4 rounded-full text-sm font-semibold border border-border hover:bg-muted cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+              data-testid="equipe-adicionar"
+            >
+              <app-icon name="person_add" [style]="{ fontSize: '17px' }" />Adicionar pessoa
+            </button>
+            <button
+              type="button"
+              (click)="salvarEquipe()"
+              [disabled]="!equipeMudou() || !equipeValida() || ocupado() === 'equipe'"
+              class="h-10 px-5 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="equipe-salvar"
+            >
+              Salvar equipe
+            </button>
+          </div>
+        </section>
+
         <!-- Funcionários -->
         <section
           class="rounded-2xl border border-border p-4 space-y-3"

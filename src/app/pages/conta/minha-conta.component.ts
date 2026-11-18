@@ -14,8 +14,11 @@ import {
   MEMBER_INVITE_EXPIRY_DAYS,
   SUBSCRIPTION_MEMBER_LIMIT,
   SUBSCRIPTION_TIER_LABEL,
+  TEAM_MAX_MEMBERS,
+  TEAM_MAX_WEEKLY_HOURS,
   memberLimitForTier,
 } from 'mintly-lib';
+import { IconComponent } from '../../shared/icon.component';
 import { ContaService, Membro, PerfilMembro } from '../../services/conta.service';
 import { AVATAR_ACCEPT, readAvatarFile } from '../../shared/avatar-file';
 import { ChipComponent } from '../../shared/chip.component';
@@ -48,6 +51,7 @@ type Secao =
   | 'email'
   | 'senha'
   | 'restaurante'
+  | 'equipe'
   | 'membro'
   | 'exclusao'
   | 'carregar';
@@ -59,7 +63,7 @@ type Secao =
 @Component({
   selector: 'app-minha-conta',
   standalone: true,
-  imports: [ModalComponent, ChipComponent, ToggleComponent],
+  imports: [ModalComponent, ChipComponent, ToggleComponent, IconComponent],
   templateUrl: './minha-conta.component.html',
 })
 export class MinhaContaComponent {
@@ -68,6 +72,11 @@ export class MinhaContaComponent {
   private toast = inject(ToastService);
 
   protected readonly inputClass = INPUT;
+  protected readonly Math = Math;
+  /** "82,5" */
+  protected fmtHoras(n: number): string {
+    return String(Math.round(n * 10) / 10).replace('.', ',');
+  }
   protected readonly avatarAccept = AVATAR_ACCEPT;
   private fotoInput = viewChild<ElementRef<HTMLInputElement>>('fotoInput');
 
@@ -107,6 +116,30 @@ export class MinhaContaComponent {
 
   // Restaurante
   protected nomeRest = signal('');
+  /** P.4: equipe em edição (horas como texto para o campo aceitar "22,5"). */
+  protected equipeEdit = signal<{ nome: string; horas: string }[]>([]);
+  protected readonly TEAM_MAX_MEMBERS = TEAM_MAX_MEMBERS;
+  protected readonly TEAM_MAX_WEEKLY_HOURS = TEAM_MAX_WEEKLY_HOURS;
+  protected equipeLinhas = computed(() =>
+    this.equipeEdit().map((p) => {
+      const horas = Number(p.horas.replace(',', '.'));
+      const nomeOk = p.nome.trim().length > 0;
+      const horasOk = Number.isFinite(horas) && horas >= 1 && horas <= TEAM_MAX_WEEKLY_HOURS;
+      return { ...p, horasNum: horas, ok: nomeOk && horasOk, nomeOk, horasOk };
+    }),
+  );
+  protected equipeTotalSemana = computed(() =>
+    this.equipeLinhas().reduce((s, p) => s + (p.horasOk ? p.horasNum : 0), 0),
+  );
+  protected equipeValida = computed(() => this.equipeLinhas().every((p) => p.ok));
+  protected equipeMudou = computed(() => {
+    const salvo = this.svc.equipe() ?? [];
+    const atual = this.equipeLinhas();
+    return (
+      atual.length !== salvo.length ||
+      atual.some((p, i) => p.nome.trim() !== salvo[i].nome || p.horasNum !== salvo[i].horasSemana)
+    );
+  });
   protected novoMembro = signal<{ nome: string; email: string; perfil: PerfilMembro }>({
     nome: '',
     email: '',
@@ -243,6 +276,7 @@ export class MinhaContaComponent {
       if (this.ehDono()) {
         await Promise.all([this.svc.carregarRestaurante(), this.svc.carregarMembros()]);
         this.nomeRest.set(this.restaurante());
+        this.resetEquipe();
       }
     } catch (err) {
       this.toast.error(apiErrorMessage(err, 'Não foi possível carregar sua conta.'));
@@ -333,6 +367,48 @@ export class MinhaContaComponent {
       this.closed.emit();
     } catch (err) {
       this.falha('senha', err, 'Não foi possível trocar a senha.');
+    } finally {
+      this.ocupado.set(null);
+    }
+  }
+
+  private resetEquipe(): void {
+    this.equipeEdit.set(
+      (this.svc.equipe() ?? []).map((p) => ({
+        nome: p.nome,
+        horas: String(p.horasSemana).replace('.', ','),
+      })),
+    );
+  }
+
+  addPessoa(): void {
+    if (this.equipeEdit().length >= TEAM_MAX_MEMBERS) return;
+    this.equipeEdit.update((l) => [...l, { nome: '', horas: '44' }]);
+  }
+
+  removerPessoa(i: number): void {
+    this.equipeEdit.update((l) => l.filter((_, k) => k !== i));
+  }
+
+  setPessoa(i: number, campo: 'nome' | 'horas', valor: string): void {
+    this.equipeEdit.update((l) => l.map((p, k) => (k === i ? { ...p, [campo]: valor } : p)));
+  }
+
+  async salvarEquipe(): Promise<void> {
+    if (!this.equipeValida() || !this.equipeMudou()) return;
+    this.ocupado.set('equipe');
+    this.limpar('equipe');
+    try {
+      await this.svc.salvarEquipe(
+        this.equipeLinhas().map((p) => ({
+          nome: p.nome,
+          horasSemana: Math.round(p.horasNum * 10) / 10,
+        })),
+      );
+      this.resetEquipe();
+      this.toast.success('Equipe salva.');
+    } catch (err) {
+      this.falha('equipe', err, 'Não foi possível salvar a equipe.');
     } finally {
       this.ocupado.set(null);
     }

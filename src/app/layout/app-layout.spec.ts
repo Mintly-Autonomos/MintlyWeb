@@ -153,6 +153,7 @@ describe('AppLayoutComponent — menu do usuário: Minha conta', () => {
             dados: signal(null),
             restaurante: signal(''),
             membros: signal([]),
+            equipe: signal(null),
             exclusaoPedidaEm: signal(null),
             carregarConta: () => new Promise<void>(() => undefined),
             carregarRestaurante: () => Promise.resolve(),

@@ -31,7 +31,7 @@ export interface PrevisaoVendas {
   /** Erro médio do método nos meses já fechados (0,08 = costuma errar ±8%); null sem meses para testar. */
   erroMedio: number | null;
   /** Previsão de cada mês que o horizonte toca ("Dez/26" → total previsto no mês inteiro). */
-  meses: { mes: string; previsto: number; anoAnterior: number | null }[];
+  meses: { ym: string; mes: string; previsto: number; anoAnterior: number | null }[];
 }
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -119,6 +119,7 @@ export function preverVendas(
       crescimento: null,
       erroMedio: null,
       meses: mesesTocados.map((ym) => ({
+        ym,
         mes: rotuloMes(ym),
         previsto: money(ritmoDia * diasNoMes(ym)),
         anoAnterior: null,
@@ -163,6 +164,7 @@ export function preverVendas(
       crescimento: Math.round(crescimento * 100) / 100,
       erroMedio: erros.length ? Math.round(media(erros) * 100) / 100 : null,
       meses: mesesTocados.map((ym) => ({
+        ym,
         mes: rotuloMes(ym),
         previsto: money(previstoMes.get(ym)!),
         anoAnterior: money(tot.get(addMes(ym, -12)) ?? 0),
@@ -199,7 +201,7 @@ export function preverVendas(
       let previsto = 0;
       for (let d = 1; d <= diasNoMes(ym); d++)
         previsto += base * efeito[diaSemana(`${ym}-${pad(d)}`)];
-      return { mes: rotuloMes(ym), previsto: money(previsto), anoAnterior: null };
+      return { ym, mes: rotuloMes(ym), previsto: money(previsto), anoAnterior: null };
     }),
   };
 }

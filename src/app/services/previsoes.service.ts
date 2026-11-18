@@ -38,6 +38,7 @@ export class PrevisoesService {
   private contas = inject(ContasService);
   private fluxo = inject(FluxoCaixaService);
   private reportClient = inject(MintlyClientService).client.reportClient;
+  private restaurantClient = inject(MintlyClientService).client.restaurantClient;
 
   readonly base = signal<PrevBase>(baseVazia());
   readonly loading = signal(false);
@@ -113,6 +114,23 @@ export class PrevisoesService {
     };
   }
 
+  /** P.4: carga semanal de cada pessoa da equipe (Minha conta → Restaurante). `null` = não informada. */
+  readonly equipe = signal<{ nome: string; horasSemana: number }[] | null>(null);
+
+  private async carregarEquipe(): Promise<void> {
+    if (environment.useMocks) return;
+    try {
+      const res = await this.call((headers) => this.restaurantClient.me({}, headers));
+      const team = res.payload?.restaurant.team;
+      this.equipe.set(
+        team ? team.map((p) => ({ nome: p.name, horasSemana: p.weeklyHours })) : null,
+      );
+    } catch {
+      // A equipe é um extra: sem ela a recomendação de contratação só fica oculta.
+      this.equipe.set(null);
+    }
+  }
+
   async refresh(): Promise<void> {
     this.loading.set(true);
     try {
@@ -121,6 +139,7 @@ export class PrevisoesService {
         this.categorias.refresh(),
         this.contas.refresh(),
         this.fluxo.fetchReport(90).catch(() => null),
+        this.carregarEquipe(),
       ]);
       this.saldoLancado.set(fluxo ? fluxo.projection.map((p) => p.balance) : null);
       const hoje = hojeIso();
