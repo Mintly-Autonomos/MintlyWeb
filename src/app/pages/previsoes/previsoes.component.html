@@ -431,7 +431,7 @@
                   {{
                     metric() === 'caixa'
                       ? 'Saldo esperado ao longo dos dias.'
-                      : 'Lucro esperado ao longo dos dias.'
+                      : 'Ritmo de lucro (quanto sobraria em 30 dias), pela data da venda, ao longo dos dias.'
                   }}
                   Linha cheia é o que já aconteceu; pontilhada é a estimativa.
                 </p>
@@ -493,7 +493,7 @@
                 >
                   <span class="truncate">Lucro previsto em {{ horizonte() }} dias</span>
                   <app-hint
-                    text="Quanto deve sobrar no fim do período, depois de todos os custos e despesas."
+                    text='Quanto deve sobrar das vendas do período: vendas previstas (pela data da venda) − custos e despesas que vencem nele − impostos. Não é o caixa: repasses de vendas antigas, o prazo do cartão e empréstimos ficam no "Caixa no fim do período".'
                   />
                 </span>
                 <span
@@ -535,7 +535,7 @@
                 >
                   <span class="truncate">Caixa no fim do período</span>
                   <app-hint
-                    text="Quanto dinheiro você deve ter em caixa ao final do período projetado."
+                    text="Quanto dinheiro você deve ter em caixa ao final do período: o caixa de hoje + o que entra (inclusive repasses de vendas antigas e empréstimos) − o que sai. Pode ser bem diferente do lucro: venda no cartão é lucro hoje e caixa só no repasse."
                   />
                 </span>
                 <span
@@ -577,7 +577,7 @@
                 >
                   <span class="truncate">Receita prevista</span>
                   <app-hint
-                    text="Quanto você deve faturar no período, antes de descontar custos."
+                    text="Quanto você deve vender no período (pela data da venda), antes de descontar custos. O dinheiro pode chegar depois, no prazo do cartão ou do iFood."
                   />
                 </span>
                 <span
