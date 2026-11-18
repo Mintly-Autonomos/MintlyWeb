@@ -199,12 +199,26 @@
               >
                 Meus clientes são sensíveis a preço?
                 <app-hint
-                  text="Quanto o volume cai quando o preço sobe 1%. Pouco = −1,2 (encomenda, bolo de festa), médio = −1,8 (doces do balcão), muito = −2,5 (impulso, concorrente perto). Com um reajuste nas vendas, o Mintly mede: volume das 4 semanas antes contra as 4 depois."
+                  text="Quanto o volume cai quando o preço sobe 1%. Sem escolha aqui, vale a medida no último reajuste (volume das 4 semanas antes contra as 4 depois) ou o perfil de venda da categoria (Cardápio → Perfil de venda das categorias). Pouco = −1,2, médio = −1,8, muito = −2,5. A escolha fica salva no prato e vale em qualquer aparelho."
                 />
               </div>
               <div
                 class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
               >
+                <button
+                  type="button"
+                  (click)="setSensibilidade(item()!.id, 'auto')"
+                  [attr.aria-pressed]="sensSel() === 'auto'"
+                  data-testid="sens-auto"
+                  [class]="
+                    'h-7 px-3 rounded-full text-[12px] font-semibold transition-colors cursor-pointer ' +
+                    (sensSel() === 'auto'
+                      ? 'bg-mint-soft text-ocean'
+                      : 'text-muted-foreground hover:bg-muted')
+                  "
+                >
+                  {{ autoRotulo() }}
+                </button>
                 @for (s of SENSIBILIDADES; track s.key) {
                   <button
                     type="button"
@@ -222,22 +236,6 @@
                     {{ s.label }}
                   </button>
                 }
-                @if (medidaSel()?.ok) {
-                  <button
-                    type="button"
-                    (click)="setSensibilidade(item()!.id, 'medida')"
-                    [attr.aria-pressed]="sensSel() === 'medida'"
-                    data-testid="sens-medida"
-                    [class]="
-                      'h-7 px-3 rounded-full text-[12px] font-semibold transition-colors cursor-pointer ' +
-                      (sensSel() === 'medida'
-                        ? 'bg-mint-soft text-ocean'
-                        : 'text-muted-foreground hover:bg-muted')
-                    "
-                  >
-                    Medida
-                  </button>
-                }
               </div>
               <div class="mt-1 text-[11.5px] text-muted-foreground" data-testid="sens-explica">
                 @if (medidaSel(); as m) {
@@ -251,10 +249,25 @@
                     {{ m.motivo }}
                   }
                 } @else {
-                  Elasticidade {{ fmtE(elasticidadeSel()) }}. Quando houver um reajuste nas vendas,
-                  o Mintly mede a dos seus clientes.
+                  Elasticidade {{ fmtE(elasticidadeSel()) }}
+                  @if (usadaSel(); as u) {
+                    @if (u.origem === 'categoria' && !pratoSel()?.category) {
+                      — prato sem categoria: vale "{{ SALES_PROFILE_LABEL[u.perfil] }}" (dê uma
+                      categoria a ele no Cardápio para escolher o perfil).
+                    } @else if (u.origem === 'categoria') {
+                      — perfil "{{ SALES_PROFILE_LABEL[u.perfil] }}" da categoria{{
+                        u.perfilSugerido ? ' (sugerido pelo nome; ajuste no Cardápio)' : ''
+                      }}.
+                    } @else {
+                      — escolhida para este prato.
+                    }
+                  }
+                  Quando houver um reajuste nas vendas, o Mintly mede a dos seus clientes.
                 }
               </div>
+              @if (erroSensibilidade(); as e) {
+                <p class="mt-1 text-[12px] text-error" role="alert">{{ e }}</p>
+              }
             </div>
 
             <div class="rounded-xl bg-muted/50 border border-border p-3.5 space-y-1.5">

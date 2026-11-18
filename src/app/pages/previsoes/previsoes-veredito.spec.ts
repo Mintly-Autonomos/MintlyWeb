@@ -46,7 +46,12 @@ describe('Previsões: número grande, veredito e dados incompletos (relatório, 
         },
         {
           provide: CardapioService,
-          useValue: { pratos: signal([]), refresh: vi.fn(() => Promise.resolve()) },
+          useValue: {
+            pratos: signal([]),
+            vendas: signal([]),
+            perfis: signal([]),
+            refresh: vi.fn(() => Promise.resolve()),
+          },
         },
         { provide: ToastService, useValue: { error: vi.fn(), success: vi.fn() } },
         {

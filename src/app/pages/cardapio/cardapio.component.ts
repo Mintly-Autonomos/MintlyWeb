@@ -1,4 +1,10 @@
 import { Location } from '@angular/common';
+import {
+  SALES_PROFILE_ELASTICITY,
+  SALES_PROFILE_LABEL,
+  SalesProfile,
+  suggestSalesProfile,
+} from 'mintly-lib';
 import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { IconComponent } from '../../shared/icon.component';
@@ -58,6 +64,57 @@ export class CardapioComponent implements OnInit, OnDestroy {
 
   protected loading = this.svc.loading;
   protected categorias = this.svc.categorias;
+
+  // ── Perfil de venda das categorias (elasticidade padrão do simulador de preço) ──
+  protected readonly PERFIS = [
+    SalesProfile.Counter,
+    SalesProfile.Everyday,
+    SalesProfile.Drink,
+    SalesProfile.Order,
+  ];
+  protected readonly PERFIL_LABEL = SALES_PROFILE_LABEL;
+  protected readonly PERFIL_E = SALES_PROFILE_ELASTICITY;
+  /** Escolhas ainda não salvas (categoria → perfil). */
+  protected perfisEdit = signal<Record<string, SalesProfile>>({});
+  protected salvandoPerfis = signal(false);
+  /** Uma linha por categoria do cardápio: o perfil salvo, o editado ou o sugerido pelo nome. */
+  protected linhasPerfil = computed(() => {
+    const salvos = new Map(
+      this.svc.perfis().map((p) => [p.category.toLocaleLowerCase('pt-BR'), p.profile]),
+    );
+    const edit = this.perfisEdit();
+    return this.categorias().map((cat) => {
+      const salvo = salvos.get(cat.toLocaleLowerCase('pt-BR'));
+      const perfil = edit[cat] ?? salvo ?? suggestSalesProfile(cat);
+      return {
+        categoria: cat,
+        perfil,
+        sugerido: !salvo && !edit[cat],
+        mudou: edit[cat] !== undefined && edit[cat] !== salvo,
+      };
+    });
+  });
+  protected perfisMudaram = computed(() => this.linhasPerfil().some((l) => l.mudou));
+
+  setPerfil(categoria: string, perfil: string): void {
+    this.perfisEdit.update((m) => ({ ...m, [categoria]: perfil as SalesProfile }));
+  }
+
+  /** Salva o perfil de TODAS as categorias (as sugeridas também, para ficarem confirmadas). */
+  async salvarPerfis(): Promise<void> {
+    this.salvandoPerfis.set(true);
+    try {
+      await this.svc.salvarPerfis(
+        this.linhasPerfil().map((l) => ({ category: l.categoria, profile: l.perfil })),
+      );
+      this.perfisEdit.set({});
+      this.toast.success('Perfis de venda salvos.');
+    } catch (err) {
+      this.toast.error(this.svc.errorMessage(err, 'Não foi possível salvar os perfis de venda.'));
+    } finally {
+      this.salvandoPerfis.set(false);
+    }
+  }
   /** Ativos primeiro, depois por nome. */
   protected pratos = computed(() =>
     [...this.svc.pratos()].sort(

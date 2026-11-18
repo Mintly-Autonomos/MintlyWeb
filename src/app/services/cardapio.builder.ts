@@ -1,10 +1,13 @@
 import { PRICE_REVIEW_ALERT_DAYS } from 'mintly-lib';
+import type { PriceSensitivity } from 'mintly-lib';
 import { addDays } from './previsoes.builder';
 import { volumeNovo } from './cardapio-elasticidade';
 
 /** Prato do cardápio, na forma que as telas usam. */
 export interface Prato {
   id: string;
+  /** Sensibilidade a preço escolhida neste prato (servidor). Ausente = a do perfil da categoria. */
+  priceSensitivity?: PriceSensitivity;
   name: string;
   category: string | null;
   price: number;
@@ -70,8 +73,10 @@ export function toPrato(raw: {
   status: string;
   priceUpdatedAt: unknown;
   priceReviewedAt: unknown;
+  priceSensitivity?: PriceSensitivity | null;
 }): Prato {
   return {
+    ...(raw.priceSensitivity ? { priceSensitivity: raw.priceSensitivity } : {}),
     id: (raw._id ?? raw.id) as string,
     name: raw.name,
     // Texto vazio (apagou a categoria ao editar) vale "sem categoria", igual a ausente.

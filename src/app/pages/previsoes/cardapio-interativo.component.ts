@@ -11,11 +11,12 @@ import { ChartCardComponent } from '../../shared/chart-card.component';
 import { ScatterChartComponent, ScatterPoint } from '../../shared/scatter-chart.component';
 import { formatBRL, localISODate } from '../../shared/format';
 import { CardapioService, Prato } from '../../services/cardapio.service';
+import { PriceSensitivity, SALES_PROFILE_ELASTICITY, SALES_PROFILE_LABEL } from 'mintly-lib';
 import {
   ELASTICIDADE,
   SENSIBILIDADES,
   Medida,
-  Sensibilidade,
+  elasticidadeDoPrato,
   curvaLucro,
   elasticidadeMedida,
   precoOtimo,
@@ -35,16 +36,6 @@ import {
   recalcular,
   tempoLabel,
 } from '../../services/cardapio.builder';
-
-const CHAVE_SENSIBILIDADE = 'mintly.cardapio.sensibilidade';
-function lerSensibilidades(): Record<string, Sensibilidade | 'medida'> {
-  try {
-    const v = JSON.parse(localStorage.getItem(CHAVE_SENSIBILIDADE) ?? '{}');
-    return v && typeof v === 'object' ? v : {};
-  } catch {
-    return {};
-  }
-}
 
 const FORMA: Record<Quadrante, ScatterPoint['forma']> = {
   estrela: 'circle',
@@ -104,8 +95,8 @@ export class CardapioInterativoComponent {
 
   // ── P.6: elasticidade (quanto o volume cai quando o preço sobe) ──
   protected readonly SENSIBILIDADES = SENSIBILIDADES;
-  /** Escolha por prato: pouco/médio/muito sensível, ou 'medida' (pelo último reajuste). Fica neste navegador. */
-  protected sensibilidade = signal<Record<string, Sensibilidade | 'medida'>>(lerSensibilidades());
+  protected readonly SALES_PROFILE_LABEL = SALES_PROFILE_LABEL;
+  protected erroSensibilidade = signal<string | null>(null);
   protected medidas = computed(() => {
     const hoje = localISODate();
     const vendas = this.svc.vendas();
@@ -113,25 +104,37 @@ export class CardapioInterativoComponent {
     for (const p of this.pratos()) out[p.id] = elasticidadeMedida(vendas, p.id, hoje);
     return out;
   });
-  /** Elasticidade usada em cada prato: a escolhida; sem escolha, a medida (se houver) ou "médio". */
-  protected elasticidades = computed(() => {
-    const esc = this.sensibilidade();
+  /** Elasticidade de cada prato: a escolhida no prato > a medida no reajuste > o perfil da categoria. */
+  protected usadas = computed(() => {
     const med = this.medidas();
-    const out: Record<string, number> = {};
-    for (const p of this.pratos()) {
-      const m = med[p.id];
-      const s = esc[p.id] ?? (m?.ok ? 'medida' : 'media');
-      out[p.id] =
-        s === 'medida' && m?.ok ? m.elasticidade : ELASTICIDADE[s === 'medida' ? 'media' : s];
-    }
+    const perfis = this.svc.perfis();
+    const out: Record<string, ReturnType<typeof elasticidadeDoPrato>> = {};
+    for (const p of this.pratos()) out[p.id] = elasticidadeDoPrato(p, med[p.id] ?? null, perfis);
     return out;
   });
-  protected sensSel = computed(() => {
+  protected elasticidades = computed(() => {
+    const out: Record<string, number> = {};
+    for (const [id, u] of Object.entries(this.usadas())) out[id] = u.valor;
+    return out;
+  });
+  /** Opção marcada: a sensibilidade do prato, ou 'auto' (medida ou perfil da categoria). */
+  protected sensSel = computed<PriceSensitivity | 'auto'>(
+    () => this.pratoSel()?.priceSensitivity ?? 'auto',
+  );
+  protected usadaSel = computed(() => {
     const id = this.selecionado();
-    if (!id) return 'media';
+    return id ? (this.usadas()[id] ?? null) : null;
+  });
+  /** Rótulo do botão automático: "Medida" ou "Categoria: Balcão (−2,0)". */
+  protected autoRotulo = computed(() => {
+    const id = this.selecionado();
+    if (!id) return '';
     const m = this.medidas()[id];
-    const s = this.sensibilidade()[id] ?? (m?.ok ? 'medida' : 'media');
-    return s === 'medida' && !m?.ok ? 'media' : s;
+    const u = this.usadas()[id];
+    if (m?.ok) return 'Medida';
+    return u
+      ? `Categoria: ${SALES_PROFILE_LABEL[u.perfil]} (${this.fmtE(SALES_PROFILE_ELASTICITY[u.perfil])})`
+      : 'Categoria';
   });
   protected medidaSel = computed(() => {
     const id = this.selecionado();
@@ -177,12 +180,15 @@ export class CardapioInterativoComponent {
     return !!i && !!o && o.qtd > 0 && i.qtd < o.qtd * (1 - QUEDA_RISCO);
   });
 
-  setSensibilidade(id: string, s: Sensibilidade | 'medida'): void {
-    this.sensibilidade.update((m) => ({ ...m, [id]: s }));
+  /** Salva no servidor (vale em qualquer aparelho). `null`/'auto' volta à medida ou ao perfil da categoria. */
+  async setSensibilidade(id: string, s: PriceSensitivity | 'auto'): Promise<void> {
+    this.erroSensibilidade.set(null);
     try {
-      localStorage.setItem(CHAVE_SENSIBILIDADE, JSON.stringify(this.sensibilidade()));
-    } catch {
-      // Sem armazenamento (aba privada): a escolha vale só nesta visita.
+      await this.svc.setSensibilidade(id, s === 'auto' ? null : s);
+    } catch (err) {
+      this.erroSensibilidade.set(
+        apiErrorMessage(err, 'Não foi possível salvar a sensibilidade deste prato.'),
+      );
     }
   }
 
