@@ -47,6 +47,47 @@ export class ReceitasComponent implements OnInit {
   protected customFrom = signal(`${hoje().slice(0, 8)}01`);
   protected customTo = signal(hoje());
   protected rankMode = signal<'receita' | 'qtd' | 'lucro'>('receita');
+  /** P.7: modo do "Quando você mais vende". Semana abre primeiro: funciona mesmo sem hora nas vendas. */
+  protected modoQuando = signal<'dia' | 'semana' | 'mes' | 'ano' | 'mapa'>('semana');
+  protected readonly modosQuando: {
+    key: 'dia' | 'semana' | 'mes' | 'ano' | 'mapa';
+    label: string;
+  }[] = [
+    { key: 'dia', label: 'Dia' },
+    { key: 'semana', label: 'Semana' },
+    { key: 'mes', label: 'Mês' },
+    { key: 'ano', label: 'Ano' },
+    { key: 'mapa', label: 'Mapa' },
+  ];
+  protected readonly quandoSerie: BarSeries[] = [
+    { key: 'valor', name: 'Vendas', color: 'var(--ocean)' },
+  ];
+  protected readonly quandoAnoSeries: LineSeries[] = [
+    { key: 'valor', name: 'Vendas', color: 'var(--ocean)' },
+    { key: 'anoAnterior', name: 'Ano anterior', color: 'var(--muted-foreground)', dashed: true },
+  ];
+  /** Semana com o índice no rótulo ("Sáb · 1,40×"). */
+  protected semanaRotulada = computed(() =>
+    (this.data()?.quando.semana ?? []).map((s) => ({
+      ...s,
+      rotulo: `${s.dia} · ${s.indice.toFixed(2).replace('.', ',')}×`,
+    })),
+  );
+  protected quandoSubtitulo = computed(
+    () =>
+      ({
+        dia: 'Vendas por hora no período',
+        semana: 'Vendas por dia da semana no período',
+        mes: 'Vendas por dia do mês no período',
+        ano: 'Vendas dos últimos 12 meses',
+        mapa: 'Vendas por dia da semana e horário no período',
+      })[this.modoQuando()],
+  );
+  protected melhorDia = computed(() => {
+    const s = this.data()?.quando.semana ?? [];
+    const top = [...s].sort((a, b) => b.valor - a.valor)[0];
+    return top && top.valor > 0 ? top : null;
+  });
   protected readonly rankModes: { key: 'receita' | 'qtd' | 'lucro'; label: string }[] = [
     { key: 'receita', label: 'Por receita (R$)' },
     { key: 'qtd', label: 'Por quantidade' },
