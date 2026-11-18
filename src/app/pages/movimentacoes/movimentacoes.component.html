@@ -422,7 +422,7 @@
       <div class="space-y-5">
         <!-- Tipo -->
         @if (!editing()) {
-          <div class="grid grid-cols-2 gap-2" data-tour="mov-tipo">
+          <div class="grid grid-cols-2 gap-4" data-tour="mov-tipo">
             @for (t of tipoOpts; track t.value) {
               <button
                 type="button"
@@ -551,7 +551,7 @@
         }
 
         <!-- Valor + Data -->
-        <div class="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label class="block" data-tour="mov-valor">
             <span class="text-[13px] font-medium block mb-1.5">Valor bruto</span>
             <div class="relative">
@@ -767,8 +767,13 @@
 
         <!-- Canal, hora da venda e número de vendas (S3.4): só em entrada -->
         @if (form().type === 'income') {
-          <div class="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr] gap-4" data-tour="mov-venda">
-            <label class="block">
+          <!-- 4 colunas: o Canal ocupa 2 e cai na mesma divisão das outras linhas; o subgrid alinha os 3 campos
+               mesmo quando um rótulo quebra em duas linhas. -->
+          <div
+            class="grid grid-cols-1 md:grid-cols-4 md:grid-rows-[auto_auto_auto] gap-x-4 gap-y-4 md:gap-y-0"
+            data-tour="mov-venda"
+          >
+            <label class="block md:col-span-2 md:row-span-3 md:grid md:grid-rows-subgrid">
               <span class="text-[13px] font-medium block mb-1.5">Canal</span>
               <select
                 data-testid="campo-canal"
@@ -784,7 +789,7 @@
               </select>
               <p class="text-muted-foreground text-[12px] mt-1">{{ channelHint }}</p>
             </label>
-            <label class="block">
+            <label class="block min-w-0 md:row-span-3 md:grid md:grid-rows-subgrid">
               <span class="text-[13px] font-medium block mb-1.5"
                 >Hora da venda <span class="text-muted-foreground">(opcional)</span></span
               >
@@ -803,7 +808,7 @@
                 </p>
               }
             </label>
-            <label class="block">
+            <label class="block min-w-0 md:row-span-3 md:grid md:grid-rows-subgrid">
               <span class="text-[13px] font-medium block mb-1.5"
                 >Quantas vendas <span class="text-muted-foreground">(opcional)</span></span
               >
@@ -849,53 +854,57 @@
     }
 
     <ng-container ngProjectAs="[slot=footer]">
-      <div
-        class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 w-full"
-      >
-        @if (!importMode() && !editing()) {
-          <div>
-            <button
-              type="button"
-              (click)="downloadTemplate()"
-              class="h-10 px-4 w-full sm:w-auto justify-center rounded-xl border-2 border-mint bg-card text-mint text-sm font-medium hover:bg-mint-soft transition cursor-pointer flex items-center gap-2"
-            >
-              <app-icon name="download" [style]="{ fontSize: '16px' }" />Baixar modelo
-            </button>
-          </div>
-        }
+      <div class="w-full min-w-0 space-y-2">
         @if (!importMode() && missingFields.length > 0) {
-          <p class="text-[12px] text-muted-foreground sm:mr-auto" data-testid="falta-preencher">
+          <p class="text-[12px] text-muted-foreground" data-testid="falta-preencher">
             Falta preencher: {{ missingFields.join(', ') }}.
           </p>
         }
-        <div class="flex gap-3 sm:ml-auto [&>button]:flex-1 sm:[&>button]:flex-none">
-          <button
-            type="button"
-            (click)="closeModal()"
-            class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted transition cursor-pointer"
-          >
-            Cancelar
-          </button>
-          @if (importMode() && !editing()) {
-            <button
-              type="button"
-              (click)="submitImport()"
-              [disabled]="!importFile() || importing()"
-              class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 disabled:opacity-50 transition cursor-pointer"
-            >
-              {{ importing() ? 'Enviando…' : 'Importar' }}
-            </button>
-          } @else {
-            <button
-              type="button"
-              (click)="save()"
-              [disabled]="!formValid"
-              data-tour="mov-registrar"
-              class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 disabled:opacity-50 transition cursor-pointer"
-            >
-              {{ editing() ? 'Salvar alterações' : 'Registrar movimentação' }}
-            </button>
+        <div
+          class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 w-full"
+        >
+          @if (!importMode() && !editing()) {
+            <div>
+              <button
+                type="button"
+                (click)="downloadTemplate()"
+                class="h-10 px-4 w-full sm:w-auto justify-center rounded-xl border-2 border-mint bg-card text-mint text-sm font-medium hover:bg-mint-soft transition cursor-pointer flex items-center gap-2"
+              >
+                <app-icon name="download" [style]="{ fontSize: '16px' }" />Baixar modelo
+              </button>
+            </div>
           }
+          <div
+            class="flex gap-3 sm:ml-auto [&>button]:flex-1 sm:[&>button]:flex-none [&>button]:whitespace-nowrap"
+          >
+            <button
+              type="button"
+              (click)="closeModal()"
+              class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted transition cursor-pointer"
+            >
+              Cancelar
+            </button>
+            @if (importMode() && !editing()) {
+              <button
+                type="button"
+                (click)="submitImport()"
+                [disabled]="!importFile() || importing()"
+                class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 disabled:opacity-50 transition cursor-pointer"
+              >
+                {{ importing() ? 'Enviando…' : 'Importar' }}
+              </button>
+            } @else {
+              <button
+                type="button"
+                (click)="save()"
+                [disabled]="!formValid"
+                data-tour="mov-registrar"
+                class="h-10 px-5 rounded-xl bg-mint text-primary-foreground text-sm font-semibold hover:brightness-95 disabled:opacity-50 transition cursor-pointer"
+              >
+                {{ editing() ? 'Salvar alterações' : 'Registrar movimentação' }}
+              </button>
+            }
+          </div>
         </div>
       </div>
     </ng-container>
