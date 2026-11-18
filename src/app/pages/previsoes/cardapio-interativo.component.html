@@ -137,7 +137,7 @@
               <div class="min-w-0">
                 <div class="text-[15px] font-bold tracking-tight truncate">{{ item()!.nome }}</div>
                 <div class="text-[12.5px] text-muted-foreground">
-                  {{ item()!.categoria ?? 'Sem categoria' }} · {{ item()!.qtd }} vendidos no mês
+                  {{ item()!.categoria ?? 'Sem categoria' }} · {{ original()!.qtd }} vendidos no mês
                 </div>
               </div>
               @if (quadranteSel(); as q) {
@@ -192,6 +192,71 @@
               </div>
             </div>
 
+            <!-- P.6: sensibilidade do cliente ao preço -->
+            <div data-testid="sensibilidade">
+              <div
+                class="text-[12.5px] font-semibold text-foreground/80 mb-1.5 inline-flex items-center gap-1"
+              >
+                Meus clientes são sensíveis a preço?
+                <app-hint
+                  text="Quanto o volume cai quando o preço sobe 1%. Pouco = −1,2 (encomenda, bolo de festa), médio = −1,8 (doces do balcão), muito = −2,5 (impulso, concorrente perto). Com um reajuste nas vendas, o Mintly mede: volume das 4 semanas antes contra as 4 depois."
+                />
+              </div>
+              <div
+                class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
+              >
+                @for (s of SENSIBILIDADES; track s.key) {
+                  <button
+                    type="button"
+                    (click)="setSensibilidade(item()!.id, s.key)"
+                    [attr.aria-pressed]="sensSel() === s.key"
+                    [attr.data-testid]="'sens-' + s.key"
+                    [title]="s.desc"
+                    [class]="
+                      'h-7 px-3 rounded-full text-[12px] font-semibold transition-colors cursor-pointer ' +
+                      (sensSel() === s.key
+                        ? 'bg-mint-soft text-ocean'
+                        : 'text-muted-foreground hover:bg-muted')
+                    "
+                  >
+                    {{ s.label }}
+                  </button>
+                }
+                @if (medidaSel()?.ok) {
+                  <button
+                    type="button"
+                    (click)="setSensibilidade(item()!.id, 'medida')"
+                    [attr.aria-pressed]="sensSel() === 'medida'"
+                    data-testid="sens-medida"
+                    [class]="
+                      'h-7 px-3 rounded-full text-[12px] font-semibold transition-colors cursor-pointer ' +
+                      (sensSel() === 'medida'
+                        ? 'bg-mint-soft text-ocean'
+                        : 'text-muted-foreground hover:bg-muted')
+                    "
+                  >
+                    Medida
+                  </button>
+                }
+              </div>
+              <div class="mt-1 text-[11.5px] text-muted-foreground" data-testid="sens-explica">
+                @if (medidaSel(); as m) {
+                  @if (m.ok) {
+                    No reajuste de {{ m.data.slice(8, 10) }}/{{ m.data.slice(5, 7) }} ({{
+                      fmtBRL(m.de)
+                    }}
+                    → {{ fmtBRL(m.para) }}), as vendas foram de {{ m.antes }} para {{ m.depois }} em
+                    4 semanas: elasticidade {{ fmtE(m.elasticidade) }}.
+                  } @else {
+                    {{ m.motivo }}
+                  }
+                } @else {
+                  Elasticidade {{ fmtE(elasticidadeSel()) }}. Quando houver um reajuste nas vendas,
+                  o Mintly mede a dos seus clientes.
+                }
+              </div>
+            </div>
+
             <div class="rounded-xl bg-muted/50 border border-border p-3.5 space-y-1.5">
               <div class="text-[13px] leading-relaxed">
                 Se você cobrar <strong class="tabular-nums">{{ fmtBRL(item()!.preco) }}</strong
@@ -199,7 +264,8 @@
                 <strong class="tabular-nums">{{ fmtBRL(original()!.margem) }}</strong> para
                 <strong class="tabular-nums">{{ fmtBRL(item()!.margem) }}</strong> por unidade ({{
                   item()!.margemPct.toFixed(0)
-                }}%).
+                }}%)<span data-testid="qtd-nova">{{ qtdFrase() }}</span
+                >.
               </div>
               <div
                 [class]="
@@ -214,14 +280,104 @@
                 @if (impacto() === 0) {
                   Sem mudança no lucro do mês.
                 } @else {
-                  ≈ {{ impacto() > 0 ? '+' : '−' }}{{ fmtBRL(Math.abs(impacto())) }}/mês, se o
-                  volume se mantiver.
+                  ≈ {{ impacto() > 0 ? '+' : '−' }}{{ fmtBRL(Math.abs(impacto())) }}/mês no lucro do
+                  prato, já contando a mudança nas vendas.
                 }
               </div>
+              @if (riscoSel()) {
+                <div class="text-[12px] font-semibold text-error" data-testid="risco-cliente">
+                  As vendas caem mais de 30%: risco de perder o cliente de vez.
+                </div>
+              }
               <div class="text-[11px] text-muted-foreground">
-                Estimativa, assumindo que a procura não muda.
+                Cliente que deixa de comprar por preço nem sempre volta quando o preço cai. Prefira
+                reajustar em passos de até 5–10% e medir antes do próximo.
               </div>
             </div>
+
+            @if (curva(); as cv) {
+              <div data-testid="curva-lucro">
+                <div class="text-[12.5px] font-semibold text-foreground/80 mb-1">
+                  Lucro do prato por mês × preço
+                </div>
+                <svg
+                  viewBox="0 0 320 120"
+                  class="w-full h-[120px]"
+                  role="img"
+                  aria-label="Lucro do prato em cada preço"
+                >
+                  @if (cv.zona) {
+                    <rect
+                      [attr.x]="cv.zona.x"
+                      y="0"
+                      [attr.width]="cv.zona.w"
+                      height="116"
+                      fill="var(--error)"
+                      opacity="0.08"
+                    />
+                  }
+                  <line
+                    x1="0"
+                    x2="320"
+                    [attr.y1]="cv.zeroY"
+                    [attr.y2]="cv.zeroY"
+                    stroke="var(--border)"
+                    stroke-dasharray="3 3"
+                  />
+                  <path [attr.d]="cv.linha" fill="none" stroke="var(--ocean)" stroke-width="2" />
+                  <circle
+                    [attr.cx]="cv.melhor.x"
+                    [attr.cy]="cv.melhor.y"
+                    r="4"
+                    fill="var(--success)"
+                  />
+                  <circle
+                    [attr.cx]="cv.atual.x"
+                    [attr.cy]="cv.atual.y"
+                    r="4"
+                    fill="var(--card)"
+                    stroke="var(--ocean)"
+                    stroke-width="2"
+                  />
+                </svg>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
+                  <span class="inline-flex items-center gap-1.5"
+                    ><span
+                      class="h-2.5 w-2.5 rounded-full"
+                      style="background: var(--success)"
+                    ></span
+                    >Maior lucro nesta faixa: {{ fmtBRL(cv.melhor.preco) }}</span
+                  >
+                  <span class="inline-flex items-center gap-1.5"
+                    ><span
+                      class="h-2.5 w-2.5 rounded-full border-2"
+                      style="border-color: var(--ocean)"
+                    ></span
+                    >Preço simulado</span
+                  >
+                  @if (cv.zona) {
+                    <span class="inline-flex items-center gap-1.5"
+                      ><span
+                        class="h-2.5 w-2.5 rounded-sm"
+                        style="background: var(--error); opacity: 0.3"
+                      ></span
+                      >Vendas caem mais de 30%</span
+                    >
+                  }
+                </div>
+                @if (otimo(); as ot) {
+                  <div class="mt-1 text-[11.5px] text-muted-foreground" data-testid="preco-otimo">
+                    Com elasticidade {{ fmtE(elasticidadeSel()) }}, o preço de maior lucro é
+                    {{ fmtBRL(ot) }} (custo × e ÷ (e + 1)).
+                  </div>
+                } @else {
+                  <div class="mt-1 text-[11.5px] text-muted-foreground" data-testid="preco-otimo">
+                    Com clientes pouco sensíveis (elasticidade acima de −1), subir o preço sempre
+                    aumenta o lucro na conta, mas o risco de perder clientes cresce.
+                  </div>
+                }
+              </div>
+            }
 
             <div class="flex flex-wrap items-center gap-2">
               <button
@@ -353,8 +509,9 @@
 
   <p class="text-[11.5px] text-muted-foreground leading-relaxed pb-2">
     Análise de cardápio baseada na metodologia de menu engineering (Kasavana & Smith, 1982). As
-    simulações de preço são estimativas e assumem que a procura não muda. Aqui você só simula: para
-    mudar o preço de verdade, use o Cardápio. Mudar o preço ou escolher "Não quero mudar" lá conta
-    como revisão e silencia o aviso do sino por cerca de 5 meses e meio.
+    simulações de preço são estimativas e já contam a queda (ou a alta) das vendas pela
+    sensibilidade escolhida. Aqui você só simula: para mudar o preço de verdade, use o Cardápio.
+    Mudar o preço ou escolher "Não quero mudar" lá conta como revisão e silencia o aviso do sino por
+    cerca de 5 meses e meio.
   </p>
 </div>

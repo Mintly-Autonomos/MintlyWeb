@@ -71,6 +71,8 @@ export class CardapioService {
   );
   readonly alertas = signal<PratoAlerta[]>([]);
   readonly loading = signal(false);
+  /** P.6: as vendas, para medir a elasticidade nos reajustes (o preço de cada prato fica guardado na venda). */
+  readonly vendas = computed(() => this.movimentacoes.movements());
   readonly categorias = computed(() =>
     [
       ...new Set(
