@@ -50,10 +50,20 @@ export interface StackedSeries {
         }
       </div>
       <div class="flex gap-2 pl-11 mt-1.5">
-        @for (row of linhas(); track row.label) {
-          <span class="flex-1 min-w-0 text-center text-[11.5px] text-muted-foreground truncate">{{
-            row.label
-          }}</span>
+        @for (row of linhas(); track row.label; let i = $index) {
+          <span class="flex-1 min-w-0 flex flex-col items-center">
+            <span class="w-full text-center text-[11.5px] text-muted-foreground truncate">{{
+              row.label
+            }}</span>
+            @if (row.sub) {
+              <span
+                class="text-[11px] font-semibold tabular-nums"
+                [style.color]="row.subColor ?? 'var(--muted-foreground)'"
+                [attr.data-testid]="'sub-' + i"
+                >{{ row.sub }}</span
+              >
+            }
+          </span>
         }
       </div>
       <ul class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[12px]">
@@ -74,6 +84,9 @@ export class StackedBarsComponent {
   @Input() categoryKey = 'mes';
   @Input() series: StackedSeries[] = [];
   @Input() valueFormatter: (v: number) => string = (v) => String(v);
+  /** Segunda linha embaixo do rótulo (P.2: o índice sazonal do mês). */
+  @Input() subKey: string | null = null;
+  @Input() subColorFor: ((d: Record<string, unknown>) => string | null) | null = null;
 
   protected linhas = computed(() =>
     this.dados().map((d) => {
@@ -83,6 +96,8 @@ export class StackedBarsComponent {
       return {
         label,
         total,
+        sub: this.subKey ? String(d[this.subKey] ?? '') : '',
+        subColor: this.subColorFor ? this.subColorFor(d) : null,
         segs: vals
           .filter((s) => s.v > 0)
           .map((s) => ({ key: s.key, color: s.color, pct: (s.v / total) * 100 })),

@@ -12,6 +12,7 @@ import { ChartCardComponent } from '../../shared/chart-card.component';
 import { InsightCardComponent } from '../../shared/insight-card.component';
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
+import { StackedBarsComponent, StackedSeries } from '../../shared/stacked-bars.component';
 import { ToastService } from '../../shared/toast.service';
 import { formatBRL, formatCompact } from '../../shared/format';
 
@@ -33,6 +34,7 @@ const PAY_COLORS = ['var(--mint)', 'var(--ocean)', 'var(--warning)'];
     InsightCardComponent,
     BarChartComponent,
     LineChartComponent,
+    StackedBarsComponent,
   ],
   templateUrl: './receitas.component.html',
 })
@@ -139,6 +141,27 @@ export class ReceitasComponent implements OnInit {
       ? [this.serieSalao, this.serieDelivery, this.serieEncomendas]
       : [this.serieSalao, this.serieDelivery],
   );
+
+  /** P.2: sazonalidade por canal, com o índice embaixo de cada mês. */
+  protected sazonalLinhas = computed(() =>
+    (this.data()?.sazonalidade.meses ?? []).map((m) => ({
+      ...m,
+      indiceTxt: m.parcial
+        ? 'parcial'
+        : m.indice === null
+          ? ''
+          : `${m.indice.toFixed(2).replace('.', ',')}×`,
+    })),
+  );
+  protected sazonalSeries = computed<StackedSeries[]>(() =>
+    this.data()?.temEncomendas
+      ? [this.serieSalao, this.serieDelivery, this.serieEncomendas]
+      : [this.serieSalao, this.serieDelivery],
+  );
+  protected sazonalCor = (d: Record<string, unknown>): string | null => {
+    const t = d['temporada'];
+    return t === 'alta' ? 'var(--success)' : t === 'baixa' ? 'var(--warning)' : null;
+  };
 
   /** Ícone e cor do chip de cada canal. */
   protected canalChip(canal: string): { tone: 'mint' | 'warning' | 'ocean'; icon: string } {
