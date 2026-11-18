@@ -33,7 +33,7 @@ function buildMockReport(): OverviewReport {
   const variacao = ((s.grossRevenue - s.prevGrossRevenue) / s.prevGrossRevenue) * 100;
   const scoreTendencia = variacao > 2 ? 100 : variacao >= -2 ? 60 : 25;
   const score = Math.round(
-    scoreMargem * 0.3 + scoreFolego * 0.3 + scorePrime * 0.25 + scoreTendencia * 0.15,
+    scoreMargem * 0.25 + scoreFolego * 0.25 + scorePrime * 0.2 + scoreTendencia * 0.15 + 100 * 0.15,
   );
 
   const insights: OverviewInsight[] = [
@@ -104,10 +104,11 @@ function buildMockReport(): OverviewReport {
       label: score >= 70 ? 'healthy' : score >= 40 ? 'attention' : 'risk',
       basisMonth: '2026-07',
       pillars: [
-        { key: 'netMargin', weight: 0.3, score: scoreMargem, value: s.marginPct / 100 },
-        { key: 'runway', weight: 0.3, score: scoreFolego, value: folego },
-        { key: 'primeCost', weight: 0.25, score: scorePrime, value: s.primeCostPct / 100 },
+        { key: 'netMargin', weight: 0.25, score: scoreMargem, value: s.marginPct / 100 },
+        { key: 'runway', weight: 0.25, score: scoreFolego, value: folego },
+        { key: 'primeCost', weight: 0.2, score: scorePrime, value: s.primeCostPct / 100 },
         { key: 'revenueTrend', weight: 0.15, score: scoreTendencia, value: variacao / 100 },
+        { key: 'debts', weight: 0.15, score: 100, value: 0 },
       ],
       bands: { risk: 40, attention: 70 },
     },

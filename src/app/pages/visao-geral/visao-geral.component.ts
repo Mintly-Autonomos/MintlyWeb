@@ -50,12 +50,15 @@ const PILLAR_LABEL: Record<string, string> = {
   runway: 'Fôlego de caixa',
   primeCost: 'Custo primário',
   revenueTrend: 'Tendência de vendas',
+  debts: 'Dívidas e vencidos',
 };
 
 /** `mesPassado`: o score é do mês já fechado, e o caixa daquela época não existe (fôlego fica sem nota). */
 function pillarDetail(key: string, value: number | null, mesPassado = false): string {
   if (value === null)
-    return key === 'runway' && mesPassado ? 'só calculado para o mês atual' : 'sem dado suficiente';
+    return (key === 'runway' || key === 'debts') && mesPassado
+      ? 'só calculado para o mês atual'
+      : 'sem dado suficiente';
   switch (key) {
     case 'netMargin':
       return `${pctFmt(value * 100)} de margem`;
@@ -65,6 +68,10 @@ function pillarDetail(key: string, value: number | null, mesPassado = false): st
       return `~${Math.round(value)} dias de caixa`;
     case 'revenueTrend':
       return `${value >= 0 ? '+' : ''}${pctFmt(value * 100)} vs. média`;
+    case 'debts':
+      return value <= 0
+        ? 'nada vencido'
+        : `vencido = ${pctFmt(value * 100)} da despesa do mês (20% ou mais zera o pilar)`;
     default:
       return '';
   }
@@ -121,6 +128,10 @@ export class VisaoGeralComponent implements OnInit {
   protected readonly pillarColor = pillarColor;
 
   /** P.9: "Dívidas e vencidos" ao lado dos 4 pilares. Não entra na média: conta vencida trava a nota. */
+  /** O pilar "Dívidas" veio da API (nova): a linha avulsa abaixo dos pilares deixa de aparecer. */
+  protected temPilarDividas = computed(
+    () => !!this.data()?.health.pillars.some((p) => p.key === 'debts'),
+  );
   protected dividas = computed(() => {
     const cap = this.data()?.health.cap;
     const vencido = !!cap?.reasons.includes('overduePayables');
