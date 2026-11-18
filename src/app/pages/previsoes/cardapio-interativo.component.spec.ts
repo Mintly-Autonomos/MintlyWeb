@@ -66,7 +66,13 @@ describe('CardapioInterativoComponent: sugestão de aumento pela IA', () => {
         { provide: AiService, useValue: ai },
         {
           provide: CardapioService,
-          useValue: { pratos: signal(pratos), loading: signal(false), vendas: signal([]) },
+          useValue: {
+            pratos: signal(pratos),
+            loading: signal(false),
+            vendas: signal([]),
+            perfis: signal([]),
+            setSensibilidade: vi.fn(() => Promise.resolve()),
+          },
         },
       ],
     });

@@ -1,9 +1,11 @@
 import { analisar, impactoMes, recalcular, Prato } from './cardapio.builder';
+import { PriceSensitivity, SalesProfile } from 'mintly-lib';
 import {
   ELASTICIDADE,
   VendaComPreco,
   curvaLucro,
   elasticidadeMedida,
+  elasticidadeDoPrato,
   precoOtimo,
   volumeNovo,
 } from './cardapio-elasticidade';
@@ -139,5 +141,57 @@ describe('elasticidade medida pelo histórico (P.6)', () => {
     ];
     const m = elasticidadeMedida(v, 'br', '2026-11-17');
     expect(m).toMatchObject({ ok: true, depois: 252 });
+  });
+});
+
+describe('elasticidadeDoPrato: prato > medida > categoria > dia a dia', () => {
+  const medidaOk = {
+    ok: true as const,
+    elasticidade: -1.1,
+    data: '2026-10-01',
+    de: 5.5,
+    para: 6,
+    antes: 280,
+    depois: 252,
+  };
+
+  it('sem nada escolhido: perfil sugerido pelo nome da categoria', () => {
+    const u = elasticidadeDoPrato({ category: 'Bebidas' }, null, []);
+    expect(u).toMatchObject({
+      origem: 'categoria',
+      perfil: 'drink',
+      perfilSugerido: true,
+      valor: -1.2,
+    });
+    expect(elasticidadeDoPrato({ category: null }, null, [])).toMatchObject({
+      perfil: 'everyday',
+      valor: -1.5,
+    });
+  });
+
+  it('o perfil salvo da categoria vale sobre o sugerido (sem diferenciar caixa)', () => {
+    const u = elasticidadeDoPrato({ category: 'bebidas' }, null, [
+      { category: 'Bebidas', profile: SalesProfile.Order },
+    ]);
+    expect(u).toMatchObject({
+      origem: 'categoria',
+      perfil: 'order',
+      perfilSugerido: false,
+      valor: -1,
+    });
+  });
+
+  it('a medida no reajuste vale sobre a categoria; a escolha do prato vale sobre tudo', () => {
+    expect(elasticidadeDoPrato({ category: 'Doces' }, medidaOk, [])).toMatchObject({
+      origem: 'medida',
+      valor: -1.1,
+    });
+    expect(
+      elasticidadeDoPrato(
+        { category: 'Doces', priceSensitivity: PriceSensitivity.High },
+        medidaOk,
+        [],
+      ),
+    ).toMatchObject({ origem: 'prato', valor: -2.5 });
   });
 });

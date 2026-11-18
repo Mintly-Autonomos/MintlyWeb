@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import type { Headers } from 'mintly-lib';
+import type { Headers, MenuCategoryProfile, PriceSensitivity } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { apiErrorInfo } from '../shared/api-error';
@@ -70,6 +70,8 @@ export class CardapioService {
     aplicarVendidos(this.pratosBase(), this.movimentacoes.movements(), localISODate()),
   );
   readonly alertas = signal<PratoAlerta[]>([]);
+  /** Perfil de venda escolhido para cada categoria (servidor). Categoria sem escolha usa o sugerido pelo nome. */
+  readonly perfis = signal<MenuCategoryProfile[]>([]);
   readonly loading = signal(false);
   /** P.6: as vendas, para medir a elasticidade nos reajustes (o preço de cada prato fica guardado na venda). */
   readonly vendas = computed(() => this.movimentacoes.movements());
@@ -119,6 +121,7 @@ export class CardapioService {
       await Promise.all([
         this.refreshPratos(),
         this.refreshAlertas(),
+        this.refreshPerfis(),
         // "Vendidos no mês" sai das vendas: sem elas carregadas o número ficaria zerado.
         this.movimentacoes.refresh().catch(() => undefined),
       ]);
@@ -137,6 +140,51 @@ export class CardapioService {
       this.menuClient.findAll({ page: 1, size: 100 }, headers),
     );
     this.pratosBase.set((response.payload ?? []).map(toPrato));
+  }
+
+  /** Perfis de venda por categoria. Sem eles (API antiga, erro), vale o sugerido pelo nome. */
+  async refreshPerfis(): Promise<void> {
+    if (environment.useMocks) return;
+    try {
+      const res = await this.call((headers) => this.menuClient.categoryProfiles(headers));
+      this.perfis.set(res.payload?.profiles ?? []);
+    } catch {
+      this.perfis.set([]);
+    }
+  }
+
+  /** Troca a lista inteira dos perfis por categoria (dono ou gerente). */
+  async salvarPerfis(profiles: MenuCategoryProfile[]): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      this.perfis.set(profiles);
+      return;
+    }
+    const res = await this.call((headers) =>
+      this.menuClient.saveCategoryProfiles(profiles, headers),
+    );
+    this.perfis.set(res.payload?.profiles ?? profiles);
+  }
+
+  /** Sensibilidade a preço do prato (`null` volta a usar a da categoria / a medida). */
+  async setSensibilidade(id: string, s: PriceSensitivity | null): Promise<void> {
+    const antes = this.pratosBase();
+    // Já mostra a escolha; se a API recusar, volta ao que estava.
+    this.pratosBase.update((l) =>
+      l.map((p) => {
+        if (p.id !== id) return p;
+        const resto = { ...p };
+        delete resto.priceSensitivity;
+        return s ? { ...resto, priceSensitivity: s } : resto;
+      }),
+    );
+    if (environment.useMocks) return;
+    try {
+      await this.call((headers) => this.menuClient.update(id, { priceSensitivity: s }, headers));
+    } catch (err) {
+      this.pratosBase.set(antes);
+      throw err;
+    }
   }
 
   /** Só os avisos (usado pelo sino, que não precisa da lista inteira). */

@@ -39,6 +39,8 @@ describe('CardapioComponent', () => {
     const svc = {
       pratos: signal(pratos),
       categorias: signal(['Frango']),
+      perfis: signal<{ category: string; profile: string }[]>([]),
+      salvarPerfis: vi.fn(() => Promise.resolve()),
       loading: signal(false),
       refresh: vi.fn(() => Promise.resolve()),
       create: vi.fn(() => Promise.resolve()),
@@ -68,6 +70,28 @@ describe('CardapioComponent', () => {
     const c = fixture.componentInstance as unknown as Internals;
     return { fixture, root, text, svc, toast, c };
   }
+
+  it('perfil de venda: cada categoria aparece com o perfil sugerido pelo nome; salvar grava todas', async () => {
+    const { root, svc, fixture } = render([prato({})]);
+    svc.categorias.set(['Frango', 'Bebidas']);
+    fixture.detectChanges();
+    const card = root.querySelector('[data-testid="perfis-venda"]')!;
+    expect(card.textContent).toContain('sugerido');
+    const bebidas = root.querySelector<HTMLSelectElement>('[data-testid="perfil-Bebidas"]')!;
+    expect(bebidas.value).toBe('drink');
+    expect(root.querySelector<HTMLSelectElement>('[data-testid="perfil-Frango"]')!.value).toBe(
+      'everyday',
+    );
+    bebidas.value = 'order';
+    bebidas.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('[data-testid="salvar-perfis"]')!.click();
+    await fixture.whenStable();
+    expect(svc.salvarPerfis).toHaveBeenCalledWith([
+      { category: 'Frango', profile: 'everyday' },
+      { category: 'Bebidas', profile: 'order' },
+    ]);
+  });
 
   it('carrega os pratos ao abrir e lista nome, categoria, preço e custo', () => {
     const { svc, text } = render([prato({})]);

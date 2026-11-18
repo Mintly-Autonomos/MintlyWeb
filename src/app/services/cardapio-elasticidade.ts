@@ -5,10 +5,22 @@
  *   lucro do prato = (preço − custo) × volume
  *   preço de lucro máximo = custo × e ÷ (e + 1)   (só existe com e < −1; com e ≥ −1, subir sempre dá mais lucro)
  *
- * A elasticidade diz quanto o volume cai quando o preço sobe 1% (−1,8 = cai 1,8%). O dono escolhe entre
- * "pouco, médio ou muito sensíveis" (−1,2 / −1,8 / −2,5, as faixas do relatório) ou usa a medida pelo histórico,
- * quando houve reajuste: volume das 4 semanas antes contra as 4 semanas depois.
+ * A elasticidade diz quanto o volume cai quando o preço sobe 1% (−1,8 = cai 1,8%). Ordem usada no simulador:
+ *  1. a escolhida no próprio prato ("pouco, médio ou muito sensíveis": −1,2 / −1,8 / −2,5), salva no servidor;
+ *  2. a medida no último reajuste (volume das 4 semanas antes contra as 4 depois);
+ *  3. a do perfil de venda da categoria (Balcão −2,0, Dia a dia −1,5, Bebida −1,2, Encomenda −1,0), o escolhido
+ *     pelo dono ou, sem escolha, o sugerido pelo nome;
+ *  4. "Dia a dia".
  */
+import {
+  DEFAULT_SALES_PROFILE,
+  PRICE_SENSITIVITY_ELASTICITY,
+  PriceSensitivity,
+  SALES_PROFILE_ELASTICITY,
+  SALES_PROFILE_LABEL,
+  SalesProfile,
+  suggestSalesProfile,
+} from 'mintly-lib';
 
 export type Sensibilidade = 'pouca' | 'media' | 'muita';
 export const ELASTICIDADE: Record<Sensibilidade, number> = {
@@ -16,11 +28,58 @@ export const ELASTICIDADE: Record<Sensibilidade, number> = {
   media: -1.8,
   muita: -2.5,
 };
-export const SENSIBILIDADES: { key: Sensibilidade; label: string; desc: string }[] = [
-  { key: 'pouca', label: 'Pouco', desc: 'encomenda, bolo de festa, cliente fiel (−1,2)' },
-  { key: 'media', label: 'Médio', desc: 'doces do balcão, pratos do dia a dia (−1,8)' },
-  { key: 'muita', label: 'Muito', desc: 'compra por impulso, tem concorrente do lado (−2,5)' },
+export const SENSIBILIDADES: { key: PriceSensitivity; label: string; desc: string }[] = [
+  {
+    key: PriceSensitivity.Low,
+    label: 'Pouco',
+    desc: 'encomenda, bolo de festa, cliente fiel (−1,2)',
+  },
+  {
+    key: PriceSensitivity.Medium,
+    label: 'Médio',
+    desc: 'doces do balcão, pratos do dia a dia (−1,8)',
+  },
+  {
+    key: PriceSensitivity.High,
+    label: 'Muito',
+    desc: 'compra por impulso, tem concorrente do lado (−2,5)',
+  },
 ];
+
+export interface ElasticidadeUsada {
+  valor: number;
+  origem: 'prato' | 'medida' | 'categoria';
+  /** Perfil da categoria (quando é ele que vale, ou o que valeria sem a escolha do prato). */
+  perfil: SalesProfile;
+  perfilSugerido: boolean;
+}
+
+/** Elasticidade do prato na ordem: escolha do prato > medida no reajuste > perfil da categoria > dia a dia. */
+export function elasticidadeDoPrato(
+  prato: { category: string | null; priceSensitivity?: PriceSensitivity | null },
+  medida: Medida | null,
+  perfisSalvos: { category: string; profile: SalesProfile }[],
+): ElasticidadeUsada {
+  const salvo = perfisSalvos.find(
+    (p) =>
+      p.category.toLocaleLowerCase('pt-BR') ===
+      (prato.category ?? '').trim().toLocaleLowerCase('pt-BR'),
+  );
+  const perfil =
+    salvo?.profile ??
+    (prato.category ? suggestSalesProfile(prato.category) : DEFAULT_SALES_PROFILE);
+  const base = { perfil, perfilSugerido: !salvo };
+  if (prato.priceSensitivity)
+    return {
+      ...base,
+      valor: PRICE_SENSITIVITY_ELASTICITY[prato.priceSensitivity],
+      origem: 'prato',
+    };
+  if (medida?.ok) return { ...base, valor: medida.elasticidade, origem: 'medida' };
+  return { ...base, valor: SALES_PROFILE_ELASTICITY[perfil], origem: 'categoria' };
+}
+
+export { SALES_PROFILE_LABEL };
 /** Queda de volume a partir da qual o simulador avisa do risco de perder o cliente de vez. */
 export const QUEDA_RISCO = 0.3;
 /** Janela de comparação da elasticidade medida (4 semanas antes e 4 depois do reajuste). */
