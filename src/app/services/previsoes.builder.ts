@@ -86,6 +86,8 @@ export interface PrevBase {
    * para o gráfico de lucro não mostrar variação de caixa. Ausente: usa `realizado`.
    */
   realizadoLucro?: Record<string, number>;
+  /** P.4: vendas por mês FECHADO pela data da venda ("AAAA-MM" → total), base da produtividade da equipe. */
+  historicoMensal?: Record<string, number>;
   temDados: boolean;
 }
 
@@ -103,6 +105,17 @@ export const addDays = (s: string, n: number) => {
 };
 const label = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
 const money = (n: number) => Math.round(n * 100) / 100;
+
+/** Vendas por mês já fechado (antes do mês de `hoje`). */
+function porMesFechado(vendas: VendaHist[], hoje: string): Record<string, number> {
+  const mesAtual = hoje.slice(0, 7);
+  const out: Record<string, number> = {};
+  for (const v of vendas) {
+    const ym = v.data.slice(0, 7);
+    if (ym < mesAtual) out[ym] = (out[ym] ?? 0) + v.valor;
+  }
+  return out;
+}
 
 export function buildBase(
   movs: PrevMov[],
@@ -163,6 +176,7 @@ export function buildBase(
     custoVarDia: custoVar / PASSADO,
     custoFixoDia: custoFixo / PASSADO,
     previsao: preverVendas(historico, hoje, receita / PASSADO),
+    historicoMensal: porMesFechado(historico, hoje),
     pendentes,
     realizado,
     realizadoLucro,

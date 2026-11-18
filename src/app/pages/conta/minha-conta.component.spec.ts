@@ -38,6 +38,7 @@ describe('MinhaContaComponent', () => {
     over: {
       dados?: ContaDados;
       membros?: Membro[];
+      equipe?: { nome: string; horasSemana: number }[] | null;
       exclusaoEm?: string | null;
       lento?: boolean;
       tier?: 'basic' | 'pro' | null;
@@ -49,11 +50,16 @@ describe('MinhaContaComponent', () => {
     const restaurante = signal('Cantina');
     const membros = signal<Membro[]>(over.membros ?? []);
     const exclusaoPedidaEm = signal<string | null>(over.exclusaoEm ?? null);
+    const equipe = signal(over.equipe ?? null);
     const svc = {
       dados,
       restaurante,
       membros,
+      equipe,
       exclusaoPedidaEm,
+      salvarEquipe: vi.fn((l: { nome: string; horasSemana: number }[]) =>
+        Promise.resolve(equipe.set(l)),
+      ),
       carregarConta: vi.fn(() =>
         over.lento
           ? new Promise<void>((resolve) => {
@@ -267,6 +273,36 @@ describe('MinhaContaComponent', () => {
       await r.click('aba-restaurante');
       return r;
     }
+
+    it('equipe (P.4): adiciona pessoas com horas por semana, valida e salva a lista inteira', async () => {
+      const { q, svc, type, click, text } = await naAbaRestaurante({
+        equipe: [{ nome: 'Dona Bel', horasSemana: 60 }],
+      });
+      expect(q<HTMLInputElement>('equipe-nome-0')!.value).toBe('Dona Bel');
+      expect(q<HTMLButtonElement>('equipe-salvar')!.disabled).toBe(true);
+      await click('equipe-adicionar');
+      // Sem nome: não deixa salvar.
+      expect(q<HTMLButtonElement>('equipe-salvar')!.disabled).toBe(true);
+      await type('equipe-nome-1', 'Joana');
+      await type('equipe-horas-1', '22,5');
+      expect(text()).toContain('Total: 82,5 h por semana');
+      await click('equipe-salvar');
+      expect(svc.salvarEquipe).toHaveBeenCalledWith([
+        { nome: 'Dona Bel', horasSemana: 60 },
+        { nome: 'Joana', horasSemana: 22.5 },
+      ]);
+    });
+
+    it('equipe (P.4): horas fora de 1 a 112 bloqueiam o salvar; remover tira da lista', async () => {
+      const { q, type, click } = await naAbaRestaurante({
+        equipe: [{ nome: 'Ana', horasSemana: 44 }],
+      });
+      await type('equipe-horas-0', '200');
+      expect(q<HTMLButtonElement>('equipe-salvar')!.disabled).toBe(true);
+      await click('equipe-remover-0');
+      expect(q('equipe-nome-0')).toBeNull();
+      expect(q<HTMLButtonElement>('equipe-salvar')!.disabled).toBe(false);
+    });
 
     it('o nome só pode ser salvo depois de mudar, e salva', async () => {
       const { q, svc, type, click } = await naAbaRestaurante();

@@ -38,6 +38,7 @@ describe('Previsões: número grande, veredito e dados incompletos (relatório, 
           provide: PrevisoesService,
           useValue: {
             base: signal(base),
+            equipe: signal(null),
             loading: signal(false),
             loaded: signal(true),
             refresh: vi.fn(() => Promise.resolve()),

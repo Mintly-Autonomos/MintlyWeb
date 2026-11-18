@@ -40,9 +40,16 @@ function delay(ms = 300): Promise<void> {
 }
 
 /** Estado do modo demonstração (`useMocks`): vale só enquanto a aba está aberta. */
+/** Pessoa da equipe com a carga semanal do contrato (P.4). Não é login. */
+export interface PessoaEquipe {
+  nome: string;
+  horasSemana: number;
+}
+
 const mock = {
   telefone: '11999990000',
   restaurante: '',
+  equipe: null as PessoaEquipe[] | null,
   exclusaoEm: null as string | null,
   membros: [] as Membro[],
 };
@@ -93,6 +100,8 @@ export class ContaService {
 
   readonly dados = signal<ContaDados | null>(null);
   readonly restaurante = signal<string>('');
+  /** P.4: equipe e horas por semana. `null` = nunca informada. */
+  readonly equipe = signal<PessoaEquipe[] | null>(null);
   readonly membros = signal<Membro[]>([]);
   /** Quando o dono pediu a exclusão do restaurante (ISO); `null` = sem pedido. */
   readonly exclusaoPedidaEm = signal<string | null>(null);
@@ -194,15 +203,36 @@ export class ContaService {
         mock.restaurante || this.auth.currentUser()?.empresa || 'Meu restaurante',
       );
       this.exclusaoPedidaEm.set(mock.exclusaoEm);
+      this.equipe.set(mock.equipe);
       return;
     }
     const res = await this.call((h) => this.client.restaurantClient.me({}, h));
     const r = res.payload?.restaurant;
     if (r) {
       this.restaurante.set(r.name);
+      this.equipe.set(
+        r.team ? r.team.map((p) => ({ nome: p.name, horasSemana: p.weeklyHours })) : null,
+      );
       const pedido = (r as { deletionRequestedAt?: Date | string }).deletionRequestedAt;
       this.exclusaoPedidaEm.set(pedido ? new Date(pedido).toISOString() : null);
     }
+  }
+
+  /** P.4: troca a lista inteira da equipe. */
+  async salvarEquipe(lista: PessoaEquipe[]): Promise<void> {
+    const team = lista.map((p) => ({ name: p.nome.trim(), weeklyHours: p.horasSemana }));
+    if (environment.useMocks) {
+      await delay();
+      mock.equipe = lista.map((p) => ({ ...p, nome: p.nome.trim() }));
+    } else {
+      const res = await this.call((h) => this.client.restaurantClient.updateMe({ team }, h));
+      const salvo = res.payload?.team;
+      if (salvo) {
+        this.equipe.set(salvo.map((p) => ({ nome: p.name, horasSemana: p.weeklyHours })));
+        return;
+      }
+    }
+    this.equipe.set(team.map((p) => ({ nome: p.name, horasSemana: p.weeklyHours })));
   }
 
   async renomearRestaurante(nome: string): Promise<void> {

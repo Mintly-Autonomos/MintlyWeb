@@ -713,6 +713,130 @@
           </div>
         </section>
 
+        <!-- P.4: reforçar ou segurar a equipe -->
+        <section class="m3-card p-5 space-y-3" data-testid="contratacao">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 class="text-[15px] font-semibold inline-flex items-center gap-1">
+                Equipe: reforçar ou segurar?
+                <app-hint
+                  text="Produtividade = vendas do mês ÷ horas da equipe. A referência é a média dos 2 meses mais produtivos (a equipe no limite). Horas necessárias = vendas previstas ÷ produtividade de referência. Vale reforçar quando a margem das vendas extras paga as horas de reforço. Contratar fixo só se as vendas ficarem 15% acima da média por 3 meses seguidos; senão, reforço temporário (freelancer)."
+                />
+              </h3>
+              <p class="text-[12.5px] text-muted-foreground mt-0.5">
+                Pelas vendas previstas de cada mês do horizonte e pelas horas da equipe.
+              </p>
+            </div>
+            @if (contratacao()) {
+              <label class="text-[12px] text-muted-foreground inline-flex items-center gap-2">
+                Custo da hora de reforço
+                <span class="relative">
+                  <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[12px]">R$</span>
+                  <input
+                    type="text"
+                    inputmode="decimal"
+                    [value]="custoHora()"
+                    (input)="setCustoHora($any($event.target).value)"
+                    class="h-8 w-20 rounded-lg border border-border bg-card pl-7 pr-2 text-[12.5px] text-right tabular-nums"
+                    data-testid="custo-hora"
+                    aria-label="Custo da hora de reforço"
+                  />
+                </span>
+              </label>
+            }
+          </div>
+
+          @if (!equipe()?.length) {
+            <p class="text-[13px] text-muted-foreground" data-testid="contratacao-sem-equipe">
+              Cadastre a equipe e as horas por semana em
+              <b>Minha conta → Restaurante → Equipe e horas</b>
+              (no menu do seu nome, no topo). Com isso o Mintly diz em que meses reforçar e em quais
+              segurar.
+            </p>
+          } @else if (!contratacao()) {
+            <p class="text-[13px] text-muted-foreground" data-testid="contratacao-pouco-historico">
+              Precisa de pelo menos 3 meses fechados de vendas para medir a produtividade da equipe.
+            </p>
+          } @else {
+            @if (contratacao(); as ct) {
+              <p class="text-[12.5px] text-muted-foreground" data-testid="contratacao-ref">
+                Equipe: {{ ct.horasSemana }} h por semana. Produtividade de referência:
+                <b class="text-foreground">{{ fmtBRL(ct.produtividadeRef) }} por hora</b> ({{
+                  ct.mesesRef.join(' e ')
+                }}).
+                @if (margemContrib() === null) {
+                  Sem custo variável lançado nos últimos 30 dias: a conta considera que toda venda
+                  extra vira margem.
+                } @else {
+                  Margem de contribuição: {{ Math.round(margemContrib()! * 100) }}%.
+                }
+              </p>
+              <div class="overflow-x-auto">
+                <table class="w-full text-[12.5px] min-w-[520px]">
+                  <thead>
+                    <tr class="text-left text-muted-foreground border-b border-border">
+                      <th class="py-2 pr-3 font-medium">Mês</th>
+                      <th class="py-2 pr-3 font-medium text-right">Vendas previstas</th>
+                      <th class="py-2 pr-3 font-medium text-right">Horas necessárias</th>
+                      <th class="py-2 pr-3 font-medium text-right">Horas da equipe</th>
+                      <th class="py-2 font-medium">Recomendação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (m of ct.meses; track m.mes) {
+                      <tr
+                        class="border-b border-border/60 align-top"
+                        [attr.data-testid]="'contratacao-' + m.mes"
+                      >
+                        <td class="py-2 pr-3 font-medium whitespace-nowrap">{{ m.mes }}</td>
+                        <td class="py-2 pr-3 text-right tabular-nums">{{ fmtBRL(m.previsto) }}</td>
+                        <td class="py-2 pr-3 text-right tabular-nums">{{ fmtH(m.necessarias) }}</td>
+                        <td class="py-2 pr-3 text-right tabular-nums">{{ fmtH(m.disponiveis) }}</td>
+                        <td class="py-2">
+                          <app-chip [tone]="DECISAO[m.decisao].tom">{{
+                            DECISAO[m.decisao].texto
+                          }}</app-chip>
+                          <div class="mt-1 text-[11.5px] text-muted-foreground">
+                            @switch (m.decisao) {
+                              @case ('reforcar') {
+                                Faltam ~{{ fmtH(m.reforco) }} (≈ {{ m.diarias }} diárias de 8 h,
+                                {{ fmtBRL(m.custoReforco) }}). As vendas extras ({{
+                                  fmtBRL(m.vendasExtras)
+                                }}) deixam ~{{ fmtBRL(m.lucroExtra) }} de margem.
+                              }
+                              @case ('nao-compensa') {
+                                Faltam ~{{ fmtH(m.reforco) }}, mas a margem das vendas extras ({{
+                                  fmtBRL(m.lucroExtra)
+                                }}) não paga o reforço ({{ fmtBRL(m.custoReforco) }}).
+                              }
+                              @case ('folga') {
+                                Sobram ~{{ fmtH(-m.reforco) }}: bom mês para férias ou banco de
+                                horas.
+                              }
+                              @default {
+                                As horas da equipe cobrem as vendas previstas.
+                              }
+                            }
+                          </div>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <p class="text-[12px] text-muted-foreground" data-testid="contratacao-clt">
+                @if (ct.avaliarFixo) {
+                  As vendas previstas ficam 15% acima da média por 3 meses seguidos: vale avaliar
+                  uma contratação fixa.
+                } @else {
+                  Contratação fixa (CLT) só compensa quando as vendas ficam 15% acima da média por 3
+                  meses seguidos; para picos de um mês, o caminho é reforço temporário.
+                }
+              </p>
+            }
+          }
+        </section>
+
         @if (conciliacao(); as c) {
           <section class="m3-card p-5 space-y-3" data-testid="conciliacao">
             <div>

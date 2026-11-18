@@ -1,3 +1,4 @@
+import { Decisao, recomendarContratacao } from '../../services/previsoes-contratacao';
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
@@ -96,6 +97,53 @@ export class PrevisoesComponent implements OnInit {
   protected dados = this.svc.base;
   protected caixaHoje = computed(() => this.dados().caixaHoje);
   protected readonly volumeDoPreco = volumeDoPreco;
+
+  // ── P.4: reforçar ou segurar a equipe ──
+  protected equipe = this.svc.equipe;
+  protected horasSemana = computed(() =>
+    (this.equipe() ?? []).reduce((s, p) => s + p.horasSemana, 0),
+  );
+  /** Custo de uma hora de reforço (diária de freelancer ÷ 8). Só nesta tela, para simular. */
+  protected custoHora = signal(25);
+  /** Fração das vendas que sobra depois do custo variável (últimos 30 dias). null = sem custo variável lançado. */
+  protected margemContrib = computed(() => {
+    const b = this.dados();
+    return b.receitaDia > 0 && b.custoVarDia > 0
+      ? Math.max(0, 1 - b.custoVarDia / b.receitaDia)
+      : null;
+  });
+  protected contratacao = computed(() => {
+    const p = this.dados().previsao;
+    if (!p) return null;
+    const hoje = this.dados().hoje;
+    const [y, m, d] = hoje.split('-').map(Number);
+    const fim = new Date(y, m - 1, d + this.horizonte());
+    const nMeses = (fim.getFullYear() - y) * 12 + fim.getMonth() - (m - 1) + 1;
+    return recomendarContratacao({
+      horasSemana: this.horasSemana(),
+      historico: this.dados().historicoMensal ?? {},
+      previstos: p.meses.slice(0, nMeses),
+      margemContrib: this.margemContrib() ?? 1,
+      custoHora: this.custoHora(),
+    });
+  });
+  protected readonly DECISAO: Record<
+    Decisao,
+    { texto: string; tom: 'mint' | 'warning' | 'ocean' | 'neutral' }
+  > = {
+    reforcar: { texto: 'Reforçar', tom: 'warning' },
+    'nao-compensa': { texto: 'Falta gente, mas não compensa', tom: 'neutral' },
+    folga: { texto: 'Segurar: sobra hora', tom: 'ocean' },
+    ok: { texto: 'Equipe dá conta', tom: 'mint' },
+  };
+  protected setCustoHora(v: string): void {
+    const n = Number(v.replace(',', '.'));
+    this.custoHora.set(Number.isFinite(n) && n >= 0 ? n : 0);
+  }
+  /** "84 h" / "−120 h" */
+  protected fmtH(n: number): string {
+    return `${n < 0 ? '−' : ''}${Math.abs(Math.round(n))} h`;
+  }
   /** "8,2%" (sem sinal). */
   protected pctAbs(n: number): string {
     return `${Math.abs(n).toFixed(1).replace('.', ',')}%`;
