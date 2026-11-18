@@ -160,6 +160,19 @@ export class PrevisoesComponent implements OnInit {
     const fim = new Date(y, m - 1, d + this.horizonte());
     const nMeses = (fim.getFullYear() - y) * 12 + fim.getMonth() - (m - 1) + 1;
     const meses = p.meses.slice(0, nMeses);
+    const fimIso = `${fim.getFullYear()}-${String(fim.getMonth() + 1).padStart(2, '0')}-${String(fim.getDate()).padStart(2, '0')}`;
+    const fx = (n: number) => `${n.toFixed(2).replace('.', ',')}×`;
+    const feriados = p.feriados
+      .filter((f) => f.data <= fimIso)
+      .map((f) => ({
+        ...f,
+        rotulo: `${f.data.slice(8, 10)}/${f.data.slice(5, 7)} ${f.nome}`,
+        efeito: f.medido
+          ? f.fator < 0.15
+            ? 'você costuma fechar ou quase não vender'
+            : `vende ${fx(f.fator)} um dia normal`
+          : 'sem histórico, conta como dia normal',
+      }));
     const erro =
       p.erroMedio !== null
         ? `Testado nos meses já fechados, o método costuma errar ±${Math.round(p.erroMedio * 100)}%; é essa a faixa do gráfico.`
@@ -172,6 +185,7 @@ export class PrevisoesComponent implements OnInit {
         texto: `Cada mês = o mesmo mês do ano anterior × ${fator(p.crescimento ?? 1)}, o crescimento (média dos últimos 6 meses ÷ média dos 6 anteriores). O total do mês se espalha pelos dias conforme o dia da semana que mais vende.`,
         erro,
         meses,
+        feriados,
       };
     if (p.nivel === 'media')
       return {
@@ -181,6 +195,7 @@ export class PrevisoesComponent implements OnInit {
         texto: `Com ${p.mesesHistorico} meses de histórico, as vendas seguem a média por dia dos últimos 90 dias, ajustada pelo dia da semana (sábado forte pesa mais, dia fechado pesa zero). Com 12 meses, a previsão passa a usar o mesmo mês do ano anterior.`,
         erro,
         meses,
+        feriados,
       };
     return {
       nivel: p.nivel,
@@ -190,6 +205,7 @@ export class PrevisoesComponent implements OnInit {
         'Ainda há menos de 3 meses completos de vendas, então a previsão segue o ritmo dos últimos 30 dias, igual em todo dia. Com 3 meses ela passa a considerar o dia da semana; com 12, a sazonalidade do ano.',
       erro,
       meses,
+      feriados,
     };
   });
   /** Do saldo do Fluxo de caixa (só o lançado) até o caixa projetado aqui (sem as alavancas do simulador). */
