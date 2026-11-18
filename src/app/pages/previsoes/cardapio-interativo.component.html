@@ -251,7 +251,10 @@
                 } @else {
                   Elasticidade {{ fmtE(elasticidadeSel()) }}
                   @if (usadaSel(); as u) {
-                    @if (u.origem === 'categoria') {
+                    @if (u.origem === 'categoria' && !pratoSel()?.category) {
+                      — prato sem categoria: vale "{{ SALES_PROFILE_LABEL[u.perfil] }}" (dê uma
+                      categoria a ele no Cardápio para escolher o perfil).
+                    } @else if (u.origem === 'categoria') {
                       — perfil "{{ SALES_PROFILE_LABEL[u.perfil] }}" da categoria{{
                         u.perfilSugerido ? ' (sugerido pelo nome; ajuste no Cardápio)' : ''
                       }}.
