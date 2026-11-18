@@ -493,6 +493,35 @@
         </app-chart-card>
       </div>
 
+      <!-- P.2 — Sazonalidade por canal -->
+      <app-chart-card
+        title="Sazonalidade por canal"
+        description="Últimos 12 meses pelo dia da venda. Embaixo de cada mês, o índice sazonal (verde é alta, laranja é baixa)."
+        [loading]="loading()"
+        [height]="320"
+      >
+        <span slot="title-extra"><app-hint [text]="h.sazonalidadeCanal" /></span>
+        <div class="h-full flex flex-col" data-testid="sazonalidade">
+          <div class="flex-1 min-h-0">
+            <app-stacked-bars
+              [data]="sazonalLinhas()"
+              categoryKey="mes"
+              [series]="sazonalSeries()"
+              subKey="indiceTxt"
+              [subColorFor]="sazonalCor"
+              [valueFormatter]="abrev"
+            />
+          </div>
+          <p class="mt-2 text-[12px] text-muted-foreground" data-testid="sazonalidade-resumo">
+            @if (d.sazonalidade.resumo) {
+              {{ d.sazonalidade.resumo }} Média mensal: {{ fmtBRL(d.sazonalidade.mediaMensal) }}.
+            } @else {
+              Com menos de 3 meses de vendas ainda não dá para calcular o índice sazonal.
+            }
+          </p>
+        </div>
+      </app-chart-card>
+
       <!-- 8 — Formas de pagamento -->
       <app-chart-card
         title="Formas de pagamento"

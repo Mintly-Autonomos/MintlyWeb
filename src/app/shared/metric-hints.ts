@@ -113,6 +113,10 @@ export const METRIC_HINTS = {
     'Quanto cada canal fatura (barra escura) e quanto sobra depois das taxas (barra verde). No delivery, o app cobra comissão.',
     'receita do canal; líquida = receita do canal − taxas desse canal − impostos sobre a venda.',
   ),
+  sazonalidadeCanal: calc(
+    'Em que meses cada canal vende mais ou menos. Ajuda a planejar compras, equipe e promoções.',
+    'vendas de cada canal por mês, pelo dia da venda, nos 12 meses até o fim do período. Índice sazonal = vendas do mês ÷ média mensal dos meses com histórico; acima de 1,15 é alta temporada e abaixo de 0,85 é baixa. Precisa de pelo menos 3 meses de vendas.',
+  ),
   formasPagamento: calc(
     'Como seus clientes pagaram e quanto cada forma custou em taxa.',
     'soma das vendas por forma de pagamento no período; o % é (bruto − líquido) ÷ bruto, a taxa que a conta cobrou nessas vendas.',

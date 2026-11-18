@@ -5,6 +5,7 @@
  */
 import { shortDateRange } from '../shared/format';
 import { porDiaDaSemana, porDiaDoMes, porHora, porMesDoAno } from './receitas-quando';
+import { Sazonalidade, sazonalidadePorCanal } from './receitas-sazonalidade';
 
 export type PeriodKey = 'Hoje' | '7 dias' | 'Este mês' | 'Mês passado' | 'Personalizado';
 export type Canal = 'salao' | 'delivery' | 'encomendas';
@@ -94,6 +95,8 @@ export interface ReceitasDataset {
   heatmapCobertura?: string;
   /** Alguma entrada (em qualquer período) é encomenda: a tela mostra o canal. */
   temEncomendas: boolean;
+  /** P.2: os 12 meses até o fim do período, por canal, com o índice sazonal. */
+  sazonalidade: Sazonalidade;
   /** Na visão por mês (12 meses): `anoAnterior` = mesmo mês do ano anterior e `media3` = média dos últimos 3 meses. */
   tendencia: {
     mes: string;
@@ -579,6 +582,7 @@ export function buildReceitas(
       'Preencha a hora da venda nos lançamentos (campo "Hora da venda") para ver em que dia e horário você mais vende.',
     heatmapCobertura: mapa.cobertura,
     temEncomendas,
+    sazonalidade: sazonalidadePorCanal(movs, win.end),
     tendencia,
     tendenciaDescricao,
     pedidosLabel: win.pedidosLabel,
