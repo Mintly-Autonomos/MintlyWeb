@@ -5,6 +5,7 @@ import {
   addDays,
   ajustesDe,
   ALAVANCAS_ZERO,
+  volumeDoPreco,
   buildBase,
   simular,
 } from './previsoes.builder';
@@ -223,5 +224,18 @@ describe('ajustesDe', () => {
   it('cenário fraco/cheio vira ±25% de vendas', () => {
     expect(ajustesDe({ ...ALAVANCAS_ZERO, cenario: 'fraco' }, 'cenario').volume).toBe(-25);
     expect(ajustesDe({ ...ALAVANCAS_ZERO, cenario: 'cheio' }, 'cenario').volume).toBe(25);
+  });
+});
+
+describe('alavanca de preço com elasticidade (P.6)', () => {
+  it('+10% de preço tira ~15,8% das vendas com elasticidade −1,8', () => {
+    expect(volumeDoPreco(10)).toBe(-15.8);
+    expect(volumeDoPreco(-10)).toBe(20.9);
+    expect(volumeDoPreco(0)).toBe(0);
+    expect(ajustesDe({ ...ALAVANCAS_ZERO, preco: 10 }, 'preco')).toEqual({
+      preco: 10,
+      volume: -15.8,
+      custo: 0,
+    });
   });
 });

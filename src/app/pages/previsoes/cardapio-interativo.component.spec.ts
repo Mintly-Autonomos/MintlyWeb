@@ -64,7 +64,10 @@ describe('CardapioInterativoComponent: sugestão de aumento pela IA', () => {
       providers: [
         provideRouter([]),
         { provide: AiService, useValue: ai },
-        { provide: CardapioService, useValue: { pratos: signal(pratos), loading: signal(false) } },
+        {
+          provide: CardapioService,
+          useValue: { pratos: signal(pratos), loading: signal(false), vendas: signal([]) },
+        },
       ],
     });
     // Sem renderizar o gráfico: o que importa aqui é o estado, e protected é só do TypeScript.

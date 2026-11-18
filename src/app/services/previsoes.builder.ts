@@ -183,9 +183,17 @@ export const ALAVANCAS_ZERO: Alavancas = { volume: 0, preco: 0, custo: 0, cenari
 export const alavancaNoNormal = (a: Alavancas, k: LeverKey): boolean =>
   k === 'cenario' ? a.cenario === 'normal' : a[k] === 0;
 
+/** P.6: elasticidade usada na alavanca de preço do simulador geral (clientes medianamente sensíveis). */
+export const ELASTICIDADE_GERAL = -1.8;
+
+/** Queda (ou alta) de volume, em %, de mudar todos os preços em `preco`% (elasticidade constante). */
+export const volumeDoPreco = (preco: number, e = ELASTICIDADE_GERAL): number =>
+  preco === 0 ? 0 : Math.round((Math.pow(1 + preco / 100, e) - 1) * 1000) / 10;
+
 export function ajustesDe(a: Alavancas, ativa: LeverKey): Ajustes {
   if (ativa === 'volume') return { ...AJUSTES_ZERO, volume: a.volume };
-  if (ativa === 'preco') return { ...AJUSTES_ZERO, preco: a.preco };
+  // P.6: subir o preço também tira vendas; antes +10% de preço dava +10% de receita sem perder ninguém.
+  if (ativa === 'preco') return { ...AJUSTES_ZERO, preco: a.preco, volume: volumeDoPreco(a.preco) };
   if (ativa === 'custo') return { ...AJUSTES_ZERO, custo: a.custo };
   return { ...AJUSTES_ZERO, volume: a.cenario === 'fraco' ? -25 : a.cenario === 'cheio' ? 25 : 0 };
 }

@@ -11,6 +11,7 @@ import {
   LeverKey,
   SimMetric,
   ajustesDe,
+  volumeDoPreco,
   alavancaNoNormal,
   isDefault,
   simular,
@@ -94,6 +95,11 @@ export class PrevisoesComponent implements OnInit {
   protected readonly Math = Math;
   protected dados = this.svc.base;
   protected caixaHoje = computed(() => this.dados().caixaHoje);
+  protected readonly volumeDoPreco = volumeDoPreco;
+  /** "8,2%" (sem sinal). */
+  protected pctAbs(n: number): string {
+    return `${Math.abs(n).toFixed(1).replace('.', ',')}%`;
+  }
 
   /** P.5: como as vendas futuras foram previstas (o nível depende do histórico), para a tela explicar. */
   protected metodo = computed(() => {

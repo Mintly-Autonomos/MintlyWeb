@@ -1,5 +1,6 @@
 import { PRICE_REVIEW_ALERT_DAYS } from 'mintly-lib';
 import { addDays } from './previsoes.builder';
+import { volumeNovo } from './cardapio-elasticidade';
 
 /** Prato do cardápio, na forma que as telas usam. */
 export interface Prato {
@@ -195,12 +196,16 @@ export const analisavel = (p: Prato): boolean => p.active && p.cost > 0 && p.sol
 /** Prato ativo ao qual ainda falta custo ou vendas registradas com ele. */
 export const incompleto = (p: Prato): boolean => p.active && !analisavel(p);
 
-export function recalcular(p: Prato, preco: number): ItemAnalise {
+/**
+ * O prato com o preço simulado. P.6: com `elasticidade` (< 0), o volume muda com o preço
+ * (volume × (preço novo ÷ atual) ^ e); com 0, o volume se mantém.
+ */
+export function recalcular(p: Prato, preco: number, elasticidade = 0): ItemAnalise {
   return {
     id: p.id,
     nome: p.name,
     categoria: p.category,
-    qtd: p.soldPerMonth,
+    qtd: elasticidade ? volumeNovo(p.soldPerMonth, p.price, preco, elasticidade) : p.soldPerMonth,
     preco,
     custo: p.cost,
     margem: preco - p.cost,
@@ -248,8 +253,14 @@ export function quadranteDe(
  * Classifica o cardápio. `precos` são preços simulados por id de prato: o prato simulado pode mudar de
  * grupo e, como as médias são recalculadas com os preços simulados, os outros também podem.
  */
-export function analisar(pratos: Prato[], precos: Record<string, number> = {}): AnaliseCardapio {
-  const itens = pratos.filter(analisavel).map((p) => recalcular(p, precos[p.id] ?? p.price));
+export function analisar(
+  pratos: Prato[],
+  precos: Record<string, number> = {},
+  elasticidades: Record<string, number> = {},
+): AnaliseCardapio {
+  const itens = pratos
+    .filter(analisavel)
+    .map((p) => recalcular(p, precos[p.id] ?? p.price, elasticidades[p.id] ?? 0));
   const n = itens.length || 1;
   const totalQtd = itens.reduce((s, i) => s + i.qtd, 0);
   const mediaQtd = totalQtd / n;
@@ -266,9 +277,9 @@ export function analisar(pratos: Prato[], precos: Record<string, number> = {}): 
   return { itens, mediaQtd, limiarQtd, margemMedia, grupos };
 }
 
-/** Impacto no lucro do mês de trocar o preço, se o volume se mantiver. */
+/** Impacto no lucro do mês de trocar o preço (P.6: com o volume que o simulado já traz). */
 export function impactoMes(simulado: ItemAnalise, original: ItemAnalise): number {
-  return (simulado.margem - original.margem) * simulado.qtd;
+  return simulado.margem * simulado.qtd - original.margem * original.qtd;
 }
 
 /** Faixa do controle de preço: de "custo + R$ 1" (ou preço − R$ 10) até preço + R$ 10, de R$ 0,50 em R$ 0,50. */

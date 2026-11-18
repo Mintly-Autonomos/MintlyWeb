@@ -9,8 +9,19 @@ import { HintComponent } from '../../shared/hint.component';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { ChartCardComponent } from '../../shared/chart-card.component';
 import { ScatterChartComponent, ScatterPoint } from '../../shared/scatter-chart.component';
-import { formatBRL } from '../../shared/format';
+import { formatBRL, localISODate } from '../../shared/format';
 import { CardapioService, Prato } from '../../services/cardapio.service';
+import {
+  ELASTICIDADE,
+  SENSIBILIDADES,
+  Medida,
+  Sensibilidade,
+  curvaLucro,
+  elasticidadeMedida,
+  precoOtimo,
+  QUEDA_RISCO,
+} from '../../services/cardapio-elasticidade';
+
 import {
   ORDEM_QUADRANTES,
   QUADRANTES,
@@ -24,6 +35,16 @@ import {
   recalcular,
   tempoLabel,
 } from '../../services/cardapio.builder';
+
+const CHAVE_SENSIBILIDADE = 'mintly.cardapio.sensibilidade';
+function lerSensibilidades(): Record<string, Sensibilidade | 'medida'> {
+  try {
+    const v = JSON.parse(localStorage.getItem(CHAVE_SENSIBILIDADE) ?? '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
 
 const FORMA: Record<Quadrante, ScatterPoint['forma']> = {
   estrela: 'circle',
@@ -81,7 +102,104 @@ export class CardapioInterativoComponent {
   protected verGrafico = signal(false);
   protected destaque = signal<string | null>(null);
 
-  protected analise = computed(() => analisar(this.pratos(), this.precos()));
+  // ── P.6: elasticidade (quanto o volume cai quando o preço sobe) ──
+  protected readonly SENSIBILIDADES = SENSIBILIDADES;
+  /** Escolha por prato: pouco/médio/muito sensível, ou 'medida' (pelo último reajuste). Fica neste navegador. */
+  protected sensibilidade = signal<Record<string, Sensibilidade | 'medida'>>(lerSensibilidades());
+  protected medidas = computed(() => {
+    const hoje = localISODate();
+    const vendas = this.svc.vendas();
+    const out: Record<string, Medida | null> = {};
+    for (const p of this.pratos()) out[p.id] = elasticidadeMedida(vendas, p.id, hoje);
+    return out;
+  });
+  /** Elasticidade usada em cada prato: a escolhida; sem escolha, a medida (se houver) ou "médio". */
+  protected elasticidades = computed(() => {
+    const esc = this.sensibilidade();
+    const med = this.medidas();
+    const out: Record<string, number> = {};
+    for (const p of this.pratos()) {
+      const m = med[p.id];
+      const s = esc[p.id] ?? (m?.ok ? 'medida' : 'media');
+      out[p.id] =
+        s === 'medida' && m?.ok ? m.elasticidade : ELASTICIDADE[s === 'medida' ? 'media' : s];
+    }
+    return out;
+  });
+  protected sensSel = computed(() => {
+    const id = this.selecionado();
+    if (!id) return 'media';
+    const m = this.medidas()[id];
+    const s = this.sensibilidade()[id] ?? (m?.ok ? 'medida' : 'media');
+    return s === 'medida' && !m?.ok ? 'media' : s;
+  });
+  protected medidaSel = computed(() => {
+    const id = this.selecionado();
+    return id ? (this.medidas()[id] ?? null) : null;
+  });
+  protected elasticidadeSel = computed(() => {
+    const id = this.selecionado();
+    return id ? (this.elasticidades()[id] ?? ELASTICIDADE.media) : ELASTICIDADE.media;
+  });
+  protected otimo = computed(() => {
+    const p = this.pratoSel();
+    return p ? precoOtimo(p.cost, this.elasticidadeSel()) : null;
+  });
+  /** Curva lucro × preço, já em coordenadas do SVG (320 × 120). */
+  protected curva = computed(() => {
+    const p = this.pratoSel();
+    const f = this.faixa();
+    const i = this.item();
+    if (!p || !f || !i) return null;
+    const pts = curvaLucro(p, this.elasticidadeSel(), f);
+    const lucros = pts.map((x) => x.lucro);
+    const lo = Math.min(0, ...lucros);
+    const hi = Math.max(...lucros, 1);
+    const x = (preco: number) => ((preco - f.min) / (f.max - f.min || 1)) * 320;
+    const y = (l: number) => 112 - ((l - lo) / (hi - lo || 1)) * 104;
+    const linha = pts
+      .map((q, k) => `${k ? 'L' : 'M'}${x(q.preco).toFixed(1)},${y(q.lucro).toFixed(1)}`)
+      .join(' ');
+    const riscos = pts.filter((q) => q.risco);
+    const zona = riscos.length ? { x: x(riscos[0].preco), w: 320 - x(riscos[0].preco) } : null;
+    const melhor = pts.reduce((a, b) => (b.lucro > a.lucro ? b : a));
+    return {
+      linha,
+      zona,
+      atual: { x: x(i.preco), y: y((i.preco - p.cost) * i.qtd) },
+      melhor: { x: x(melhor.preco), y: y(melhor.lucro), preco: melhor.preco },
+      zeroY: y(0),
+    };
+  });
+  protected riscoSel = computed(() => {
+    const i = this.item();
+    const o = this.original();
+    return !!i && !!o && o.qtd > 0 && i.qtd < o.qtd * (1 - QUEDA_RISCO);
+  });
+
+  setSensibilidade(id: string, s: Sensibilidade | 'medida'): void {
+    this.sensibilidade.update((m) => ({ ...m, [id]: s }));
+    try {
+      localStorage.setItem(CHAVE_SENSIBILIDADE, JSON.stringify(this.sensibilidade()));
+    } catch {
+      // Sem armazenamento (aba privada): a escolha vale só nesta visita.
+    }
+  }
+
+  /** "−1,80" (com o sinal de menos tipográfico). */
+  protected fmtE(e: number): string {
+    return e.toFixed(2).replace('.', ',').replace('-', '−');
+  }
+
+  /** " e as vendas devem ir de 84 para ~67 por mês" (vazio sem mudança de preço). */
+  protected qtdFrase = computed(() => {
+    const i = this.item();
+    const o = this.original();
+    if (!i || !o || !i.alterado) return '';
+    return ` e as vendas devem ir de ${o.qtd} para ~${Math.round(i.qtd)} por mês`;
+  });
+
+  protected analise = computed(() => analisar(this.pratos(), this.precos(), this.elasticidades()));
   protected temAnalise = computed(() => this.analise().itens.length > 0);
   protected item = computed(() => {
     const id = this.selecionado();
