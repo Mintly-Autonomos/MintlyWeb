@@ -792,7 +792,27 @@ export class MovimentacoesComponent implements OnInit {
   }
 
   setFormField<K extends keyof MovForm>(k: K, v: MovForm[K]): void {
+    if (k === 'status') this.statusEscolhido = true;
     this.form.update((f) => ({ ...f, [k]: v }));
+    if (k === 'accountId' || k === 'date') this.sugerirStatus();
+  }
+
+  /** O status foi escolhido à mão neste lançamento novo: o automático não mexe mais nele. */
+  private statusEscolhido = false;
+
+  /**
+   * Lançamento NOVO: entrada em conta com repasse (cartão, iFood) nasce "Pendente", porque o dinheiro só cai
+   * depois do prazo; sem repasse, nasce liquidada ("Recebido"/"Pago"). Não mexe se a pessoa escolheu o status
+   * nem em lançamento que está sendo editado.
+   */
+  private sugerirStatus(): void {
+    if (!this.creating() || this.editing() || this.statusEscolhido) return;
+    const f = this.form();
+    if (f.status === 'cancelled') return;
+    const repasse = this.settlementDate;
+    const status: MovStatus =
+      f.type === 'income' ? (repasse && repasse > f.date ? 'pending' : 'received') : 'paid';
+    if (status !== f.status) this.form.update((x) => ({ ...x, status }));
   }
 
   /** Switches the movement type, keeping the status valid for the new type. */
@@ -817,6 +837,7 @@ export class MovimentacoesComponent implements OnInit {
         salesCount: type === 'income' ? f.salesCount : '',
       };
     });
+    this.sugerirStatus();
   }
 
   private errMsg(err: unknown): string {
@@ -859,6 +880,8 @@ export class MovimentacoesComponent implements OnInit {
     this.importMode.set(false);
     this.importFile.set(null);
     this.creating.set(true);
+    this.statusEscolhido = false;
+    this.sugerirStatus();
     this.formInicial = JSON.stringify(this.form());
   }
 

@@ -122,14 +122,8 @@
     @if (alerta()) {
       <app-insight-card
         severity="atencao"
-        [title]="'Seu caixa vai ficar apertado por volta do dia ' + diaAperto()"
-        [description]="
-          'Várias contas vencem juntas e seu caixa deve cair para cerca de ' +
-          fmtBRL(criticalInsight()!.balance) +
-          ' no dia ' +
-          diaAperto() +
-          '. Considere antecipar recebimentos ou renegociar prazos.'
-        "
+        [title]="alertaTitulo()"
+        [description]="alertaTexto()"
         action="Ver vencimentos"
         (actionClick)="scrollToVencimentos()"
       />
