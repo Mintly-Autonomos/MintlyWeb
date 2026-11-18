@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { quandoTexto } from '../../shared/quando';
 import { MovementDirection, MovementStatus } from 'mintly-lib';
 import {
   FluxoCaixaService,
@@ -173,6 +174,25 @@ export class FluxoCaixaComponent implements OnInit {
     const c = this.criticalInsight();
     return c ? offsetFromIso(c.date) : 0;
   });
+  /** "hoje" / "amanhã" / "em 22/11 (daqui a 4 dias)" */
+  protected quandoAperta = computed(() => {
+    const c = this.criticalInsight();
+    return c ? quandoTexto(c.date, this.hoje()) : '';
+  });
+  protected alertaTitulo = computed(() =>
+    this.diaAperto() <= 0
+      ? 'Seu caixa já está abaixo do mínimo hoje'
+      : `Seu caixa vai ficar apertado ${this.quandoAperta()}`,
+  );
+  protected alertaTexto = computed(() => {
+    const c = this.criticalInsight();
+    if (!c) return '';
+    const saldo = formatBRL(c.balance);
+    const minimo = formatBRL(c.threshold);
+    return this.diaAperto() <= 0
+      ? `O saldo está em cerca de ${saldo}, abaixo do caixa mínimo de ${minimo}. Considere antecipar recebimentos ou renegociar prazos.`
+      : `Várias contas vencem juntas e seu caixa deve cair para cerca de ${saldo} ${this.quandoAperta()}, abaixo do caixa mínimo de ${minimo}. Considere antecipar recebimentos ou renegociar prazos.`;
+  });
   protected menorSaldoOffset = computed(() => {
     const d = this.data();
     return d ? offsetFromIso(d.lowestBalance.date) : 0;
@@ -182,7 +202,10 @@ export class FluxoCaixaComponent implements OnInit {
     const d = this.data();
     if (!d || this.menorSaldoOffset() <= 0) return 'sem queda prevista no período';
     return (
-      'menor saldo: ~' + formatBRL(d.lowestBalance.balance) + ' no dia ' + this.menorSaldoOffset()
+      'menor saldo: ~' +
+      formatBRL(d.lowestBalance.balance) +
+      ' ' +
+      quandoTexto(d.lowestBalance.date, this.hoje())
     );
   });
 

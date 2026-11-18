@@ -304,7 +304,7 @@ export class PrevisoesComponent implements OnInit {
     const caixaTxt = negativo
       ? 'dá pra reverter no simulador'
       : apertado
-        ? `caixa aperta no dia ${r.caixaMinimoLabel.slice(0, 2)}`
+        ? `caixa aperta em ${r.caixaMinimoLabel}`
         : 'caixa tranquilo';
     return { lucroTxt, caixaTxt };
   });
@@ -318,7 +318,7 @@ export class PrevisoesComponent implements OnInit {
         sev: caixaBaixo ? 'risco' : 'positivo',
         icon: caixaBaixo ? 'report' : 'check_circle',
         titulo: caixaBaixo
-          ? `Caixa apertado por volta do dia ${r.caixaMinimoLabel.slice(0, 2)}`
+          ? `Caixa apertado por volta de ${r.caixaMinimoLabel}`
           : 'Caixa segue positivo no período',
         frase: `Saldo mais baixo: ${formatBRL(Math.round(r.caixaMinimo))}.`,
         acao: 'Ver fluxo de caixa',

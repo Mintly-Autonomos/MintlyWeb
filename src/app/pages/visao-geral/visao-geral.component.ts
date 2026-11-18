@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { quandoTexto } from '../../shared/quando';
 import { Router } from '@angular/router';
 import type { AiInsightText, HealthCapReason } from 'mintly-lib';
 import { AiService, textoDaIa } from '../../services/ai.service';
@@ -20,7 +21,13 @@ import { AreaChartComponent, AreaSeries } from '../../shared/area-chart.componen
 import { ToastService } from '../../shared/toast.service';
 import { CMV_HINT, PRIME_COST_HINT, METRIC_HINTS } from '../../shared/metric-hints';
 import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
-import { formatBRL, fmtMonthLong, fmtMonthShort, formatCompact } from '../../shared/format';
+import {
+  formatBRL,
+  fmtMonthLong,
+  fmtMonthShort,
+  formatCompact,
+  localISODate,
+} from '../../shared/format';
 import { MONTH_OPTS, MonthOpt, defaultMonthOpt, monthStr } from '../../shared/month-select';
 import { EstouDevendoComponent } from './estou-devendo.component';
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
@@ -363,7 +370,7 @@ export class VisaoGeralComponent implements OnInit {
     if (ia) return ia.title;
     switch (i.kind) {
       case 'cashTight':
-        return `Caixa apertado a partir do dia ${i.date.slice(8, 10)}`;
+        return `Caixa apertado a partir de ${quandoTexto(i.date, localISODate()).replace(/^em /, '')}`;
       case 'cmvAboveTarget':
         return `Custo dos ingredientes acima do ideal (${pctFmt(i.pct * 100)})`;
       case 'primeCostAboveTarget':
@@ -382,7 +389,7 @@ export class VisaoGeralComponent implements OnInit {
     if (ia) return ia.description;
     switch (i.kind) {
       case 'cashTight':
-        return `Contas concentradas devem reduzir seu caixa para cerca de ${this.fmtBRL(i.balance)} por volta do dia ${i.date.slice(8, 10)}.`;
+        return `Contas concentradas devem reduzir seu caixa para cerca de ${this.fmtBRL(i.balance)} ${quandoTexto(i.date, localISODate())}.`;
       case 'cmvAboveTarget':
         return `Acima do teto de ${pctFmt(i.targetMax * 100)} — isso reduziu seu lucro em cerca de ${this.fmtBRL(i.impact)}.`;
       case 'primeCostAboveTarget':

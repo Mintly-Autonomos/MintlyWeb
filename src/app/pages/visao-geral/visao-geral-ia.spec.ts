@@ -107,7 +107,7 @@ describe('VisaoGeralComponent: textos da IA nos cards', () => {
     const m = montar();
     await abrir(m);
 
-    expect(m.c.insightTitle(insights[0])).toBe('Caixa apertado a partir do dia 22');
+    expect(m.c.insightTitle(insights[0])).toBe('Caixa apertado a partir de hoje');
     // a lista mudou no meio: a posição 0 agora é outro tipo de insight
     expect(m.c.insightTitle(insights[1], 0)).toBe('Energia acima do normal');
     expect(m.c.insightIa(insights[1], 0)).toBe(false);
@@ -118,7 +118,7 @@ describe('VisaoGeralComponent: textos da IA nos cards', () => {
     m.ai.textosInsights.mockResolvedValue([]);
     await abrir(m);
 
-    expect(m.c.insightTitle(insights[0], 0)).toBe('Caixa apertado a partir do dia 22');
+    expect(m.c.insightTitle(insights[0], 0)).toBe('Caixa apertado a partir de hoje');
     expect(m.toast.error).not.toHaveBeenCalled();
   });
 
