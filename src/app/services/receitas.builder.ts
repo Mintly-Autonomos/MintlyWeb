@@ -4,6 +4,7 @@
  * Datas são "AAAA-MM-DD" (calendário, sem fuso).
  */
 import { shortDateRange } from '../shared/format';
+import { porDiaDaSemana, porDiaDoMes, porHora, porMesDoAno } from './receitas-quando';
 
 export type PeriodKey = 'Hoje' | '7 dias' | 'Este mês' | 'Mês passado' | 'Personalizado';
 export type Canal = 'salao' | 'delivery' | 'encomendas';
@@ -82,6 +83,13 @@ export interface ReceitasDataset {
   heatmap: { dia: string; faixa: string; valor: number }[] | null;
   heatmapMax: number;
   heatmapVazioMsg?: string;
+  /** P.7: "Quando você mais vende" por hora, dia da semana, dia do mês e mês do ano. */
+  quando: {
+    hora: { pontos: { hora: string; valor: number }[]; semHora: number };
+    semana: { dia: string; valor: number; indice: number }[];
+    mes: { dia: string; valor: number }[];
+    ano: { mes: string; valor: number; anoAnterior: number }[];
+  };
   /** Quantas vendas do período entraram no mapa (têm hora), ex.: "12 de 40 vendas com hora informada". */
   heatmapCobertura?: string;
   /** Alguma entrada (em qualquer período) é encomenda: a tela mostra o canal. */
@@ -559,6 +567,12 @@ export function buildReceitas(
         };
       })
       .sort((a, b) => b.valor - a.valor),
+    quando: {
+      hora: porHora(sel),
+      semana: porDiaDaSemana(sel),
+      mes: porDiaDoMes(sel),
+      ano: porMesDoAno(movs, win.end),
+    },
     heatmap: mapa.heatmap,
     heatmapMax: mapa.max,
     heatmapVazioMsg:

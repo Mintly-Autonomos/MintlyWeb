@@ -218,20 +218,122 @@
             <h3 class="text-[15px] font-bold tracking-tight inline-flex items-center gap-1.5">
               Quando você mais vende
               <app-hint
-                text="Soma das vendas com hora informada no período, por dia da semana e faixa do dia (manhã até 11h, almoço até 15h, tarde até 18h, noite depois). Útil para planejar equipe e estoque."
+                text="Soma das vendas pelo dia da venda. Dia: por hora (só vendas com hora informada). Semana: por dia da semana, com o índice contra a média. Mês: por dia do mês. Ano: os últimos 12 meses contra o ano anterior. Mapa: dia da semana × faixa do dia (manhã até 11h, almoço até 15h, tarde até 18h, noite depois). Útil para planejar equipe e estoque."
               />
             </h3>
             <p class="text-[12.5px] text-muted-foreground mt-0.5">
-              Vendas por dia da semana e horário no período
+              {{ quandoSubtitulo() }}
             </p>
-            @if (d.heatmap && d.heatmapCobertura) {
+            @if (modoQuando() === 'mapa' && d.heatmap && d.heatmapCobertura) {
               <p class="text-[12px] text-muted-foreground mt-0.5" data-testid="mapa-cobertura">
                 {{ d.heatmapCobertura }}
               </p>
             }
           </div>
         </div>
-        @if (loading()) {
+        <div
+          class="inline-flex flex-wrap items-center gap-1 p-1 mb-4 rounded-full border border-border bg-card"
+          role="group"
+          aria-label="Ver por"
+        >
+          @for (m of modosQuando; track m.key) {
+            <button
+              type="button"
+              (click)="modoQuando.set(m.key)"
+              [attr.aria-pressed]="modoQuando() === m.key"
+              [attr.data-testid]="'quando-' + m.key"
+              [class]="
+                'h-8 px-3 rounded-full text-[12px] font-semibold transition-colors duration-150 cursor-pointer ' +
+                (modoQuando() === m.key
+                  ? 'bg-mint-soft text-ocean'
+                  : 'text-muted-foreground hover:bg-muted')
+              "
+            >
+              {{ m.label }}
+            </button>
+          }
+        </div>
+        @if (modoQuando() !== 'mapa') {
+          <div class="h-[280px]" data-testid="quando-grafico">
+            @switch (modoQuando()) {
+              @case ('dia') {
+                @if (d.quando.hora.pontos.length === 0) {
+                  <div
+                    class="h-full rounded-xl border border-dashed border-border grid place-items-center text-center px-6"
+                  >
+                    <p class="text-[13px] text-muted-foreground max-w-[420px]">
+                      Para ver a hora em que você mais vende, preencha a "Hora da venda" ao lançar
+                      uma entrada.
+                      <a
+                        routerLink="/movimentacoes"
+                        class="font-semibold text-ocean underline underline-offset-2"
+                        >Ir para Movimentações</a
+                      >
+                    </p>
+                  </div>
+                } @else {
+                  <app-bar-chart
+                    [data]="d.quando.hora.pontos"
+                    categoryKey="hora"
+                    [series]="quandoSerie"
+                    orientation="columns"
+                    [valueFormatter]="abrev"
+                  />
+                }
+              }
+              @case ('semana') {
+                <app-bar-chart
+                  [data]="semanaRotulada()"
+                  categoryKey="rotulo"
+                  [series]="quandoSerie"
+                  orientation="columns"
+                  [valueFormatter]="abrev"
+                />
+              }
+              @case ('mes') {
+                <app-bar-chart
+                  [data]="d.quando.mes"
+                  categoryKey="dia"
+                  [series]="quandoSerie"
+                  orientation="columns"
+                  [valueFormatter]="abrev"
+                />
+              }
+              @case ('ano') {
+                <app-line-chart
+                  [data]="d.quando.ano"
+                  categoryKey="mes"
+                  [series]="quandoAnoSeries"
+                  [valueFormatter]="abrev"
+                />
+              }
+            }
+          </div>
+          <p class="mt-2 text-[12px] text-muted-foreground" data-testid="quando-legenda">
+            @switch (modoQuando()) {
+              @case ('dia') {
+                Vendas de cada hora no período.
+                @if (d.quando.hora.semHora > 0) {
+                  {{ d.quando.hora.semHora }} vendas sem hora ficam de fora.
+                }
+              }
+              @case ('semana') {
+                Vendas por dia da semana no período; o número é quanto o dia vende contra a média
+                (1,40× = 40% acima).
+                @if (melhorDia(); as md) {
+                  O dia mais forte é {{ md.dia }}.
+                }
+              }
+              @case ('mes') {
+                Vendas por dia do mês: mostra o efeito do dia do pagamento e das datas
+                comemorativas.
+              }
+              @case ('ano') {
+                Vendas dos últimos 12 meses, com o mesmo mês do ano anterior tracejado.
+              }
+            }
+          </p>
+        } @else if (loading()) {
           <div class="h-[280px] w-full rounded-xl bg-muted animate-pulse"></div>
         } @else if (!d.heatmap) {
           <div

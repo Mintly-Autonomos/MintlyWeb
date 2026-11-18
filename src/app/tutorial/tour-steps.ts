@@ -72,7 +72,7 @@ export const PAGE_STEPS: Record<string, TourStep[]> = {
     {
       target: 'quando-vende',
       title: 'Quando você mais vende',
-      text: 'Um mapa por dia da semana e horário: quanto mais escuro o quadrado, mais você vende naquele momento. Conta as vendas com a hora informada no lançamento. Use para planejar equipe e compras.',
+      text: 'Veja quando entra mais dinheiro: por hora (Dia), por dia da semana (Semana), por dia do mês (Mês) ou mês a mês contra o ano anterior (Ano). O Mapa cruza dia da semana e horário. A hora conta só nas vendas com a hora informada no lançamento. Use para planejar equipe e compras.',
     },
   ],
   custos: [
