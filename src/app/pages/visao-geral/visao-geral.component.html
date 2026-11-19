@@ -92,7 +92,17 @@
               />
             </div>
             <div class="relative w-[180px] h-[180px] mt-2">
-              <svg viewBox="0 0 100 100" class="w-full h-full -rotate-90">
+              <svg
+                viewBox="0 0 100 100"
+                class="w-full h-full -rotate-90"
+                role="img"
+                data-testid="saude-medidor"
+                [attr.aria-label]="
+                  d.health.score === null
+                    ? 'Saúde financeira: sem dados suficientes para a nota.'
+                    : 'Saúde financeira: nota ' + d.health.score + ' de 100. ' + scoreResumo()
+                "
+              >
                 <circle cx="50" cy="50" r="46" fill="none" stroke="var(--muted)" stroke-width="8" />
                 <circle
                   cx="50"
@@ -282,7 +292,7 @@
         "
         [description]="
           graficoPrincipal() === 'resultado'
-            ? 'Últimos 6 meses: receita menos custos e despesas. Verde é lucro, vermelho é prejuízo.'
+            ? 'Lucro de cada mês, igual ao Resultado (receita − impostos − custos e despesas). Verde é lucro, vermelho é prejuízo.'
             : 'Últimos 6 meses e projeção do fechamento do mês atual.'
         "
         [loading]="loading()"

@@ -627,9 +627,22 @@
           type="button"
           [disabled]="savingRegime()"
           (click)="setRegime('mei')"
+          [attr.aria-pressed]="regimeAtual() === 'mei'"
+          [class.ring-2]="regimeAtual() === 'mei'"
+          [class.ring-mint]="regimeAtual() === 'mei'"
+          [class.bg-mint-soft]="regimeAtual() === 'mei'"
           class="w-full text-left p-4 rounded-xl border border-border hover:border-mint hover:bg-mint-soft/40 transition cursor-pointer disabled:opacity-60"
         >
-          <div class="font-semibold text-[14px]">MEI — Microempreendedor Individual</div>
+          <div class="font-semibold text-[14px] flex flex-wrap items-center gap-2">
+            MEI — Microempreendedor Individual
+            @if (regimeAtual() === 'mei') {
+              <span
+                class="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-mint text-primary-foreground"
+                data-testid="regime-atual"
+                >Regime atual</span
+              >
+            }
+          </div>
           <dl class="mt-2 space-y-1.5 text-[12.5px]">
             <div>
               <dt class="font-medium">Para quem é</dt>
@@ -656,9 +669,22 @@
           type="button"
           [disabled]="savingRegime()"
           (click)="setRegime('simplesNacionalAnexoI')"
+          [attr.aria-pressed]="regimeAtual() === 'simplesNacionalAnexoI'"
+          [class.ring-2]="regimeAtual() === 'simplesNacionalAnexoI'"
+          [class.ring-mint]="regimeAtual() === 'simplesNacionalAnexoI'"
+          [class.bg-mint-soft]="regimeAtual() === 'simplesNacionalAnexoI'"
           class="w-full text-left p-4 rounded-xl border border-border hover:border-mint hover:bg-mint-soft/40 transition cursor-pointer disabled:opacity-60"
         >
-          <div class="font-semibold text-[14px]">Simples Nacional — Anexo I (comércio)</div>
+          <div class="font-semibold text-[14px] flex flex-wrap items-center gap-2">
+            Simples Nacional — Anexo I (comércio)
+            @if (regimeAtual() === 'simplesNacionalAnexoI') {
+              <span
+                class="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-mint text-primary-foreground"
+                data-testid="regime-atual"
+                >Regime atual</span
+              >
+            }
+          </div>
           <dl class="mt-2 space-y-1.5 text-[12.5px]">
             <div>
               <dt class="font-medium">Para quem é</dt>
@@ -686,11 +712,22 @@
           type="button"
           [disabled]="savingRegime()"
           (click)="setRegime('simplesNacionalAnexoII')"
+          [attr.aria-pressed]="regimeAtual() === 'simplesNacionalAnexoII'"
+          [class.ring-2]="regimeAtual() === 'simplesNacionalAnexoII'"
+          [class.ring-mint]="regimeAtual() === 'simplesNacionalAnexoII'"
+          [class.bg-mint-soft]="regimeAtual() === 'simplesNacionalAnexoII'"
           class="w-full text-left p-4 rounded-xl border border-border hover:border-mint hover:bg-mint-soft/40 transition cursor-pointer disabled:opacity-60"
           data-testid="regime-anexo-ii"
         >
-          <div class="font-semibold text-[14px]">
+          <div class="font-semibold text-[14px] flex flex-wrap items-center gap-2">
             Simples Nacional — Anexo II (indústria / produção própria)
+            @if (regimeAtual() === 'simplesNacionalAnexoII') {
+              <span
+                class="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-mint text-primary-foreground"
+                data-testid="regime-atual"
+                >Regime atual</span
+              >
+            }
           </div>
           <dl class="mt-2 space-y-1.5 text-[12.5px]">
             <div>

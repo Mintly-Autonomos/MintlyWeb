@@ -78,6 +78,8 @@ export interface PrevBase {
     valor: number;
     variavel: number;
     naoOperacional?: boolean;
+    /** Já venceu (estava para hoje ou antes): vale para o caixa de amanhã, mas é custo de mês passado, não lucro. */
+    vencido?: boolean;
   }[];
   /** Resultado de caixa (entradas − saídas) liquidado em cada um dos últimos 30 dias. */
   realizado: Record<string, number>;
@@ -151,6 +153,7 @@ export function buildBase(
         valor: m.valor,
         variavel: m.variavel,
         naoOperacional: m.naoOperacional,
+        ...(m.date <= hoje ? { vencido: true } : {}),
       });
       continue;
     }
@@ -253,6 +256,8 @@ export interface ResultadoSim {
   caixaFim: number;
   caixaMinimo: number;
   caixaMinimoLabel: string;
+  /** Contas já vencidas que o caixa paga no horizonte (fora do lucro previsto). */
+  vencidas: number;
 }
 
 export interface Simulacao {
@@ -277,6 +282,9 @@ interface DiaSim {
   cv: number;
   cf: number;
   /** Entradas − saídas não operacionais do dia (empréstimo, parcelas, equipamento): mexem no caixa, não no lucro. */
+  /** Contas vencidas pagas no dia (só caixa; fora do lucro previsto). */
+  vencido: number;
+  vencidoVar: number;
   naoOp: number;
 }
 
@@ -321,7 +329,7 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
 
   // Pendentes agrupados por dia (dentro do horizonte).
   const fim = addDays(base.hoje, horizonte);
-  const vazio = () => ({ in: 0, outVar: 0, outFixo: 0, naoOp: 0 });
+  const vazio = () => ({ in: 0, outVar: 0, outFixo: 0, naoOp: 0, outVencido: 0, outVencidoVar: 0 });
   const porDia = new Map<string, ReturnType<typeof vazio>>();
   for (const x of base.pendentes) {
     if (x.date > fim) continue;
@@ -331,6 +339,10 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     else {
       d.outVar += x.valor * x.variavel;
       d.outFixo += x.valor * (1 - x.variavel);
+      if (x.vencido) {
+        d.outVencido += x.valor;
+        d.outVencidoVar += x.valor * x.variavel;
+      }
     }
     porDia.set(x.date, d);
   }
@@ -359,6 +371,8 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
         cv: 0,
         cf: 0,
         naoOp: 0,
+        vencido: 0,
+        vencidoVar: 0,
       });
       continue;
     }
@@ -375,8 +389,9 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     // P.9: o lucro do dia é pela venda do dia, sem repasses de vendas antigas nem o atraso do cartão.
     const vendasBase = vendasPrevistasNoDia(base, fIdx);
     const vendasSim = vendasBase * (1 + p) * (1 + v);
-    const lucroCompBase = vendasBase * (1 - base.aliquota) - cvBase - cfBase;
-    const lucroComp = vendasSim * (1 - base.aliquota) - cvSim - cfBase;
+    // Reteste 18/11, item 9: conta a pagar vencida sai do caixa (amanhã), mas não é lucro do período previsto.
+    const lucroCompBase = vendasBase * (1 - base.aliquota) - cvBase - cfBase + pend.outVencido;
+    const lucroComp = vendasSim * (1 - base.aliquota) - cvSim - cfBase + pend.outVencido;
     serie.push({
       label: label(date),
       futuro,
@@ -390,6 +405,8 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
       cv: cvSim,
       cf: cfBase,
       naoOp: pend.naoOp,
+      vencido: pend.outVencido,
+      vencidoVar: pend.outVencidoVar,
     });
   }
 
@@ -408,6 +425,8 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
   let entradas = 0;
   let custoVariavel = 0;
   let custoFixo = 0;
+  let vencidas = 0;
+  let vencidasVar = 0;
 
   const mmWin: number[] = [];
   const mmWinBase: number[] = [];
@@ -428,6 +447,8 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
       entradas += d.rec;
       custoVariavel += d.cv;
       custoFixo += d.cf;
+      vencidas += d.vencido;
+      vencidasVar += d.vencidoVar;
     }
     mmWin.push(d.lucroComp);
     mmWinBase.push(d.lucroCompBase);
@@ -478,6 +499,9 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
   }
 
   const impostos = receita * base.aliquota;
+  // Reteste 18/11, item 9: as vencidas saem dos custos do período (são de meses passados); ficam só no caixa.
+  custoVariavel = Math.max(0, custoVariavel - vencidasVar);
+  custoFixo = Math.max(0, custoFixo - (vencidas - vencidasVar));
   const lucro = receita - custoVariavel - custoFixo - impostos;
 
   const resultado: ResultadoSim = {
@@ -492,6 +516,7 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     caixaFim: money(caixaSim),
     caixaMinimo: money(caixaMinimo === Number.POSITIVE_INFINITY ? caixaSim : caixaMinimo),
     caixaMinimoLabel,
+    vencidas: money(vencidas),
   };
 
   return { resultado, pontos, pontosLucro, acumSim: money(acumSim), acumBase: money(acumBase) };

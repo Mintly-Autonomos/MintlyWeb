@@ -81,6 +81,11 @@ const REGIME_LABEL: Record<TaxRegimeKey, string> = {
   simplesNacionalAnexoII: 'Simples Nacional — Anexo II',
 };
 
+/** Categoria de despesa que é taxa de venda (cartão, app, maquininha), pelo nome. */
+export function ehCategoriaDeTaxa(nome: string): boolean {
+  return /\b(taxas?|tarifas?|comiss(ã|a)o|comiss(õ|o)es|maquininha)\b/i.test(nome);
+}
+
 @Component({
   selector: 'app-resultado',
   standalone: true,
@@ -271,14 +276,19 @@ export class ResultadoComponent implements OnInit {
       d.operatingExpenseItems
         .filter((i) => kinds.includes(i.kind))
         .reduce((s, i) => s + i.amount, 0);
-    const taxas = soma(['platformFee', 'cardFee']);
+    // Reteste 18/11, item 11: além das taxas calculadas pelas contas, as despesas lançadas em categoria de taxa
+    // (ex.: "Taxas de cartão e iFood": comissão complementar, aluguel da maquininha, mensalidade do app).
+    const taxaLancada = d.operatingExpenseItems
+      .filter((i) => i.kind === 'opex' && ehCategoriaDeTaxa(i.name))
+      .reduce((s, i) => s + i.amount, 0);
+    const taxas = soma(['platformFee', 'cardFee']) + taxaLancada;
     const pessoal = soma(['labor']);
     const outras = Math.max(0, c.operatingExpenses - taxas - pessoal);
     const naoOp = (c.nonOperatingIncome ?? 0) !== 0 || (c.nonOperatingExpenses ?? 0) !== 0;
     const linhas: WaterfallRow[] = [
       { label: 'Vendas', value: c.grossRevenue, kind: 'start' },
       { label: 'Impostos sobre venda', value: -c.taxes, kind: 'down' },
-      { label: 'Taxas dos apps e da maquininha', value: -taxas, kind: 'down' },
+      { label: 'Taxas de cartão, apps e maquininha', value: -taxas, kind: 'down' },
       { label: 'CMV (insumos)', value: -c.cmv, kind: 'down' },
       { label: 'Mão de obra', value: -pessoal, kind: 'down' },
       { label: 'Outras despesas', value: -outras, kind: 'down' },
@@ -493,6 +503,9 @@ export class ResultadoComponent implements OnInit {
 
   protected readonly breakEvenHint =
     'Quanto você precisa vender no mês só para pagar as contas, sem lucro nem prejuízo. Ponto de equilíbrio = custos fixos ÷ margem de contribuição, que é a parte de cada real vendido que sobra depois dos impostos e dos custos variáveis.';
+
+  /** Regime em uso, para a janela marcar a opção atual (reteste 18/11, item 2). */
+  protected regimeAtual = computed(() => this.data()?.tax.regime ?? null);
 
   async setRegime(regime: TaxRegimeKey): Promise<void> {
     const trocando = !!this.data()?.tax.regime;

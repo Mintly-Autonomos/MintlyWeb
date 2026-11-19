@@ -168,11 +168,20 @@ export class ContasComponent implements OnInit {
       .filter((a) => a.active)
       .reduce((s, a) => s + a.balance, 0),
   );
+  /**
+   * Reteste 18/11, item 5: o `predictedBalance` da API é só a soma das PENDÊNCIAS da conta. O saldo previsto é o
+   * saldo atual mais elas (conta sem pendência repete o saldo atual, em vez de mostrar zero).
+   */
+  protected previsto = (a: { balance: number; predictedBalance: number }): number =>
+    Math.round((a.balance + a.predictedBalance) * 100) / 100;
   protected totalPredicted = computed(() =>
     this.accounts()
       .filter((a) => a.active)
-      .reduce((s, a) => s + a.predictedBalance, 0),
+      .reduce((s, a) => s + this.previsto(a), 0),
   );
+  /** Conta de banco, caixa ou carteira (não plataforma) com saldo negativo: dinheiro que não existe. */
+  protected negativa = (a: { type: string; balance: number; active: boolean }): boolean =>
+    a.active && a.type !== 'Financial Platform' && a.balance < 0;
 
   protected activeFilters = computed(
     () => (this.typeFilter() !== 'all' ? 1 : 0) + (this.statusFilter() !== 'all' ? 1 : 0),

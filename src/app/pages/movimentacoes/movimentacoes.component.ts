@@ -406,7 +406,8 @@ export class MovimentacoesComponent implements OnInit {
   protected totalPending = computed(() =>
     this.doNegocio()
       .filter((m) => m.status === 'pending')
-      .reduce((s, m) => s + (m.type === 'income' ? m.value : -m.value), 0),
+      // Entrada pelo líquido (depois da taxa do app/maquininha), como o saldo das contas.
+      .reduce((s, m) => s + (m.type === 'income' ? (m.net ?? m.value) : -m.value), 0),
   );
 
   ngOnInit(): void {
