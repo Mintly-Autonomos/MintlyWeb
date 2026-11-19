@@ -281,6 +281,8 @@ export class CardapioInterativoComponent {
   protected erroIa = signal<string | null>(null);
   /** O preço sugerido foi colocado no simulador (o prato tem custo e vendas, então está na análise). */
   protected aplicada = signal(false);
+  /** O prato da sugestão está no simulador (mesmo quando a sugestão é manter o preço). */
+  protected sugestaoNoSimulador = signal(false);
   protected semChamadas = computed(() => this.uso()?.remainingToday === 0);
   protected impacto = computed(() => {
     const i = this.item();
@@ -390,6 +392,7 @@ export class CardapioInterativoComponent {
       this.irParaGrupoDe(s.menuItemId);
       const naAnalise = this.analise().itens.some((i) => i.id === s.menuItemId);
       this.aplicada.set(naAnalise && s.increasePercent > 0);
+      this.sugestaoNoSimulador.set(naAnalise);
       if (naAnalise) {
         this.selecionado.set(s.menuItemId);
         if (s.increasePercent > 0) this.setPreco(s.menuItemId, s.suggestedPrice);
