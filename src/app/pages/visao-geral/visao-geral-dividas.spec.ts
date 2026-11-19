@@ -62,3 +62,24 @@ describe('Visão geral: pilar Dívidas', () => {
     expect(c.pillarDetail('debts', null, true)).toBe('só calculado para o mês atual');
   });
 });
+
+describe('Visão geral: texto da Saúde (reteste 18/11, item 14)', () => {
+  it('com todos os pilares bem, não manda "ficar de olho" em nenhum', () => {
+    const c = montar([
+      { key: 'netMargin', weight: 0.25, score: 100, value: 0.33 },
+      { key: 'primeCost', weight: 0.2, score: 100, value: 0.43 },
+      { key: 'revenueTrend', weight: 0.15, score: 100, value: 0.1 },
+    ]) as unknown as { scoreResumo(): string };
+    expect(c.scoreResumo()).not.toContain('Fique de olho');
+    expect(c.scoreResumo()).toContain('Todos os pontos avaliados estão bem');
+  });
+
+  it('com um pilar fraco, aponta ele', () => {
+    TestBed.resetTestingModule();
+    const c = montar([
+      { key: 'netMargin', weight: 0.25, score: 100, value: 0.33 },
+      { key: 'revenueTrend', weight: 0.15, score: 20, value: -0.15 },
+    ]) as unknown as { scoreResumo(): string };
+    expect(c.scoreResumo()).toContain('Fique de olho em tendência de vendas');
+  });
+});

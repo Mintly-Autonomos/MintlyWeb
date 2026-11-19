@@ -225,6 +225,45 @@ describe('simular', () => {
   });
 });
 
+describe('contas vencidas: saem do caixa, não do lucro previsto (reteste 18/11, item 9)', () => {
+  it('a vencida paga amanhã baixa o caixa, mas não entra no lucro nem nos custos do período', () => {
+    const sem = buildBase([mov({ valor: 100 })], 5000, 0, HOJE);
+    const com = buildBase(
+      [
+        mov({ valor: 100 }),
+        mov({
+          tipo: 'out',
+          pendente: true,
+          valor: 3000,
+          date: addDays(HOJE, -10),
+          lancamento: addDays(HOJE, -40),
+        }),
+      ],
+      5000,
+      0,
+      HOJE,
+    );
+    const a = simular(AJUSTES_ZERO, 30, sem).resultado;
+    const b = simular(AJUSTES_ZERO, 30, com).resultado;
+    expect(b.caixaFim).toBeCloseTo(a.caixaFim - 3000, 6);
+    expect(b.lucro).toBeCloseTo(a.lucro, 6);
+    expect(b.custoFixo).toBeCloseTo(a.custoFixo, 6);
+    expect(b.vencidas).toBe(3000);
+  });
+
+  it('conta a pagar que ainda vai vencer no horizonte continua no lucro', () => {
+    const com = buildBase(
+      [mov({ tipo: 'out', pendente: true, valor: 800, date: addDays(HOJE, 10), lancamento: HOJE })],
+      0,
+      0,
+      HOJE,
+    );
+    const r = simular(AJUSTES_ZERO, 30, com).resultado;
+    expect(r.custoFixo).toBe(800);
+    expect(r.vencidas).toBe(0);
+  });
+});
+
 describe('lucro pela venda, caixa pelo dinheiro (P.9)', () => {
   it('o lucro realizado dos últimos 30 dias é pela data da venda; o caixa, pela data do dinheiro', () => {
     const base = buildBase(

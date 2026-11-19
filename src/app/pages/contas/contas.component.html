@@ -55,7 +55,9 @@
         >Saldo previsto</span
       >
       <span class="text-2xl font-bold text-foreground">{{ fmtBRL(totalPredicted()) }}</span>
-      <span class="text-[12px] text-muted-foreground">Inclui movimentações pendentes</span>
+      <span class="text-[12px] text-muted-foreground"
+        >Saldo total + o que ainda vai entrar ou sair (pendentes)</span
+      >
     </div>
     <div class="m3-card p-5 flex flex-col gap-1">
       <span class="text-[12px] text-muted-foreground font-medium uppercase tracking-wide"
@@ -189,9 +191,27 @@
               <span class="text-[11px] text-muted-foreground uppercase tracking-wide"
                 >Saldo previsto</span
               >
-              <span class="text-base font-bold">{{ fmtBRL(a.predictedBalance) }}</span>
+              <span class="text-base font-bold" data-testid="saldo-previsto">{{
+                fmtBRL(previsto(a))
+              }}</span>
+              @if (a.predictedBalance !== 0) {
+                <span class="text-[11px] text-muted-foreground tabular-nums"
+                  >pendências {{ a.predictedBalance > 0 ? '+' : ''
+                  }}{{ fmtBRL(a.predictedBalance) }}</span
+                >
+              }
             </div>
           </div>
+          @if (negativa(a)) {
+            <p
+              class="rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-[12px] text-error"
+              data-testid="conta-negativa"
+            >
+              Saldo negativo: uma conta de banco ou caixa não fica abaixo de zero. Falta lançar
+              alguma entrada (por exemplo, o repasse da maquininha ou do app caindo aqui) ou há
+              saída lançada em dobro.
+            </p>
+          }
 
           <!-- Platform fields -->
           @if (
@@ -777,7 +797,7 @@
     <div class="space-y-4">
       <div class="p-4 rounded-2xl bg-warning/10 border border-warning/30 text-[13px] space-y-1">
         <p><strong>Saldo atual:</strong> {{ fmtBRL(blocked()!.balance) }}</p>
-        <p><strong>Saldo previsto:</strong> {{ fmtBRL(blocked()!.predictedBalance) }}</p>
+        <p><strong>Pendências:</strong> {{ fmtBRL(blocked()!.predictedBalance) }}</p>
       </div>
       <p class="text-[13px] text-muted-foreground">
         Para desativar esta conta, zere os saldos primeiro transferindo ou estornando as

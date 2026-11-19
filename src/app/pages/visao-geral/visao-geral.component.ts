@@ -151,16 +151,15 @@ export class VisaoGeralComponent implements OnInit {
 
   /** P.9: o gráfico principal mostra o resultado de cada mês (verde lucro, vermelho prejuízo). */
   protected graficoPrincipal = signal<'resultado' | 'linhas'>('resultado');
+  /** Reteste 18/11, item 12: o lucro de cada mês do Resultado (já com o imposto), não receita − despesa. */
   protected resultadoMensal = computed(() =>
-    (this.data()?.revenueVsExpense ?? [])
-      .filter((p) => !p.projected)
-      .map((p) => ({
-        mes: fmtMonthShort(p.month),
-        resultado: Math.round((p.revenue - p.expense) * 100) / 100,
-      })),
+    (this.data()?.cards.netProfit.history ?? []).map((h) => ({
+      mes: fmtMonthShort(h.month),
+      resultado: Math.round(h.amount * 100) / 100,
+    })),
   );
   protected readonly resultadoSeries: BarSeries[] = [
-    { key: 'resultado', name: 'Receita − custos e despesas', color: 'var(--success)' },
+    { key: 'resultado', name: 'Lucro do mês', color: 'var(--success)' },
   ];
   protected resultadoCor = (d: unknown): string =>
     ((d as { resultado: number }).resultado ?? 0) < 0 ? 'var(--error)' : 'var(--success)';
@@ -231,13 +230,22 @@ export class VisaoGeralComponent implements OnInit {
     const fortes = ordenados.filter((p) => (p.score ?? 0) >= 75).slice(0, 2);
     const fraco = ordenados[ordenados.length - 1];
     const nome = (key: string) => (PILLAR_LABEL[key] ?? key).toLowerCase();
+    // "Dívidas e vencidos" bem = contas em dia (senão a frase fica "vendas e dívidas e vencidos estão bem").
+    const forte = (key: string) => (key === 'debts' ? 'contas em dia' : nome(key));
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+    // Reteste 18/11, item 14: com todos os pilares bem, não aponta um "fraco" que tem nota 100.
+    if ((fraco.score ?? 0) >= 75) {
+      return fortes.length >= 2
+        ? `Todos os pontos avaliados estão bem, com destaque para ${forte(fortes[0].key)} e ${forte(fortes[1].key)}.`
+        : `${cap(forte(fortes[0].key))} está bem.`;
+    }
     const bons =
       fortes.length >= 2
-        ? `${nome(fortes[0].key)} e ${nome(fortes[1].key)} estão bem`
+        ? `${cap(forte(fortes[0].key))} e ${forte(fortes[1].key)} estão bem`
         : fortes.length === 1
-          ? `${nome(fortes[0].key)} está bem`
-          : 'vários pontos precisam de atenção';
-    return `Sua ${bons}. Fique de olho em ${nome(fraco.key)}.`;
+          ? `${cap(forte(fortes[0].key))} está bem`
+          : 'Vários pontos precisam de atenção';
+    return `${bons}. Fique de olho em ${nome(fraco.key)}.`;
   });
 
   protected mainData = computed(() => {
