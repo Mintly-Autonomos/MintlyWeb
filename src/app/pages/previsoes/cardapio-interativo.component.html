@@ -1,4 +1,34 @@
 <div class="space-y-6">
+  @if (gruposPerfil().length > 1) {
+    <div class="flex flex-wrap items-center gap-2" data-testid="matriz-perfis">
+      <span class="text-[12.5px] font-semibold text-foreground/80 inline-flex items-center gap-1">
+        Comparar com
+        <app-hint
+          text="Bolo inteiro e fatia não se comparam: cada prato é avaliado só contra os do mesmo perfil de venda (Balcão, Dia a dia, Bebida, Encomenda). O perfil vem da categoria do prato (Cardápio → Perfil de venda das categorias)."
+        />
+      </span>
+      <div
+        class="inline-flex flex-wrap items-center gap-1 p-1 rounded-full border border-border bg-card"
+      >
+        @for (g of gruposPerfil(); track g.perfil) {
+          <button
+            type="button"
+            (click)="setPerfilMatriz(g.perfil)"
+            [attr.aria-pressed]="perfilMatriz() === g.perfil"
+            [attr.data-testid]="'matriz-perfil-' + g.perfil"
+            [class]="
+              'h-8 px-3 rounded-full text-[12px] font-semibold transition-colors cursor-pointer ' +
+              (perfilMatriz() === g.perfil
+                ? 'bg-mint-soft text-ocean'
+                : 'text-muted-foreground hover:bg-muted')
+            "
+          >
+            {{ g.label }} ({{ g.n }})
+          </button>
+        }
+      </div>
+    </div>
+  }
   @if (temAnalise()) {
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
       <!-- Listas por grupo -->
@@ -112,6 +142,8 @@
               @if (aplicada()) {
                 O preço sugerido já está no simulador abaixo. É só uma simulação: nada muda no
                 Cardápio.
+              } @else if (sugestaoNoSimulador()) {
+                O prato está no simulador abaixo: a curva de lucro mostra por que manter o preço.
               } @else {
                 Para simular este prato aqui, cadastre o custo e as vendas dele no Cardápio.
               }
@@ -449,7 +481,7 @@
       >
         <span slot="title-extra">
           <app-hint
-            text="Cruzamos quanto cada item vende com quanto ele deixa por unidade, em R$, para mostrar o que proteger, promover ou repensar. Método de menu engineering de Kasavana & Smith (1982): a linha vertical é 70% da média de vendidos por prato; a horizontal, a margem média do cardápio ponderada pelas vendas."
+            text="Cruzamos quanto cada item vende com quanto ele deixa por unidade, em R$, para mostrar o que proteger, promover ou repensar. Método de menu engineering de Kasavana & Smith (1982): a linha vertical é 70% da média de vendidos por prato; a horizontal, a margem média ponderada pelas vendas. As médias são do grupo escolhido em 'Comparar com' (só pratos do mesmo perfil de venda)."
           />
         </span>
         @if (categoriasMatriz().length > 1) {

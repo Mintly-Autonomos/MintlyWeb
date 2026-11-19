@@ -11,7 +11,12 @@ import { ChartCardComponent } from '../../shared/chart-card.component';
 import { ScatterChartComponent, ScatterPoint } from '../../shared/scatter-chart.component';
 import { formatBRL, localISODate } from '../../shared/format';
 import { CardapioService, Prato } from '../../services/cardapio.service';
-import { PriceSensitivity, SALES_PROFILE_ELASTICITY, SALES_PROFILE_LABEL } from 'mintly-lib';
+import {
+  PriceSensitivity,
+  SALES_PROFILE_ELASTICITY,
+  SALES_PROFILE_LABEL,
+  SalesProfile,
+} from 'mintly-lib';
 import {
   ELASTICIDADE,
   SENSIBILIDADES,
@@ -205,7 +210,46 @@ export class CardapioInterativoComponent {
     return ` e as vendas devem ir de ${o.qtd} para ~${Math.round(i.qtd)} por mês`;
   });
 
-  protected analise = computed(() => analisar(this.pratos(), this.precos(), this.elasticidades()));
+  // ── Reteste 18/11, item 7: cada prato é comparado só com os do mesmo perfil de venda ──
+  /** Grupos (perfis de venda) com pratos, na ordem do maior para o menor. */
+  protected gruposPerfil = computed(() => {
+    const conta = new Map<SalesProfile, number>();
+    for (const p of this.pratos()) {
+      const perfil = this.usadas()[p.id]?.perfil;
+      if (perfil) conta.set(perfil, (conta.get(perfil) ?? 0) + 1);
+    }
+    return [...conta.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([perfil, n]) => ({ perfil, n, label: SALES_PROFILE_LABEL[perfil] }));
+  });
+  protected perfilEscolhido = signal<SalesProfile | null>(null);
+  /** O grupo em análise: o escolhido ou, sem escolha, o que tem mais pratos. */
+  protected perfilMatriz = computed<SalesProfile | null>(() => {
+    const grupos = this.gruposPerfil();
+    const esc = this.perfilEscolhido();
+    return esc && grupos.some((g) => g.perfil === esc) ? esc : (grupos[0]?.perfil ?? null);
+  });
+  protected pratosDoGrupo = computed(() => {
+    const perfil = this.perfilMatriz();
+    return perfil
+      ? this.pratos().filter((p) => this.usadas()[p.id]?.perfil === perfil)
+      : this.pratos();
+  });
+  protected setPerfilMatriz(perfil: string): void {
+    this.perfilEscolhido.set(perfil as SalesProfile);
+    this.categoriaFiltro.set('');
+    const sel = this.selecionado();
+    if (sel && this.usadas()[sel]?.perfil !== perfil) this.selecionado.set(null);
+  }
+  /** Leva a análise para o grupo do prato (sino, IA) antes de selecioná-lo. */
+  private irParaGrupoDe(id: string): void {
+    const perfil = this.usadas()[id]?.perfil;
+    if (perfil && perfil !== this.perfilMatriz()) this.perfilEscolhido.set(perfil);
+  }
+
+  protected analise = computed(() =>
+    analisar(this.pratosDoGrupo(), this.precos(), this.elasticidades()),
+  );
   protected temAnalise = computed(() => this.analise().itens.length > 0);
   protected item = computed(() => {
     const id = this.selecionado();
@@ -237,6 +281,8 @@ export class CardapioInterativoComponent {
   protected erroIa = signal<string | null>(null);
   /** O preço sugerido foi colocado no simulador (o prato tem custo e vendas, então está na análise). */
   protected aplicada = signal(false);
+  /** O prato da sugestão está no simulador (mesmo quando a sugestão é manter o preço). */
+  protected sugestaoNoSimulador = signal(false);
   protected semChamadas = computed(() => this.uso()?.remainingToday === 0);
   protected impacto = computed(() => {
     const i = this.item();
@@ -319,6 +365,7 @@ export class CardapioInterativoComponent {
     if (!p) return;
     this.pendingFocus = null;
     this.destaque.set(id);
+    this.irParaGrupoDe(id);
     if (!this.analise().itens.some((i) => i.id === id)) return;
     this.selecionado.set(id);
     setTimeout(
@@ -342,8 +389,10 @@ export class CardapioInterativoComponent {
     try {
       const s = await this.ai.sugerirPreco();
       this.sugestao.set(s);
+      this.irParaGrupoDe(s.menuItemId);
       const naAnalise = this.analise().itens.some((i) => i.id === s.menuItemId);
       this.aplicada.set(naAnalise && s.increasePercent > 0);
+      this.sugestaoNoSimulador.set(naAnalise);
       if (naAnalise) {
         this.selecionado.set(s.menuItemId);
         if (s.increasePercent > 0) this.setPreco(s.menuItemId, s.suggestedPrice);
