@@ -230,19 +230,22 @@ export class VisaoGeralComponent implements OnInit {
     const fortes = ordenados.filter((p) => (p.score ?? 0) >= 75).slice(0, 2);
     const fraco = ordenados[ordenados.length - 1];
     const nome = (key: string) => (PILLAR_LABEL[key] ?? key).toLowerCase();
+    // "Dívidas e vencidos" bem = contas em dia (senão a frase fica "vendas e dívidas e vencidos estão bem").
+    const forte = (key: string) => (key === 'debts' ? 'contas em dia' : nome(key));
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
     // Reteste 18/11, item 14: com todos os pilares bem, não aponta um "fraco" que tem nota 100.
     if ((fraco.score ?? 0) >= 75) {
       return fortes.length >= 2
-        ? `Todos os pontos avaliados estão bem, com destaque para ${nome(fortes[0].key)} e ${nome(fortes[1].key)}.`
-        : `${PILLAR_LABEL[fortes[0].key] ?? fortes[0].key} está bem.`;
+        ? `Todos os pontos avaliados estão bem, com destaque para ${forte(fortes[0].key)} e ${forte(fortes[1].key)}.`
+        : `${cap(forte(fortes[0].key))} está bem.`;
     }
     const bons =
       fortes.length >= 2
-        ? `${nome(fortes[0].key)} e ${nome(fortes[1].key)} estão bem`
+        ? `${cap(forte(fortes[0].key))} e ${forte(fortes[1].key)} estão bem`
         : fortes.length === 1
-          ? `${nome(fortes[0].key)} está bem`
-          : 'vários pontos precisam de atenção';
-    return `Sua ${bons}. Fique de olho em ${nome(fraco.key)}.`;
+          ? `${cap(forte(fortes[0].key))} está bem`
+          : 'Vários pontos precisam de atenção';
+    return `${bons}. Fique de olho em ${nome(fraco.key)}.`;
   });
 
   protected mainData = computed(() => {
