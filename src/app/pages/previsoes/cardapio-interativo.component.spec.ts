@@ -224,3 +224,79 @@ describe('CardapioInterativoComponent: sugestão de aumento pela IA', () => {
     expect(c.pct(20)).toBe('20,0%');
   });
 });
+
+describe('CardapioInterativoComponent: matriz por perfil de venda (reteste 18/11, item 7)', () => {
+  function montarComPratos(pratos: Prato[]) {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        {
+          provide: AiService,
+          useValue: {
+            disponivel: true,
+            uso: signal(null),
+            carregarUso: vi.fn(() => Promise.resolve()),
+          },
+        },
+        {
+          provide: CardapioService,
+          useValue: {
+            pratos: signal(pratos),
+            loading: signal(false),
+            vendas: signal([]),
+            perfis: signal([]),
+            setSensibilidade: vi.fn(() => Promise.resolve()),
+          },
+        },
+      ],
+    });
+    return TestBed.createComponent(CardapioInterativoComponent).componentInstance as unknown as {
+      gruposPerfil(): { perfil: string; n: number }[];
+      perfilMatriz(): string | null;
+      analise(): { itens: { id: string }[] };
+      setPerfilMatriz(p: string): void;
+    };
+  }
+
+  it('bolo inteiro (encomenda) não entra na mesma comparação que fatia e doce (balcão)', () => {
+    const c = montarComPratos([
+      prato({
+        id: 'f1',
+        name: 'Fatia de torta',
+        category: 'Fatias',
+        price: 22,
+        cost: 7,
+        soldPerMonth: 80,
+      }),
+      prato({
+        id: 'f2',
+        name: 'Brigadeiro',
+        category: 'Doces',
+        price: 6,
+        cost: 2,
+        soldPerMonth: 200,
+      }),
+      prato({
+        id: 'b1',
+        name: 'Bolo inteiro 1,5 kg',
+        category: 'Bolos de festa',
+        price: 220,
+        cost: 90,
+        soldPerMonth: 6,
+      }),
+    ]);
+    expect(c.gruposPerfil().map((g) => [g.perfil, g.n])).toEqual([
+      ['counter', 2],
+      ['order', 1],
+    ]);
+    expect(c.perfilMatriz()).toBe('counter');
+    expect(
+      c
+        .analise()
+        .itens.map((i) => i.id)
+        .sort(),
+    ).toEqual(['f1', 'f2']);
+    c.setPerfilMatriz('order');
+    expect(c.analise().itens.map((i) => i.id)).toEqual(['b1']);
+  });
+});
