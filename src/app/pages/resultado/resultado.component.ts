@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { SeriePeriodoComponent } from '../../shared/serie-periodo.component';
 import { CategoryBehavior } from 'mintly-lib';
 import type { ResultHistoryMonths } from 'mintly-lib';
 import { ResultadoService, OpexItem } from '../../services/resultado.service';
@@ -90,6 +91,7 @@ export function ehCategoriaDeTaxa(nome: string): boolean {
   selector: 'app-resultado',
   standalone: true,
   imports: [
+    SeriePeriodoComponent,
     IconComponent,
     ChipComponent,
     HintComponent,
