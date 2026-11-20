@@ -302,7 +302,10 @@
         emptyTitle="Ainda não há lançamentos para mostrar"
         emptyDescription="Registre uma venda ou uma despesa e este gráfico passa a mostrar a evolução da sua receita e dos seus custos."
       >
-        <span slot="title-extra"><app-hint [text]="h.receitaVsCustos" /></span>
+        <span slot="title-extra"
+          ><app-hint
+            [text]="graficoPrincipal() === 'resultado' ? h.resultadoMensal : h.receitaVsCustos"
+        /></span>
         <app-button slot="empty-action" icon="point_of_sale" (clicked)="lancar('entrada')"
           >Lançar venda</app-button
         >

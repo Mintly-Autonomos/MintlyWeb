@@ -49,6 +49,10 @@ export const METRIC_HINTS = {
     'Quanto você já vendeu no mês, dia a dia, contra o quanto precisa vender para pagar as contas. Onde a linha azul passa a tracejada, o mês começa a dar lucro.',
     'soma das vendas do dia 1 até cada dia, pela data da venda (sem empréstimo, aporte nem transferência); ponto de equilíbrio = custos fixos ÷ margem de contribuição. O ritmo é o vendido ÷ dias que já passaram.',
   ),
+  resultadoMensal: calc(
+    'O lucro (ou prejuízo) de cada mês dos últimos 12 meses, o mesmo da tela Resultado.',
+    'receita bruta − impostos sobre a venda − custos e despesas do mês; no mês em andamento, até hoje.',
+  ),
   receitaVsCustos: calc(
     'A receita e os custos de cada mês, lado a lado.',
     'receita bruta do mês contra a soma de custos e despesas do mês (o mesmo total da tela Custos).',
