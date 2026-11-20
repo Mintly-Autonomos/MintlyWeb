@@ -561,23 +561,25 @@
           }
         </div>
       </div>
-      @if (serie() === 'lucro') {
-        <app-bar-chart
-          [data]="historicoView()"
-          categoryKey="mes"
-          [series]="lucroSeries"
-          orientation="columns"
-          [valueFormatter]="abrev"
-          [colorFor]="lucroCor"
-        />
-      } @else {
-        <app-line-chart
-          [data]="historicoView()"
-          categoryKey="mes"
-          [series]="margemSeries"
-          [valueFormatter]="pctFmt"
-        />
-      }
+      <app-serie-periodo metrica="resultado">
+        @if (serie() === 'lucro') {
+          <app-bar-chart
+            [data]="historicoView()"
+            categoryKey="mes"
+            [series]="lucroSeries"
+            orientation="columns"
+            [valueFormatter]="abrev"
+            [colorFor]="lucroCor"
+          />
+        } @else {
+          <app-line-chart
+            [data]="historicoView()"
+            categoryKey="mes"
+            [series]="margemSeries"
+            [valueFormatter]="pctFmt"
+          />
+        }
+      </app-serie-periodo>
     </app-chart-card>
 
     <app-modal

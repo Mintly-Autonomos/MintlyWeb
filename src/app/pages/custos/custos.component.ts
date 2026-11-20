@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { SeriePeriodoComponent } from '../../shared/serie-periodo.component';
 import { CategoryBehavior, DreGroup } from 'mintly-lib';
 import { CustosService, ExpenseItem, ExpenseSubitem } from '../../services/custos.service';
 import { IconComponent } from '../../shared/icon.component';
@@ -33,6 +34,7 @@ interface LinhaDespesa extends ExpenseItem {
   selector: 'app-custos',
   standalone: true,
   imports: [
+    SeriePeriodoComponent,
     StackedBarsComponent,
     IconComponent,
     ChipComponent,

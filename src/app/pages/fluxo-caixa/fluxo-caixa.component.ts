@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { SeriePeriodoComponent } from '../../shared/serie-periodo.component';
 import { quandoTexto } from '../../shared/quando';
 import { MovementDirection, MovementStatus } from 'mintly-lib';
 import {
@@ -78,6 +79,7 @@ const STATUS_META: Record<
   selector: 'app-fluxo-caixa',
   standalone: true,
   imports: [
+    SeriePeriodoComponent,
     IconComponent,
     ChipComponent,
     HintComponent,

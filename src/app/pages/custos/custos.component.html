@@ -414,12 +414,14 @@
       <span slot="title-extra">
         <app-hint [text]="h.evolucaoCustos" />
       </span>
-      <app-stacked-bars
-        [data]="porGrupo()"
-        categoryKey="mes"
-        [series]="grupoSeries"
-        [valueFormatter]="abrev"
-      />
+      <app-serie-periodo metrica="custos">
+        <app-stacked-bars
+          [data]="porGrupo()"
+          categoryKey="mes"
+          [series]="grupoSeries"
+          [valueFormatter]="abrev"
+        />
+      </app-serie-periodo>
     </app-chart-card>
 
     <!-- 6 — CMV % e custo primário % (P.9) -->
