@@ -63,6 +63,8 @@ export interface PrevBase {
   caixaHoje: number;
   /** Imposto sobre venda (fração da receita). */
   aliquota: number;
+  /** T1: DAS do MEI por dia (fixo do mês ÷ 30). Não muda com as vendas. Ausente = 0. */
+  impostoFixoDia?: number;
   /** Ritmo de vendas por dia (todas as formas de pagamento). */
   receitaDia: number;
   /** O mesmo ritmo separado pelo prazo do repasse: a parte com prazo P só vira dinheiro a partir do dia P+1. */
@@ -124,6 +126,7 @@ export function buildBase(
   caixaHoje: number,
   aliquota: number,
   hoje: string,
+  impostoFixoMes = 0,
 ): PrevBase {
   const ini = addDays(hoje, -(PASSADO - 1));
   let receita = 0;
@@ -174,6 +177,7 @@ export function buildBase(
     hoje,
     caixaHoje,
     aliquota,
+    impostoFixoDia: impostoFixoMes > 0 ? impostoFixoMes / 30 : 0,
     receitaDia: receita / PASSADO,
     receitaPrazos,
     custoVarDia: custoVar / PASSADO,
@@ -404,14 +408,17 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     const cfBase = base.custoFixoDia + pend.outFixo;
     const recSim = ritmo * (1 + p) * (1 + v) + pend.in;
     const cvSim = cvDia * (1 + v) * (1 + c) + pend.outVar;
-    const lucroBase = recBase - cvBase - cfBase - recBase * base.aliquota;
-    const lucroSim = recSim - cvSim - cfBase - recSim * base.aliquota;
+    // T1: o DAS do MEI é fixo por dia (não sobe nem desce com as vendas simuladas).
+    const fixoDia = base.impostoFixoDia ?? 0;
+    const lucroBase = recBase - cvBase - cfBase - recBase * base.aliquota - fixoDia;
+    const lucroSim = recSim - cvSim - cfBase - recSim * base.aliquota - fixoDia;
     // P.9: o lucro do dia é pela venda do dia, sem repasses de vendas antigas nem o atraso do cartão.
     const vendasBase = vendasPrevistasNoDia(base, fIdx);
     const vendasSim = vendasBase * (1 + p) * (1 + v);
     // Reteste 18/11, item 9: conta a pagar vencida sai do caixa (amanhã), mas não é lucro do período previsto.
-    const lucroCompBase = vendasBase * (1 - base.aliquota) - cvBase - cfBase + pend.outVencido;
-    const lucroComp = vendasSim * (1 - base.aliquota) - cvSim - cfBase + pend.outVencido;
+    const lucroCompBase =
+      vendasBase * (1 - base.aliquota) - cvBase - cfBase - fixoDia + pend.outVencido;
+    const lucroComp = vendasSim * (1 - base.aliquota) - cvSim - cfBase - fixoDia + pend.outVencido;
     serie.push({
       label: label(date),
       futuro,
@@ -518,7 +525,8 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     pushPonto(pontosLucro, media(mmWin) * 30, media(mmWinBase) * 30);
   }
 
-  const impostos = receita * base.aliquota;
+  const impostoFixo = (base.impostoFixoDia ?? 0) * horizonte;
+  const impostos = receita * base.aliquota + impostoFixo;
   // Reteste 18/11, item 9: as vencidas saem dos custos do período (são de meses passados); ficam só no caixa.
   custoVariavel = Math.max(0, custoVariavel - vencidasVar);
   custoFixo = Math.max(0, custoFixo - (vencidas - vencidasVar));
@@ -527,7 +535,7 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
   const resultado: ResultadoSim = {
     receita: money(receita),
     entradas: money(entradas),
-    impostosCaixa: money(entradas * base.aliquota),
+    impostosCaixa: money(entradas * base.aliquota + impostoFixo),
     custoVariavel: money(custoVariavel),
     custoFixo: money(custoFixo),
     impostos: money(impostos),

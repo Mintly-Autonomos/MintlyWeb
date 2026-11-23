@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { ImpostoMes, SEM_IMPOSTO, impostoDoResultado } from '../shared/imposto-mes';
 import { ehTaxaDeVenda } from '../shared/taxa-venda';
 import { apiErrorInfo } from '../shared/api-error';
 import { CategoriasService } from './categorias.service';
@@ -65,16 +66,15 @@ export class ReceitasService {
     return typeof err === 'object' && err !== null && apiErrorInfo(err).status === 401;
   }
 
-  /** Fração de imposto sobre a venda do mês (impostos ÷ receita bruta do DRE); 0 sem regime. */
-  private async taxRatio(month: string): Promise<number> {
-    if (environment.useMocks) return MOCK_TAX_RATIO;
+  /** Imposto do mês pelo Resultado: alíquota no Simples, DAS fixo no MEI (o mesmo das outras telas). */
+  private async taxRatio(month: string): Promise<ImpostoMes> {
+    if (environment.useMocks) return { aliquota: MOCK_TAX_RATIO, fixoMes: 0 };
     try {
       const res = await this.call((headers) => this.reportClient.result({ month }, headers));
-      const cur = res.payload?.current;
-      return cur && cur.grossRevenue > 0 ? cur.taxes / cur.grossRevenue : 0;
+      return impostoDoResultado(res.payload);
     } catch {
       // O imposto é um detalhe: sem o DRE a tela ainda mostra as receitas (sem o desconto).
-      return 0;
+      return SEM_IMPOSTO;
     }
   }
 

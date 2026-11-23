@@ -5,6 +5,7 @@
  */
 import { shortDateRange } from '../shared/format';
 import { porDiaDaSemana, porDiaDoMes, porHora, porMesDoAno } from './receitas-quando';
+import { ImpostoMes, impostoFixoNaJanela } from '../shared/imposto-mes';
 import { Sazonalidade, sazonalidadePorCanal } from './receitas-sazonalidade';
 
 export type PeriodKey = 'Hoje' | '7 dias' | 'Este mês' | 'Mês passado' | 'Personalizado';
@@ -377,10 +378,8 @@ function porGrupo<T extends string>(
 const formaLabel = (p: string) => (p === 'PIX' ? 'Pix' : p);
 
 /**
- * @param taxRatio fração de imposto sobre a venda (0–1), vinda do DRE do mês; 0 quando o regime
- *   tributário ainda não foi configurado.
- */
-/**
+ * @param imposto fração de imposto sobre a venda (0–1, Simples; 0 sem regime) ou o imposto do mês do Resultado
+ *   (`ImpostoMes`: no MEI, o DAS fixo, repartido entre canais e dias pela receita).
  * @param custos custo unitário atual de cada prato do cardápio (id → R$). Prato sem custo (0 ou ausente) fica
  *   sem lucro no ranking.
  */
@@ -407,12 +406,18 @@ const taxaLancadaEntre = (xs: TaxaLancada[], start: string, end: string) =>
 export function buildReceitas(
   movs: ReceitaMov[],
   win: PeriodWindow,
-  taxRatio: number,
+  imposto: number | ImpostoMes,
   custos: ReadonlyMap<string, number> = new Map(),
   extras: ReceitasExtras = {},
 ): ReceitasDataset {
   const cur = totals(movs, win.start, win.end);
   const prev = totals(movs, win.prevStart, win.prevEnd);
+  // T1: no MEI o DAS é fixo no período; vira uma fração só para repartir entre canais e dias (como a série da API).
+  const imp: ImpostoMes = typeof imposto === 'number' ? { aliquota: imposto, fixoMes: 0 } : imposto;
+  const fixoCur = impostoFixoNaJanela(imp.fixoMes, win.start, win.end);
+  const fixoPrev = impostoFixoNaJanela(imp.fixoMes, win.prevStart, win.prevEnd);
+  const taxRatio = imp.aliquota + (cur.gross > 0 ? fixoCur / cur.gross : 0);
+  const taxRatioPrev = imp.aliquota + (prev.gross > 0 ? fixoPrev / prev.gross : 0);
   const sel = movs.filter((m) => within(m, win.start, win.end));
   const lancadas = extras.taxasLancadas ?? [];
 
@@ -426,7 +431,7 @@ export function buildReceitas(
     prev.gross -
       Math.max(0, prev.gross - prev.net) -
       taxaLancadaEntre(lancadas, win.prevStart, win.prevEnd) -
-      prev.gross * taxRatio,
+      prev.gross * taxRatioPrev,
   );
 
   const dB = delta(cur.gross, prev.gross);

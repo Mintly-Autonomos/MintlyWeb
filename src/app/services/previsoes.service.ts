@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { ImpostoMes, SEM_IMPOSTO, impostoDoResultado } from '../shared/imposto-mes';
 import { apiErrorInfo } from '../shared/api-error';
 import { CategoriasService } from './categorias.service';
 import { ContasService } from './contas.service';
@@ -73,16 +74,15 @@ export class PrevisoesService {
     return typeof err === 'object' && err !== null && apiErrorInfo(err).status === 401;
   }
 
-  /** Fração de imposto sobre a venda do mês (impostos ÷ receita bruta do DRE); 0 sem regime. */
-  private async taxRatio(month: string): Promise<number> {
-    if (environment.useMocks) return MOCK_TAX_RATIO;
+  /** Imposto do mês pelo Resultado: alíquota no Simples, DAS fixo no MEI (o mesmo das outras telas). */
+  private async taxRatio(month: string): Promise<ImpostoMes> {
+    if (environment.useMocks) return { aliquota: MOCK_TAX_RATIO, fixoMes: 0 };
     try {
       const res = await this.call((headers) => this.reportClient.result({ month }, headers));
-      const cur = res.payload?.current;
-      return cur && cur.grossRevenue > 0 ? cur.taxes / cur.grossRevenue : 0;
+      return impostoDoResultado(res.payload);
     } catch {
       // O imposto é um detalhe: sem o DRE a previsão segue sem esse desconto.
-      return 0;
+      return SEM_IMPOSTO;
     }
   }
 
@@ -154,8 +154,8 @@ export class PrevisoesService {
         .movements()
         .filter((m) => m.status !== 'cancelled')
         .map((m) => this.toPrev(m));
-      const ratio = await this.taxRatio(hoje.slice(0, 7));
-      this.base.set(buildBase(movs, caixaHoje, ratio, hoje));
+      const imposto = await this.taxRatio(hoje.slice(0, 7));
+      this.base.set(buildBase(movs, caixaHoje, imposto.aliquota, hoje, imposto.fixoMes));
     } finally {
       this.loading.set(false);
       this.loaded.set(true);
