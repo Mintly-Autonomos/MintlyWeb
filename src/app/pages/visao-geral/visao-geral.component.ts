@@ -20,6 +20,7 @@ import { ProfitBridgeComponent } from '../../shared/profit-bridge.component';
 import { AreaChartComponent, AreaSeries } from '../../shared/area-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { CMV_HINT, PRIME_COST_HINT, METRIC_HINTS } from '../../shared/metric-hints';
+import { SeriePeriodoComponent } from '../../shared/serie-periodo.component';
 import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
 import {
   formatBRL,
@@ -88,6 +89,7 @@ function pillarDetail(key: string, value: number | null, mesPassado = false): st
   selector: 'app-visao-geral',
   standalone: true,
   imports: [
+    SeriePeriodoComponent,
     BarChartComponent,
     EstouDevendoComponent,
     IconComponent,
