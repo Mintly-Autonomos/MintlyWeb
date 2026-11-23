@@ -60,7 +60,7 @@ export interface StatDelta {
             }}</span>
           </div>
         }
-        @if (spark && spark.length > 1) {
+        @if (temSpark) {
           <svg
             viewBox="0 0 100 28"
             preserveAspectRatio="none"
@@ -100,6 +100,11 @@ export class StatCardComponent {
   @Input() spark: number[] | null = null;
   /** Formato do mínimo e do máximo do minigráfico (padrão: compacto, ex. 1,2 mil). */
   @Input() sparkFormatter: (v: number) => string = formatCompact;
+
+  /** Linha reta (todos os pontos iguais) não informa nada: o card não mostra o minigráfico nem "mín 0, máx 0". */
+  get temSpark(): boolean {
+    return !!this.spark && this.spark.length > 1 && this.sparkMin !== this.sparkMax;
+  }
 
   get sparkMin(): number {
     return Math.min(...(this.spark ?? [0]));
