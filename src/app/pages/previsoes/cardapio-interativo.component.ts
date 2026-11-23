@@ -175,7 +175,7 @@ export class CardapioInterativoComponent {
       linha,
       zona,
       atual: { x: x(i.preco), y: y((i.preco - p.cost) * i.qtd) },
-      melhor: { x: x(melhor.preco), y: y(melhor.lucro), preco: melhor.preco },
+      melhor: { x: x(melhor.preco), y: y(melhor.lucro), preco: melhor.preco, lucro: melhor.lucro },
       zeroY: y(0),
     };
   });

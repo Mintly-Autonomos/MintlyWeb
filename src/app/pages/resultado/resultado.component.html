@@ -103,13 +103,19 @@
           <app-chip [tone]="d.current.netProfit < 0 ? 'error' : 'success'" icon="percent"
             >Margem de {{ pctFmt(margemLiquida()) }}</app-chip
           >
-          @if (statDelta(d.deltas.netProfit); as ld) {
+          @if (
+            statDelta(d.deltas.netProfit, {
+              note: notaComparacao(),
+              base: { current: d.current.netProfit, previous: d.previous.netProfit, lucro: true },
+            });
+            as ld
+          ) {
             <app-chip
               [tone]="ld.flat ? 'neutral' : ld.up ? 'mint' : 'warning'"
               [icon]="ld.flat ? 'trending_flat' : ld.up ? 'trending_up' : 'trending_down'"
             >
               {{ ld.flat ? 'Sem variação' : (ld.up ? '+' : '−') + ld.value }}
-              {{ notaComparacao() }}
+              {{ ld.note }}
             </app-chip>
           }
           <span class="text-[12.5px] text-muted-foreground">
@@ -216,7 +222,12 @@
         [value]="fmtBRL(d.current.grossRevenue)"
         icon="payments"
         status="positive"
-        [delta]="statDelta(d.deltas.grossRevenue, { note: notaComparacao() })"
+        [delta]="
+          statDelta(d.deltas.grossRevenue, {
+            note: notaComparacao(),
+            base: { current: d.current.grossRevenue, previous: d.previous.grossRevenue },
+          })
+        "
         subtext="Salão + delivery"
       >
         <app-hint slot="hint" [text]="h.receitaBrutaMes" />
@@ -227,7 +238,12 @@
         icon="restaurant_menu"
         status="positive"
         [subtext]="pctFmt(pctDaReceita(d.current.grossMargin)) + ' da receita'"
-        [delta]="statDelta(d.deltas.grossMargin, { note: notaComparacao() })"
+        [delta]="
+          statDelta(d.deltas.grossMargin, {
+            note: notaComparacao(),
+            base: { current: d.current.grossMargin, previous: d.previous.grossMargin },
+          })
+        "
       >
         <app-hint slot="hint" [text]="h.margemBruta" />
       </app-stat-card>
@@ -237,7 +253,12 @@
         icon="receipt_long"
         status="warning"
         [subtext]="pctFmt(pctDaReceita(d.current.operatingExpenses)) + ' da receita'"
-        [delta]="statDelta(d.deltas.operatingExpenses, { note: notaComparacao() })"
+        [delta]="
+          statDelta(d.deltas.operatingExpenses, {
+            note: notaComparacao(),
+            base: { current: d.current.operatingExpenses, previous: d.previous.operatingExpenses },
+          })
+        "
       >
         <app-hint slot="hint" [text]="h.despesasOperacionais" />
       </app-stat-card>
@@ -276,15 +297,16 @@
                 [title]="
                   (insight.difference >= 0 ? 'Seu lucro cresceu ' : 'Seu lucro caiu ') +
                   fmtBRL(Math.abs(insight.difference)) +
-                  ' em relação a ' +
-                  fmtMonthLong(d.previousMonth)
+                  ' em relação ' +
+                  baseComparacao()
                 "
                 [description]="
                   'A margem passou de ' +
                   pctFmt((insight.previousMargin ?? 0) * 100) +
                   ' para ' +
                   pctFmt((insight.currentMargin ?? 0) * 100) +
-                  '.'
+                  '.' +
+                  (mesAnteriorInteiro() ?? '')
                 "
               />
             }
