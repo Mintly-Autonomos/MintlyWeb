@@ -19,7 +19,13 @@ import { ProfitBridgeComponent } from '../../shared/profit-bridge.component';
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
-import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
+import { ehCategoriaDeTaxa, ehTaxaDeVenda } from '../../shared/taxa-venda';
+import {
+  comparisonBase,
+  comparisonNote,
+  partialMonthLabel,
+  statDelta,
+} from '../../shared/stat-delta';
 import { CmvAvisoComponent, DespesaForaDoCmv } from '../../shared/cmv-aviso.component';
 import {
   formatBRL,
@@ -82,10 +88,8 @@ const REGIME_LABEL: Record<TaxRegimeKey, string> = {
   simplesNacionalAnexoII: 'Simples Nacional — Anexo II',
 };
 
-/** Categoria de despesa que é taxa de venda (cartão, app, maquininha), pelo nome. */
-export function ehCategoriaDeTaxa(nome: string): boolean {
-  return /\b(taxas?|tarifas?|comiss(ã|a)o|comiss(õ|o)es|maquininha)\b/i.test(nome);
-}
+/** A regra de taxa é a mesma de Custos e Receitas (shared/taxa-venda). */
+export { ehCategoriaDeTaxa };
 
 @Component({
   selector: 'app-resultado',
@@ -130,6 +134,23 @@ export class ResultadoComponent implements OnInit {
     return d ? comparisonNote(d.comparison, d.referenceMonth) : undefined;
   });
   protected mesParcial = computed(() => partialMonthLabel(this.data()?.comparison));
+  /** "aos dias 1 a 22 de Outubro/2026" (mês em andamento) ou "a Outubro/2026". */
+  protected baseComparacao = computed(() => {
+    const d = this.data();
+    return d ? comparisonBase(d.comparison, d.referenceMonth) : '';
+  });
+  /**
+   * No mês em andamento a leitura compara os mesmos dias; esta frase traz o mês anterior INTEIRO, para ninguém achar
+   * que o mês já está melhor que ele. null no mês fechado ou sem o mês no histórico.
+   */
+  protected mesAnteriorInteiro = computed(() => {
+    const d = this.data();
+    if (!d || d.comparison?.kind !== 'samePeriod') return null;
+    const h = d.history.find((p) => p.month === d.previousMonth);
+    if (!h) return null;
+    const margem = h.netMargin == null ? '' : ` (margem de ${pctFmt(h.netMargin * 100)})`;
+    return ` ${fmtMonthLong(d.previousMonth)} inteiro fechou com ${h.netProfit < 0 ? 'prejuízo' : 'lucro'} de ${formatBRL(Math.abs(h.netProfit))}${margem}.`;
+  });
   /** Mês futuro (U.4): o DRE mostra só o que já está lançado com competência nele. */
   protected mesFuturo = computed(() => {
     const d = this.data();
@@ -148,8 +169,18 @@ export class ResultadoComponent implements OnInit {
       mes: fmtMonthLong(py.month),
       receita: py.lines.grossRevenue,
       lucro: py.lines.netProfit,
-      receitaDelta: statDelta(py.deltas.grossRevenue, { note: nota }),
-      lucroDelta: statDelta(py.deltas.netProfit, { note: nota }),
+      receitaDelta: statDelta(py.deltas.grossRevenue, {
+        note: nota,
+        base: { current: this.data()!.current.grossRevenue, previous: py.lines.grossRevenue },
+      }),
+      lucroDelta: statDelta(py.deltas.netProfit, {
+        note: nota,
+        base: {
+          current: this.data()!.current.netProfit,
+          previous: py.lines.netProfit,
+          lucro: true,
+        },
+      }),
     };
   });
   protected regimeLabel = REGIME_LABEL;
@@ -274,16 +305,15 @@ export class ResultadoComponent implements OnInit {
     const d = this.data();
     if (!d) return [];
     const c = d.current;
+    const taxas = d.operatingExpenseItems
+      .filter((i) => ehTaxaDeVenda(i))
+      .reduce((s, i) => s + i.amount, 0);
     const soma = (kinds: string[]) =>
       d.operatingExpenseItems
         .filter((i) => kinds.includes(i.kind))
         .reduce((s, i) => s + i.amount, 0);
-    // Reteste 18/11, item 11: além das taxas calculadas pelas contas, as despesas lançadas em categoria de taxa
-    // (ex.: "Taxas de cartão e iFood": comissão complementar, aluguel da maquininha, mensalidade do app).
-    const taxaLancada = d.operatingExpenseItems
-      .filter((i) => i.kind === 'opex' && ehCategoriaDeTaxa(i.name))
-      .reduce((s, i) => s + i.amount, 0);
-    const taxas = soma(['platformFee', 'cardFee']) + taxaLancada;
+    // Reteste 18/11, item 11, e 22/11, T4: as taxas calculadas pelas contas e as despesas em categoria de taxa
+    // (ex.: "Taxas de cartão e iFood", aluguel da maquininha), pela mesma regra de Custos e Receitas.
     const pessoal = soma(['labor']);
     const outras = Math.max(0, c.operatingExpenses - taxas - pessoal);
     const naoOp = (c.nonOperatingIncome ?? 0) !== 0 || (c.nonOperatingExpenses ?? 0) !== 0;

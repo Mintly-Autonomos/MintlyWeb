@@ -383,11 +383,32 @@ const formaLabel = (p: string) => (p === 'PIX' ? 'Pix' : p);
  * @param custos custo unitário atual de cada prato do cardápio (id → R$). Prato sem custo (0 ou ausente) fica
  *   sem lucro no ranking.
  */
+/** Despesa lançada em categoria de taxa (aluguel da maquininha, "Taxas de cartão e iFood"), pela data dela. */
+export interface TaxaLancada {
+  date: string;
+  valor: number;
+}
+
+export interface ReceitasExtras {
+  /**
+   * T3 (reteste 22/11): TODAS as vendas do período (recebidas e a receber, sem as canceladas), pelo dia da venda.
+   * A sazonalidade usa estas, como o Resultado; antes usava só as recebidas e outubro, já fechado, mudava de valor
+   * conforme os repasses caíam. Ausente = as mesmas de `movs`.
+   */
+  vendas?: ReceitaMov[];
+  /** T4: despesas em categoria de taxa, que entram em "Taxas" junto com o que a plataforma desconta. */
+  taxasLancadas?: TaxaLancada[];
+}
+
+const taxaLancadaEntre = (xs: TaxaLancada[], start: string, end: string) =>
+  money(sum(xs.filter((t) => t.date >= start && t.date <= end).map((t) => t.valor)));
+
 export function buildReceitas(
   movs: ReceitaMov[],
   win: PeriodWindow,
   imposto: number | ImpostoMes,
   custos: ReadonlyMap<string, number> = new Map(),
+  extras: ReceitasExtras = {},
 ): ReceitasDataset {
   const cur = totals(movs, win.start, win.end);
   const prev = totals(movs, win.prevStart, win.prevEnd);
@@ -398,12 +419,19 @@ export function buildReceitas(
   const taxRatio = imp.aliquota + (cur.gross > 0 ? fixoCur / cur.gross : 0);
   const taxRatioPrev = imp.aliquota + (prev.gross > 0 ? fixoPrev / prev.gross : 0);
   const sel = movs.filter((m) => within(m, win.start, win.end));
+  const lancadas = extras.taxasLancadas ?? [];
 
-  const taxas = money(Math.max(0, cur.gross - cur.net));
+  // Taxas: o que a plataforma desconta na venda + as despesas em categoria de taxa (regra única, shared/taxa-venda).
+  const taxas = money(
+    Math.max(0, cur.gross - cur.net) + taxaLancadaEntre(lancadas, win.start, win.end),
+  );
   const impostos = money(cur.gross * taxRatio);
   const liquida = money(cur.gross - taxas - impostos);
   const liquidaPrev = money(
-    prev.gross - Math.max(0, prev.gross - prev.net) - prev.gross * taxRatioPrev,
+    prev.gross -
+      Math.max(0, prev.gross - prev.net) -
+      taxaLancadaEntre(lancadas, win.prevStart, win.prevEnd) -
+      prev.gross * taxRatioPrev,
   );
 
   const dB = delta(cur.gross, prev.gross);
@@ -431,6 +459,9 @@ export function buildReceitas(
     const receita = money(sum(doCanal.map((m) => m.gross)));
     const net = sum(doCanal.map((m) => m.net));
     const taxaPct = receita > 0 ? Math.round(((receita - net) / receita) * 100) : 0;
+    // A base da taxa vai no texto (reteste 22/11): no delivery, a % é sobre TODO o canal, com os pedidos que não
+    // pagam taxa (WhatsApp, entrega própria). A taxa cobrada pelo app, sobre as vendas dele, fica em Custos.
+    const semTaxa = doCanal.some((m) => m.net >= m.gross) && doCanal.some((m) => m.net < m.gross);
     return {
       canal: NOME_CANAL[canal],
       receita,
@@ -440,7 +471,7 @@ export function buildReceitas(
           ? 'Sem taxas de marketplace'
           : taxaPct > 0
             ? canal === 'delivery'
-              ? `Após taxas da plataforma (~${taxaPct}%)`
+              ? `Taxas: ~${taxaPct}% de todo o delivery${semTaxa ? ' (inclui pedidos sem taxa, como WhatsApp)' : ''}`
               : `Após taxas (~${taxaPct}%)`
             : 'Sem taxas registradas',
     };
@@ -587,7 +618,7 @@ export function buildReceitas(
       'Preencha a hora da venda nos lançamentos (campo "Hora da venda") para ver em que dia e horário você mais vende.',
     heatmapCobertura: mapa.cobertura,
     temEncomendas,
-    sazonalidade: sazonalidadePorCanal(movs, win.end),
+    sazonalidade: sazonalidadePorCanal(extras.vendas ?? movs, win.end),
     tendencia,
     tendenciaDescricao,
     pedidosLabel: win.pedidosLabel,

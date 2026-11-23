@@ -215,17 +215,37 @@ export const ALAVANCAS_ZERO: Alavancas = { volume: 0, preco: 0, custo: 0, cenari
 export const alavancaNoNormal = (a: Alavancas, k: LeverKey): boolean =>
   k === 'cenario' ? a.cenario === 'normal' : a[k] === 0;
 
-/** P.6: elasticidade usada na alavanca de preço do simulador geral (clientes medianamente sensíveis). */
-export const ELASTICIDADE_GERAL = -1.8;
+/**
+ * Elasticidade da alavanca de preço do simulador geral quando o cardápio não tem prato com venda: o perfil "dia a
+ * dia" (−1,5), o mesmo padrão do simulador por prato. Com pratos, a tela usa a média deles (`elasticidadeDoCardapio`).
+ */
+export const ELASTICIDADE_GERAL = -1.5;
 
 /** Queda (ou alta) de volume, em %, de mudar todos os preços em `preco`% (elasticidade constante). */
 export const volumeDoPreco = (preco: number, e = ELASTICIDADE_GERAL): number =>
   preco === 0 ? 0 : Math.round((Math.pow(1 + preco / 100, e) - 1) * 1000) / 10;
 
-export function ajustesDe(a: Alavancas, ativa: LeverKey): Ajustes {
+/** Margem prevista (% da receita) abaixo da qual o simulador olha o preço. */
+export const MARGEM_ALERTA_PRECO = 15;
+
+/**
+ * Alerta de preço das Previsões (reteste 22/11, T8). Com a margem baixa, só sugere o reajuste de 5% quando a
+ * simulação dele (com a queda de vendas da elasticidade) AUMENTA o lucro previsto; senão, manda revisar custos e
+ * pratos. Antes sugeria +5% só pela margem, e o simulador da mesma tela mostrava o lucro caindo.
+ */
+export function alertaDePreco(
+  r: { receita: number; margem: number },
+  ganhoComReajuste: number,
+): 'reajustar' | 'revisar' | null {
+  if (!(r.receita > 0) || r.margem >= MARGEM_ALERTA_PRECO) return null;
+  return ganhoComReajuste > 0 ? 'reajustar' : 'revisar';
+}
+
+export function ajustesDe(a: Alavancas, ativa: LeverKey, e = ELASTICIDADE_GERAL): Ajustes {
   if (ativa === 'volume') return { ...AJUSTES_ZERO, volume: a.volume };
   // P.6: subir o preço também tira vendas; antes +10% de preço dava +10% de receita sem perder ninguém.
-  if (ativa === 'preco') return { ...AJUSTES_ZERO, preco: a.preco, volume: volumeDoPreco(a.preco) };
+  if (ativa === 'preco')
+    return { ...AJUSTES_ZERO, preco: a.preco, volume: volumeDoPreco(a.preco, e) };
   if (ativa === 'custo') return { ...AJUSTES_ZERO, custo: a.custo };
   return { ...AJUSTES_ZERO, volume: a.cenario === 'fraco' ? -25 : a.cenario === 'cheio' ? 25 : 0 };
 }

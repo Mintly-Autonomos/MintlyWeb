@@ -75,6 +75,15 @@ const STATUS_META: Record<
   vencido: { label: 'Vencido', icon: 'error', tone: 'error' },
 };
 
+/** Soma corrida de entradas ou saídas da projeção. */
+export function acumulado(
+  pontos: { inflows: number; outflows: number }[],
+  k: 'inflows' | 'outflows',
+): number[] {
+  let soma = 0;
+  return pontos.map((p) => (soma = Math.round((soma + p[k]) * 100) / 100));
+}
+
 @Component({
   selector: 'app-fluxo-caixa',
   standalone: true,
@@ -267,20 +276,13 @@ export class FluxoCaixaComponent implements OnInit {
     }));
   });
 
-  /** Sparks curtos (não vêm mais do back) — últimos pontos realizados + previstos. */
-  protected sparkReceber = computed(() => {
-    const d = this.data();
-    if (!d) return [];
-    return [...d.realized.map((p) => p.inflows), ...d.projection.slice(1, 5).map((p) => p.inflows)];
-  });
-  protected sparkPagar = computed(() => {
-    const d = this.data();
-    if (!d) return [];
-    return [
-      ...d.realized.map((p) => p.outflows),
-      ...d.projection.slice(1, 5).map((p) => p.outflows),
-    ];
-  });
+  /**
+   * Minigráficos de "A receber" e "A pagar": o ACUMULADO dia a dia no horizonte, de hoje (com as vencidas, que a
+   * projeção põe em hoje) até o último dia. Termina no valor do card; antes, eram as entradas/saídas soltas de
+   * poucos dias, quase sempre zero ("mín 0, máx 0" embaixo de R$ 57 mil).
+   */
+  protected sparkReceber = computed(() => acumulado(this.data()?.projection ?? [], 'inflows'));
+  protected sparkPagar = computed(() => acumulado(this.data()?.projection ?? [], 'outflows'));
 
   protected itens = computed<VencimentoView[]>(() => {
     const d = this.data();

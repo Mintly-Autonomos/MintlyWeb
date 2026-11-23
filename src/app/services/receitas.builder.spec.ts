@@ -212,3 +212,27 @@ describe('Receitas com o DAS fixo do MEI (reteste 22/11, T1)', () => {
     expect(salao.liquida).toBe(980);
   });
 });
+
+describe('reteste 22/11: taxas e sazonalidade iguais às outras telas', () => {
+  const win = resolveWindow('Mês passado', undefined, undefined, '2026-11-22');
+
+  it('T4: despesa em categoria de taxa entra em Taxas junto com o desconto da plataforma', () => {
+    const movs = [mov({ date: '2026-10-10', gross: 1000, net: 900 })];
+    const d = buildReceitas(movs, win, 0, new Map(), {
+      taxasLancadas: [
+        { date: '2026-10-05', valor: 79.8 },
+        { date: '2026-09-30', valor: 50 },
+      ],
+    });
+    expect(d.taxas).toBe(179.8);
+    expect(d.receitaLiquida).toBe(820.2);
+  });
+
+  it('T3: a sazonalidade usa todas as vendas pelo dia da venda, não só as recebidas', () => {
+    const recebida = mov({ date: '2026-10-20', saleDate: '2026-10-20', gross: 100, net: 100 });
+    const aReceber = mov({ date: '2026-11-05', saleDate: '2026-10-28', gross: 50, net: 50 });
+    const d = buildReceitas([recebida], win, 0, new Map(), { vendas: [recebida, aReceber] });
+    const out = d.sazonalidade.meses.find((m) => m.mes === 'Out/26');
+    expect(out?.total).toBe(150);
+  });
+});
