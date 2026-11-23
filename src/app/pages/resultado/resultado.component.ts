@@ -87,6 +87,23 @@ const REGIME_LABEL: Record<TaxRegimeKey, string> = {
   simplesNacionalAnexoII: 'Simples Nacional — Anexo II',
 };
 
+/**
+ * Texto da linha de impostos. No MEI diz o DAS fixo do mês e, quando o valor oficial não está configurado, que ele
+ * foi estimado pelos DAS pagos (reteste 22/11, T1): é o mesmo valor que Receitas e Previsões usam.
+ */
+export function explicacaoImposto(t: {
+  regime: string | null;
+  meiMonthlyDas: number | null;
+  meiDasEstimated?: boolean;
+}): string {
+  if (t.regime === 'mei' && t.meiMonthlyDas != null && t.meiMonthlyDas > 0) {
+    return t.meiDasEstimated
+      ? `DAS-MEI fixo de ${formatBRL(t.meiMonthlyDas)} por mês, estimado pelos DAS pagos nos últimos 12 meses (o valor de cada DAS, não a soma do mês). É o mesmo imposto em Receitas e nas Previsões.`
+      : `DAS-MEI fixo de ${formatBRL(t.meiMonthlyDas)} por mês, o mesmo em Receitas e nas Previsões.`;
+  }
+  return 'O que sai direto do faturamento para o governo, conforme o regime tributário configurado.';
+}
+
 /** Categoria de despesa que é taxa de venda (cartão, app, maquininha), pelo nome. */
 export function ehCategoriaDeTaxa(nome: string): boolean {
   return /\b(taxas?|tarifas?|comiss(ã|a)o|comiss(õ|o)es|maquininha)\b/i.test(nome);
@@ -220,8 +237,7 @@ export class ResultadoComponent implements OnInit {
         valor: -d.current.taxes,
         tipo: 'deducao',
         pctReceita: -pct(d.current.taxes),
-        explicacao:
-          'O que sai direto do faturamento para o governo, conforme o regime tributário configurado.',
+        explicacao: explicacaoImposto(d.tax),
         deltaFraction: d.deltas.taxes,
       },
       {

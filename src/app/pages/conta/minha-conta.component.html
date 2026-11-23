@@ -417,6 +417,99 @@
           </div>
         </section>
 
+        <!-- Abertura da empresa (reteste 22/11, T2) -->
+        <section
+          class="rounded-2xl border border-border p-4 space-y-3"
+          data-testid="secao-abertura"
+        >
+          <div>
+            <h4 class="text-[14px] font-bold">Abertura da empresa (Simples Nacional)</h4>
+            <p class="text-[13px] text-muted-foreground">
+              Nos 12 primeiros meses de atividade, o Simples calcula a alíquota pela média do que a
+              empresa faturou até ali (Resolução CGSN 140/2018, art. 22). Se o restaurante abriu
+              antes de usar o Mintly, informe o mês de abertura e o faturamento dos meses de antes,
+              para o imposto sair certo. Sem isso, o Mintly conta a partir da primeira venda
+              lançada.
+            </p>
+          </div>
+          <label class="block max-w-[220px]">
+            <span class="text-[12.5px] font-medium">Mês de abertura</span>
+            <input
+              type="month"
+              [max]="mesAtual"
+              [value]="aberturaInicio()"
+              (input)="aberturaInicio.set(valor($event))"
+              data-testid="abertura-inicio"
+              [class]="inputClass + ' mt-1'"
+            />
+          </label>
+          @if (aberturaLinhas().length > 0) {
+            <ul class="space-y-2">
+              @for (l of aberturaLista(); track $index; let i = $index) {
+                <li class="grid grid-cols-[minmax(0,160px)_minmax(0,1fr)_36px] items-start gap-2">
+                  <input
+                    type="month"
+                    [max]="mesAtual"
+                    [value]="l.mes"
+                    (input)="setMesAntes(i, 'mes', valor($event))"
+                    [attr.aria-label]="'Mês ' + (i + 1) + ' do faturamento anterior'"
+                    [attr.data-testid]="'abertura-mes-' + i"
+                    [class]="inputClass + (l.mesOk ? '' : ' border-error')"
+                  />
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="0,00"
+                    [value]="l.valor"
+                    (input)="setMesAntes(i, 'valor', valor($event))"
+                    [attr.aria-label]="'Faturamento de ' + l.mes"
+                    [attr.data-testid]="'abertura-valor-' + i"
+                    [class]="
+                      inputClass + ' text-right tabular-nums' + (l.valorOk ? '' : ' border-error')
+                    "
+                  />
+                  <button
+                    type="button"
+                    (click)="removerMesAntes(i)"
+                    class="h-10 w-9 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted hover:text-error cursor-pointer"
+                    [attr.aria-label]="'Remover ' + l.mes"
+                  >
+                    <app-icon name="delete" [style]="{ fontSize: '18px' }" />
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+          @if (!aberturaValida()) {
+            <p class="text-[12.5px] text-error" role="alert">
+              Use meses até o atual, cada um uma vez só, com o faturamento em reais.
+            </p>
+          }
+          @if (erros().abertura; as e) {
+            <p class="text-[12.5px] text-error" role="alert">{{ e }}</p>
+          }
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              (click)="addMesAntes()"
+              [disabled]="aberturaLinhas().length >= REVENUE_BEFORE_MINTLY_MAX"
+              class="h-10 px-4 rounded-full text-sm font-semibold border border-border hover:bg-muted cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+              data-testid="abertura-adicionar"
+            >
+              <app-icon name="add" [style]="{ fontSize: '17px' }" />Adicionar mês anterior ao Mintly
+            </button>
+            <button
+              type="button"
+              (click)="salvarAbertura()"
+              [disabled]="!aberturaMudou() || !aberturaValida() || ocupado() === 'abertura'"
+              class="h-10 px-5 rounded-full text-sm font-semibold bg-mint text-primary-foreground hover:brightness-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="abertura-salvar"
+            >
+              Salvar abertura
+            </button>
+          </div>
+        </section>
+
         <!-- Funcionários -->
         <section
           class="rounded-2xl border border-border p-4 space-y-3"

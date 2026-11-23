@@ -46,10 +46,18 @@ export interface PessoaEquipe {
   horasSemana: number;
 }
 
+/** Reteste 22/11 (T2): o mês de abertura e o faturamento de antes do Mintly, para o RBT12 do Simples. */
+export interface AberturaEmpresa {
+  /** `AAAA-MM`; "" = não informado. */
+  inicio: string;
+  faturamentoAntes: { mes: string; valor: number }[];
+}
+
 const mock = {
   telefone: '11999990000',
   restaurante: '',
   equipe: null as PessoaEquipe[] | null,
+  abertura: { inicio: '', faturamentoAntes: [] } as AberturaEmpresa,
   exclusaoEm: null as string | null,
   membros: [] as Membro[],
 };
@@ -102,6 +110,8 @@ export class ContaService {
   readonly restaurante = signal<string>('');
   /** P.4: equipe e horas por semana. `null` = nunca informada. */
   readonly equipe = signal<PessoaEquipe[] | null>(null);
+  /** T2: início da atividade e faturamento antes do Mintly. */
+  readonly abertura = signal<AberturaEmpresa>({ inicio: '', faturamentoAntes: [] });
   readonly membros = signal<Membro[]>([]);
   /** Quando o dono pediu a exclusão do restaurante (ISO); `null` = sem pedido. */
   readonly exclusaoPedidaEm = signal<string | null>(null);
@@ -204,6 +214,7 @@ export class ContaService {
       );
       this.exclusaoPedidaEm.set(mock.exclusaoEm);
       this.equipe.set(mock.equipe);
+      this.abertura.set(mock.abertura);
       return;
     }
     const res = await this.call((h) => this.client.restaurantClient.me({}, h));
@@ -213,6 +224,13 @@ export class ContaService {
       this.equipe.set(
         r.team ? r.team.map((p) => ({ nome: p.name, horasSemana: p.weeklyHours })) : null,
       );
+      this.abertura.set({
+        inicio: r.activityStart ?? '',
+        faturamentoAntes: (r.revenueBeforeMintly ?? []).map((x) => ({
+          mes: x.month,
+          valor: x.amount,
+        })),
+      });
       const pedido = (r as { deletionRequestedAt?: Date | string }).deletionRequestedAt;
       this.exclusaoPedidaEm.set(pedido ? new Date(pedido).toISOString() : null);
     }
@@ -233,6 +251,28 @@ export class ContaService {
       }
     }
     this.equipe.set(team.map((p) => ({ nome: p.name, horasSemana: p.weeklyHours })));
+  }
+
+  /** T2: grava o mês de abertura ("" apaga) e troca a lista inteira do faturamento anterior ([] apaga). */
+  async salvarAbertura(a: AberturaEmpresa): Promise<void> {
+    if (environment.useMocks) {
+      await delay();
+      mock.abertura = a;
+    } else {
+      await this.call((h) =>
+        this.client.restaurantClient.updateMe(
+          {
+            activityStart: a.inicio,
+            revenueBeforeMintly: a.faturamentoAntes.map((x) => ({ month: x.mes, amount: x.valor })),
+          },
+          h,
+        ),
+      );
+    }
+    this.abertura.set({
+      inicio: a.inicio,
+      faturamentoAntes: [...a.faturamentoAntes].sort((x, y) => x.mes.localeCompare(y.mes)),
+    });
   }
 
   async renomearRestaurante(nome: string): Promise<void> {
