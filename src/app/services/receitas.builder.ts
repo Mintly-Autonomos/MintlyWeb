@@ -454,6 +454,9 @@ export function buildReceitas(
     const receita = money(sum(doCanal.map((m) => m.gross)));
     const net = sum(doCanal.map((m) => m.net));
     const taxaPct = receita > 0 ? Math.round(((receita - net) / receita) * 100) : 0;
+    // A base da taxa vai no texto (reteste 22/11): no delivery, a % é sobre TODO o canal, com os pedidos que não
+    // pagam taxa (WhatsApp, entrega própria). A taxa cobrada pelo app, sobre as vendas dele, fica em Custos.
+    const semTaxa = doCanal.some((m) => m.net >= m.gross) && doCanal.some((m) => m.net < m.gross);
     return {
       canal: NOME_CANAL[canal],
       receita,
@@ -463,7 +466,7 @@ export function buildReceitas(
           ? 'Sem taxas de marketplace'
           : taxaPct > 0
             ? canal === 'delivery'
-              ? `Após taxas da plataforma (~${taxaPct}%)`
+              ? `Taxas: ~${taxaPct}% de todo o delivery${semTaxa ? ' (inclui pedidos sem taxa, como WhatsApp)' : ''}`
               : `Após taxas (~${taxaPct}%)`
             : 'Sem taxas registradas',
     };

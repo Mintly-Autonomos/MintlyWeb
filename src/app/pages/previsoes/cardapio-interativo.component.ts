@@ -22,6 +22,7 @@ import {
   SENSIBILIDADES,
   Medida,
   elasticidadeDoPrato,
+  elasticidadeDoCardapio,
   curvaLucro,
   elasticidadeMedida,
   precoOtimo,
@@ -117,6 +118,10 @@ export class CardapioInterativoComponent {
     for (const p of this.pratos()) out[p.id] = elasticidadeDoPrato(p, med[p.id] ?? null, perfis);
     return out;
   });
+  /** T9: a média do cardápio que o simulador geral ("todos os preços") usa, para o número aparecer nas duas telas. */
+  protected elasticidadeCardapio = computed(() =>
+    elasticidadeDoCardapio(this.pratos(), this.medidas(), this.svc.perfis()),
+  );
   protected elasticidades = computed(() => {
     const out: Record<string, number> = {};
     for (const [id, u] of Object.entries(this.usadas())) out[id] = u.valor;
@@ -175,7 +180,7 @@ export class CardapioInterativoComponent {
       linha,
       zona,
       atual: { x: x(i.preco), y: y((i.preco - p.cost) * i.qtd) },
-      melhor: { x: x(melhor.preco), y: y(melhor.lucro), preco: melhor.preco },
+      melhor: { x: x(melhor.preco), y: y(melhor.lucro), preco: melhor.preco, lucro: melhor.lucro },
       zeroY: y(0),
     };
   });

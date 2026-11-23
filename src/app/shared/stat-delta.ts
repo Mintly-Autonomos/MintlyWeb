@@ -1,11 +1,14 @@
 import type { ReportComparison } from 'mintly-lib';
 import type { StatDelta } from './stat-card.component';
-import { fmtMonthLong } from './format';
+import { fmtMonthLong, formatBRL } from './format';
 
 /** Abaixo disso (em %, ou em p.p.) a variação é tratada como "sem alteração". */
 const FLAT_BELOW = 0.05;
 
 const fmt = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+
+/** Acima disto (300%) a variação em % deixa de ajudar a ler: mostra a diferença em reais. */
+const PCT_MAX = 3;
 
 /**
  * Variação de um indicador para o `app-stat-card`.
@@ -16,8 +19,34 @@ const fmt = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 
  */
 export function statDelta(
   value: number | null | undefined,
-  opts: { note?: string; points?: boolean } = {},
+  opts: {
+    note?: string;
+    points?: boolean;
+    /**
+     * Valor atual e a base da comparação. Com a base negativa ou a variação acima de 300%, a % não diz nada
+     * ("+34.399,4%" sobre −R$ 42,10): mostra a diferença em reais e, em `lucro`, "virou lucro"/"virou prejuízo".
+     */
+    base?: { current: number; previous: number | null | undefined; lucro?: boolean };
+  } = {},
 ): StatDelta | null {
+  const b = opts.base;
+  if (b && b.previous != null && Number.isFinite(b.previous) && !opts.points) {
+    const prev = b.previous;
+    const pctInutil =
+      prev < 0 || (value != null && Number.isFinite(value) && Math.abs(value) > PCT_MAX);
+    if (pctInutil) {
+      const diff = Math.round((b.current - prev) * 100) / 100;
+      if (diff === 0) return { value: formatBRL(0), up: false, flat: true, note: opts.note };
+      const virou =
+        b.lucro && prev < 0 && b.current >= 0
+          ? 'virou lucro'
+          : b.lucro && prev >= 0 && b.current < 0
+            ? 'virou prejuízo'
+            : '';
+      const note = [opts.note, virou].filter(Boolean).join(' · ') || undefined;
+      return { value: formatBRL(Math.abs(diff)), up: diff > 0, note };
+    }
+  }
   if (value === null || value === undefined || !Number.isFinite(value)) return null;
   const n = opts.points ? value : value * 100;
   const unit = opts.points ? ' p.p.' : '%';
@@ -48,6 +77,24 @@ export function comparisonNote(
     return `vs. ${dias} de ${anterior}`;
   }
   return `vs. ${anterior}`;
+}
+
+/**
+ * Base da comparação por extenso, para frases: "aos dias 1 a 22 de Outubro/2026" no mês em andamento (a API compara
+ * os mesmos dias) ou "a Outubro/2026" no mês fechado. Sem isso, "cresceu R$ 8.826 em relação a Outubro" fazia parecer
+ * que o mês era melhor que outubro inteiro (reteste 22/11).
+ */
+export function comparisonBase(
+  comparison: ReportComparison | null | undefined,
+  referenceMonth: string,
+): string {
+  const anterior = fmtMonthLong(mesAnterior(referenceMonth));
+  if (comparison?.kind === 'samePeriod' && comparison.untilDay) {
+    return comparison.untilDay === 1
+      ? `ao dia 1 de ${anterior}`
+      : `aos dias 1 a ${comparison.untilDay} de ${anterior}`;
+  }
+  return `a ${anterior}`;
 }
 
 /** Selo de mês parcial: "Mês parcial: até o dia 4". Mês fechado não tem selo (null). */

@@ -20,7 +20,12 @@ import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
 import { ehCategoriaDeTaxa, ehTaxaDeVenda } from '../../shared/taxa-venda';
-import { comparisonNote, partialMonthLabel, statDelta } from '../../shared/stat-delta';
+import {
+  comparisonBase,
+  comparisonNote,
+  partialMonthLabel,
+  statDelta,
+} from '../../shared/stat-delta';
 import { CmvAvisoComponent, DespesaForaDoCmv } from '../../shared/cmv-aviso.component';
 import {
   formatBRL,
@@ -129,6 +134,23 @@ export class ResultadoComponent implements OnInit {
     return d ? comparisonNote(d.comparison, d.referenceMonth) : undefined;
   });
   protected mesParcial = computed(() => partialMonthLabel(this.data()?.comparison));
+  /** "aos dias 1 a 22 de Outubro/2026" (mês em andamento) ou "a Outubro/2026". */
+  protected baseComparacao = computed(() => {
+    const d = this.data();
+    return d ? comparisonBase(d.comparison, d.referenceMonth) : '';
+  });
+  /**
+   * No mês em andamento a leitura compara os mesmos dias; esta frase traz o mês anterior INTEIRO, para ninguém achar
+   * que o mês já está melhor que ele. null no mês fechado ou sem o mês no histórico.
+   */
+  protected mesAnteriorInteiro = computed(() => {
+    const d = this.data();
+    if (!d || d.comparison?.kind !== 'samePeriod') return null;
+    const h = d.history.find((p) => p.month === d.previousMonth);
+    if (!h) return null;
+    const margem = h.netMargin == null ? '' : ` (margem de ${pctFmt(h.netMargin * 100)})`;
+    return ` ${fmtMonthLong(d.previousMonth)} inteiro fechou com ${h.netProfit < 0 ? 'prejuízo' : 'lucro'} de ${formatBRL(Math.abs(h.netProfit))}${margem}.`;
+  });
   /** Mês futuro (U.4): o DRE mostra só o que já está lançado com competência nele. */
   protected mesFuturo = computed(() => {
     const d = this.data();
@@ -147,8 +169,18 @@ export class ResultadoComponent implements OnInit {
       mes: fmtMonthLong(py.month),
       receita: py.lines.grossRevenue,
       lucro: py.lines.netProfit,
-      receitaDelta: statDelta(py.deltas.grossRevenue, { note: nota }),
-      lucroDelta: statDelta(py.deltas.netProfit, { note: nota }),
+      receitaDelta: statDelta(py.deltas.grossRevenue, {
+        note: nota,
+        base: { current: this.data()!.current.grossRevenue, previous: py.lines.grossRevenue },
+      }),
+      lucroDelta: statDelta(py.deltas.netProfit, {
+        note: nota,
+        base: {
+          current: this.data()!.current.netProfit,
+          previous: py.lines.netProfit,
+          lucro: true,
+        },
+      }),
     };
   });
   protected regimeLabel = REGIME_LABEL;
