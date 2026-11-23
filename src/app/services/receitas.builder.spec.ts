@@ -197,3 +197,18 @@ describe('buildReceitas', () => {
     ]);
   });
 });
+
+describe('Receitas com o DAS fixo do MEI (reteste 22/11, T1)', () => {
+  it('o imposto do mês é o DAS fixo, repartido entre os canais pela receita', () => {
+    const win = resolveWindow('Mês passado', undefined, undefined, '2026-11-22');
+    const movs = [
+      mov({ date: '2026-10-10', gross: 1000, net: 1000, canal: 'salao' }),
+      mov({ date: '2026-10-12', gross: 3000, net: 2400, canal: 'delivery' }),
+    ];
+    const d = buildReceitas(movs, win, { aliquota: 0, fixoMes: 80 });
+    expect(d.impostos).toBe(80);
+    expect(d.receitaLiquida).toBe(4000 - 600 - 80);
+    const salao = d.canais.find((c) => c.canal === 'Salão')!;
+    expect(salao.liquida).toBe(980);
+  });
+});

@@ -327,3 +327,21 @@ describe('alavanca de preço com elasticidade (P.6)', () => {
     });
   });
 });
+
+describe('simular com o DAS fixo do MEI (reteste 22/11, T1)', () => {
+  const movs = [mov({ valor: 3000 }), mov({ tipo: 'out', valor: 600, variavel: 1 })];
+
+  it('o imposto é o DAS do período (fixo do mês ÷ 30 por dia), não uma fração da venda', () => {
+    const base = buildBase(movs, 2000, 0, HOJE, 81);
+    const { resultado } = simular(AJUSTES_ZERO, 30, base);
+    expect(resultado.impostos).toBe(81);
+    expect(resultado.impostosCaixa).toBe(81);
+    expect(resultado.lucro).toBe(2400 - 81);
+  });
+
+  it('vender mais não muda o DAS', () => {
+    const base = buildBase(movs, 2000, 0, HOJE, 81);
+    const { resultado } = simular({ ...AJUSTES_ZERO, volume: 50 }, 60, base);
+    expect(resultado.impostos).toBe(162);
+  });
+});
