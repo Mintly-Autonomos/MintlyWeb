@@ -51,11 +51,22 @@ describe('MinhaContaComponent', () => {
     const membros = signal<Membro[]>(over.membros ?? []);
     const exclusaoPedidaEm = signal<string | null>(over.exclusaoEm ?? null);
     const equipe = signal(over.equipe ?? null);
+    const abertura = signal<{ inicio: string; faturamentoAntes: { mes: string; valor: number }[] }>(
+      {
+        inicio: '',
+        faturamentoAntes: [],
+      },
+    );
     const svc = {
       dados,
       restaurante,
       membros,
       equipe,
+      abertura,
+      salvarAbertura: vi.fn(
+        (a: { inicio: string; faturamentoAntes: { mes: string; valor: number }[] }) =>
+          Promise.resolve(abertura.set(a)),
+      ),
       exclusaoPedidaEm,
       salvarEquipe: vi.fn((l: { nome: string; horasSemana: number }[]) =>
         Promise.resolve(equipe.set(l)),
@@ -302,6 +313,33 @@ describe('MinhaContaComponent', () => {
       await click('equipe-remover-0');
       expect(q('equipe-nome-0')).toBeNull();
       expect(q<HTMLButtonElement>('equipe-salvar')!.disabled).toBe(false);
+    });
+
+    it('abertura (reteste 22/11, T2): mês de abertura e faturamento antes do Mintly, salvos juntos', async () => {
+      const { q, svc, type, click } = await naAbaRestaurante();
+      expect(q<HTMLButtonElement>('abertura-salvar')!.disabled).toBe(true);
+      await type('abertura-inicio', '2024-03');
+      await click('abertura-adicionar');
+      await type('abertura-mes-0', '2025-10');
+      // Campo de dinheiro: cada dígito entra pelos centavos.
+      await type('abertura-valor-0', '4200000');
+      expect(q<HTMLInputElement>('abertura-valor-0')!.value).toBe('42.000,00');
+      await click('abertura-salvar');
+      expect(svc.salvarAbertura).toHaveBeenCalledWith({
+        inicio: '2024-03',
+        faturamentoAntes: [{ mes: '2025-10', valor: 42000 }],
+      });
+    });
+
+    it('abertura: mês repetido bloqueia o salvar', async () => {
+      const { q, type, click } = await naAbaRestaurante();
+      await click('abertura-adicionar');
+      await type('abertura-mes-0', '2025-10');
+      await type('abertura-valor-0', '100');
+      await click('abertura-adicionar');
+      await type('abertura-mes-1', '2025-10');
+      await type('abertura-valor-1', '100');
+      expect(q<HTMLButtonElement>('abertura-salvar')!.disabled).toBe(true);
     });
 
     it('o nome só pode ser salvo depois de mudar, e salva', async () => {

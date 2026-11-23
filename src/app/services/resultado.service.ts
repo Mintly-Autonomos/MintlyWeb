@@ -109,6 +109,7 @@ function buildMockReport(): ResultReport {
       regime: TaxRegime.SimplesNacionalAnexoI,
       effectiveRate: m.impostos / m.receitaBruta,
       meiMonthlyDas: null,
+      meiDasEstimated: false,
     },
     operatingExpenseItems,
     breakEven: {

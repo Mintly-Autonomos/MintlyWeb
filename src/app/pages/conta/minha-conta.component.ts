@@ -14,6 +14,7 @@ import {
   MEMBER_INVITE_EXPIRY_DAYS,
   SUBSCRIPTION_MEMBER_LIMIT,
   SUBSCRIPTION_TIER_LABEL,
+  REVENUE_BEFORE_MINTLY_MAX,
   TEAM_MAX_MEMBERS,
   TEAM_MAX_WEEKLY_HOURS,
   memberLimitForTier,
@@ -52,6 +53,7 @@ type Secao =
   | 'senha'
   | 'restaurante'
   | 'equipe'
+  | 'abertura'
   | 'membro'
   | 'exclusao'
   | 'carregar';
@@ -60,6 +62,9 @@ type Secao =
  * Modal "Minha conta" (menu do usuário). "Meus dados": nome, telefone, e-mail e senha. "Restaurante" (só o
  * dono): nome, funcionários (logins próprios) e pedido de exclusão. A API é quem confere se quem pede é o dono.
  */
+import { formatMoneyInput, moneyToInput } from '../../shared/money-input';
+import { localISOMonth } from '../../shared/format';
+
 @Component({
   selector: 'app-minha-conta',
   standalone: true,
@@ -116,6 +121,41 @@ export class MinhaContaComponent {
 
   // Restaurante
   protected nomeRest = signal('');
+  /** T2: abertura da empresa e faturamento antes do Mintly (valores como texto do campo de dinheiro). */
+  protected readonly REVENUE_BEFORE_MINTLY_MAX = REVENUE_BEFORE_MINTLY_MAX;
+  protected readonly mesAtual = localISOMonth();
+  protected aberturaInicio = signal('');
+  protected aberturaLinhas = signal<{ mes: string; valor: string }[]>([]);
+  protected aberturaLista = computed(() =>
+    this.aberturaLinhas().map((l) => {
+      const valor = Number(l.valor.replace(/\./g, '').replace(',', '.'));
+      const mesOk = /^\d{4}-(0[1-9]|1[0-2])$/.test(l.mes) && l.mes <= this.mesAtual;
+      const valorOk = l.valor.trim() !== '' && Number.isFinite(valor) && valor >= 0;
+      return { ...l, valorNum: valor, mesOk, valorOk };
+    }),
+  );
+  protected aberturaValida = computed(() => {
+    const ls = this.aberturaLista();
+    const meses = ls.map((l) => l.mes);
+    const inicio = this.aberturaInicio();
+    return (
+      (inicio === '' || inicio <= this.mesAtual) &&
+      ls.every((l) => l.mesOk && l.valorOk) &&
+      new Set(meses).size === meses.length
+    );
+  });
+  protected aberturaMudou = computed(() => {
+    const s = this.svc.abertura();
+    const ls = this.aberturaLista();
+    return (
+      this.aberturaInicio() !== s.inicio ||
+      ls.length !== s.faturamentoAntes.length ||
+      ls.some(
+        (l, i) =>
+          l.mes !== s.faturamentoAntes[i]?.mes || l.valorNum !== s.faturamentoAntes[i]?.valor,
+      )
+    );
+  });
   /** P.4: equipe em edição (horas como texto para o campo aceitar "22,5"). */
   protected equipeEdit = signal<{ nome: string; horas: string }[]>([]);
   protected readonly TEAM_MAX_MEMBERS = TEAM_MAX_MEMBERS;
@@ -277,6 +317,7 @@ export class MinhaContaComponent {
         await Promise.all([this.svc.carregarRestaurante(), this.svc.carregarMembros()]);
         this.nomeRest.set(this.restaurante());
         this.resetEquipe();
+        this.resetAbertura();
       }
     } catch (err) {
       this.toast.error(apiErrorMessage(err, 'Não foi possível carregar sua conta.'));
@@ -367,6 +408,54 @@ export class MinhaContaComponent {
       this.closed.emit();
     } catch (err) {
       this.falha('senha', err, 'Não foi possível trocar a senha.');
+    } finally {
+      this.ocupado.set(null);
+    }
+  }
+
+  private resetAbertura(): void {
+    const a = this.svc.abertura();
+    this.aberturaInicio.set(a.inicio);
+    this.aberturaLinhas.set(
+      a.faturamentoAntes.map((x) => ({ mes: x.mes, valor: moneyToInput(x.valor) })),
+    );
+  }
+
+  addMesAntes(): void {
+    const ls = this.aberturaLinhas();
+    if (ls.length >= REVENUE_BEFORE_MINTLY_MAX) return;
+    // Sugere o mês antes do mais antigo já na lista (ou o mês passado).
+    const base = ls.length ? [...ls].map((l) => l.mes).sort()[0] : this.mesAtual;
+    const [y, m] = base.split('-').map(Number);
+    const ant = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+    this.aberturaLinhas.update((l) => [...l, { mes: ant, valor: '' }]);
+  }
+
+  removerMesAntes(i: number): void {
+    this.aberturaLinhas.update((l) => l.filter((_, k) => k !== i));
+  }
+
+  setMesAntes(i: number, campo: 'mes' | 'valor', v: string): void {
+    const valor = campo === 'valor' ? formatMoneyInput(v) : v;
+    this.aberturaLinhas.update((l) => l.map((p, k) => (k === i ? { ...p, [campo]: valor } : p)));
+  }
+
+  async salvarAbertura(): Promise<void> {
+    if (!this.aberturaValida() || !this.aberturaMudou()) return;
+    this.ocupado.set('abertura');
+    this.limpar('abertura');
+    try {
+      await this.svc.salvarAbertura({
+        inicio: this.aberturaInicio(),
+        faturamentoAntes: this.aberturaLista().map((l) => ({
+          mes: l.mes,
+          valor: Math.round(l.valorNum * 100) / 100,
+        })),
+      });
+      this.resetAbertura();
+      this.toast.success('Abertura e faturamento anterior salvos.');
+    } catch (err) {
+      this.falha('abertura', err, 'Não foi possível salvar a abertura da empresa.');
     } finally {
       this.ocupado.set(null);
     }

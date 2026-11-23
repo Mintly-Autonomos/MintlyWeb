@@ -65,11 +65,13 @@ function buildMockReport(): OverviewReport {
     cards: {
       netProfit: {
         amount: s.netProfit,
+        previousAmount: s.prevNetProfit,
         delta: (s.netProfit - s.prevNetProfit) / s.prevNetProfit,
         history: netProfitHistory,
       },
       revenue: {
         amount: s.grossRevenue,
+        previousAmount: s.prevGrossRevenue,
         delta: (s.grossRevenue - s.prevGrossRevenue) / s.prevGrossRevenue,
         history: revenueHistory,
       },

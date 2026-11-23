@@ -198,7 +198,16 @@
         <app-stat-card
           label="Lucro do mês"
           [value]="fmtBRL(d.cards.netProfit.amount)"
-          [delta]="statDelta(d.cards.netProfit.delta, { note: notaComparacao() })"
+          [delta]="
+            statDelta(d.cards.netProfit.delta, {
+              note: notaComparacao(),
+              base: {
+                current: d.cards.netProfit.amount,
+                previous: d.cards.netProfit.previousAmount,
+                lucro: true,
+              },
+            })
+          "
           icon="savings"
           status="neutral"
           [spark]="netProfitSpark()"
@@ -271,7 +280,12 @@
         <app-stat-card
           label="Receita do mês"
           [value]="fmtBRL(d.cards.revenue.amount)"
-          [delta]="statDelta(d.cards.revenue.delta, { note: notaComparacao() })"
+          [delta]="
+            statDelta(d.cards.revenue.delta, {
+              note: notaComparacao(),
+              base: { current: d.cards.revenue.amount, previous: d.cards.revenue.previousAmount },
+            })
+          "
           icon="trending_up"
           status="neutral"
           [spark]="revenueSpark()"
