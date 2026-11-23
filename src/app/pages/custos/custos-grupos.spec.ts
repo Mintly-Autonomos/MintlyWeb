@@ -9,17 +9,31 @@ const hist = (a: number, b: number) => [
   { month: '2026-09', amount: a },
   { month: '2026-10', amount: b },
 ];
-const item = (kind: string, dreGroup: DreGroup | null, a: number, b: number) =>
-  ({ kind, dreGroup, history: hist(a, b) }) as never;
+const item = (kind: string, dreGroup: DreGroup | null, a: number, b: number, name = 'Categoria') =>
+  ({ kind, dreGroup, name, history: hist(a, b) }) as never;
 
 describe('grupos de custo', () => {
   it('taxa de app e de maquininha vira Taxas; o resto vem do grupo do DRE', () => {
-    expect(grupoDe({ kind: 'platformFee', dreGroup: null })).toBe('taxas');
-    expect(grupoDe({ kind: 'cardFee', dreGroup: null })).toBe('taxas');
-    expect(grupoDe({ kind: 'category', dreGroup: DreGroup.Cmv })).toBe('cmv');
-    expect(grupoDe({ kind: 'category', dreGroup: DreGroup.Labor })).toBe('pessoal');
-    expect(grupoDe({ kind: 'category', dreGroup: DreGroup.Tax })).toBe('impostos');
-    expect(grupoDe({ kind: 'category', dreGroup: DreGroup.Opex })).toBe('outras');
+    const n = 'Categoria';
+    expect(grupoDe({ kind: 'platformFee', dreGroup: null, name: 'Taxa iFood' })).toBe('taxas');
+    expect(grupoDe({ kind: 'cardFee', dreGroup: null, name: 'Taxa Stone' })).toBe('taxas');
+    expect(grupoDe({ kind: 'category', dreGroup: DreGroup.Cmv, name: n })).toBe('cmv');
+    expect(grupoDe({ kind: 'category', dreGroup: DreGroup.Labor, name: n })).toBe('pessoal');
+    expect(grupoDe({ kind: 'category', dreGroup: DreGroup.Tax, name: n })).toBe('impostos');
+    expect(grupoDe({ kind: 'category', dreGroup: DreGroup.Opex, name: n })).toBe('outras');
+  });
+
+  it('T4: categoria de taxa lançada como despesa também é Taxas, como no Resultado', () => {
+    expect(
+      grupoDe({ kind: 'category', dreGroup: DreGroup.Opex, name: 'Taxas de cartão e iFood' }),
+    ).toBe('taxas');
+    expect(
+      grupoDe({ kind: 'category', dreGroup: DreGroup.Opex, name: 'Aluguel da maquininha' }),
+    ).toBe('taxas');
+    // O grupo do DRE vem primeiro: "Comissão" marcada como mão de obra continua em mão de obra.
+    expect(grupoDe({ kind: 'category', dreGroup: DreGroup.Labor, name: 'Comissão' })).toBe(
+      'pessoal',
+    );
   });
 
   it('soma cada grupo por mês e fecha com o total da API (o que falta vira "sem detalhe")', () => {
