@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import type { Headers } from 'mintly-lib';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { ehTaxaDeVenda } from '../shared/taxa-venda';
 import { apiErrorInfo } from '../shared/api-error';
 import { CategoriasService } from './categorias.service';
 import { MintlyClientService } from './mintly-client.service';
@@ -102,6 +103,10 @@ export class ReceitasService {
     };
   }
 
+  private doSistema(categoryId: string | null): boolean {
+    return !!this.categorias.categories().find((c) => c.id === categoryId)?.system;
+  }
+
   private naoOperacional(categoryId: string | null): boolean {
     return (
       this.categorias.categories().find((c) => c.id === categoryId)?.nature === 'non-operational'
@@ -119,17 +124,34 @@ export class ReceitasService {
       ]);
       const today = hoje();
       const win = resolveWindow(period, from, to, today);
-      const movs = this.movimentacoes
-        .movements()
-        // Empréstimo, aporte e saldo inicial (categoria 'Não operacional') não são venda.
-        .filter(
-          (m) =>
-            m.type === 'income' && m.status === 'received' && !this.naoOperacional(m.categoryId),
-        )
+      const todas = this.movimentacoes.movements();
+      // Empréstimo, aporte, saldo inicial e transferência (categoria 'Não operacional' ou do sistema) não são venda.
+      const ehVenda = (m: Movement) =>
+        m.type === 'income' && !this.naoOperacional(m.categoryId) && !this.doSistema(m.categoryId);
+      const movs = todas
+        .filter((m) => ehVenda(m) && m.status === 'received')
         .map((m) => this.toReceita(m));
+      // T3: a sazonalidade é pelo dia da venda com TODAS as vendas (a receber também), como o Resultado.
+      const vendas = todas
+        .filter((m) => ehVenda(m) && m.status !== 'cancelled')
+        .map((m) => this.toReceita(m));
+      // T4: despesa em categoria de taxa entra em "Taxas", pela mesma regra do Resultado e de Custos.
+      const cats = this.categorias.categories();
+      const taxasLancadas = todas
+        .filter((m) => {
+          if (m.type !== 'expense' || m.status === 'cancelled') return false;
+          const c = cats.find((x) => x.id === m.categoryId);
+          return (
+            !!c &&
+            c.nature !== 'non-operational' &&
+            !c.system &&
+            ehTaxaDeVenda({ kind: 'category', name: c.name, dreGroup: c.dreGroup ?? 'opex' })
+          );
+        })
+        .map((m) => ({ date: m.date, valor: m.value }));
       const ratio = await this.taxRatio(win.end.slice(0, 7));
       const custos = new Map(this.cardapio.pratos().map((p) => [p.id, p.cost]));
-      this.data.set(buildReceitas(movs, win, ratio, custos));
+      this.data.set(buildReceitas(movs, win, ratio, custos, { vendas, taxasLancadas }));
     } finally {
       this.loading.set(false);
     }

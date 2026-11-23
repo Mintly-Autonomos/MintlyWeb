@@ -1,5 +1,6 @@
 import { DreGroup } from 'mintly-lib';
 import type { ExpenseItem } from '../../services/custos.service';
+import { ehTaxaDeVenda } from '../../shared/taxa-venda';
 
 /**
  * Grupos de custo dos gráficos de Custos (relatório Sweetie Bel, P.9 / tabela 13.3). Saem do grupo do DRE da
@@ -29,8 +30,12 @@ export const GRUPOS: { key: GrupoCusto; nome: string; cor: string }[] = [
   },
 ];
 
-export function grupoDe(item: Pick<ExpenseItem, 'kind' | 'dreGroup'>): GrupoCusto {
-  if (item.kind === 'platformFee' || item.kind === 'cardFee') return 'taxas';
+/**
+ * Grupo do item. "Taxas" segue a regra única do Resultado e de Receitas (`ehTaxaDeVenda`): app, maquininha e as
+ * categorias de taxa lançadas como despesa ("Taxas de cartão e iFood", "Aluguel da maquininha").
+ */
+export function grupoDe(item: Pick<ExpenseItem, 'kind' | 'dreGroup' | 'name'>): GrupoCusto {
+  if (ehTaxaDeVenda(item)) return 'taxas';
   if (item.dreGroup === DreGroup.Cmv) return 'cmv';
   if (item.dreGroup === DreGroup.Labor) return 'pessoal';
   if (item.dreGroup === DreGroup.Tax) return 'impostos';
@@ -46,7 +51,7 @@ const money = (n: number) => Math.round(n * 100) / 100;
 
 /** Custo de cada grupo em cada mês do histórico dos itens (o mesmo mês a mês do total da tela). */
 export function custosPorGrupo(
-  items: Pick<ExpenseItem, 'kind' | 'dreGroup' | 'history'>[],
+  items: Pick<ExpenseItem, 'kind' | 'dreGroup' | 'name' | 'history'>[],
   totais: { month: string; total: number }[] = [],
 ): LinhaGrupos[] {
   const meses =
