@@ -446,28 +446,35 @@
           @if (aberturaLinhas().length > 0) {
             <ul class="space-y-2">
               @for (l of aberturaLista(); track $index; let i = $index) {
-                <li class="grid grid-cols-[minmax(0,160px)_minmax(0,1fr)_36px] items-start gap-2">
-                  <input
-                    type="month"
-                    [max]="mesAtual"
-                    [value]="l.mes"
-                    (input)="setMesAntes(i, 'mes', valor($event))"
-                    [attr.aria-label]="'Mês ' + (i + 1) + ' do faturamento anterior'"
-                    [attr.data-testid]="'abertura-mes-' + i"
-                    [class]="inputClass + (l.mesOk ? '' : ' border-error')"
-                  />
-                  <input
-                    type="text"
-                    inputmode="numeric"
-                    placeholder="0,00"
-                    [value]="l.valor"
-                    (input)="setMesAntes(i, 'valor', valor($event))"
-                    [attr.aria-label]="'Faturamento de ' + l.mes"
-                    [attr.data-testid]="'abertura-valor-' + i"
-                    [class]="
-                      inputClass + ' text-right tabular-nums' + (l.valorOk ? '' : ' border-error')
-                    "
-                  />
+                <!-- No celular: mês e remover na 1ª linha, o valor embaixo (inteiro); a partir de sm, uma linha só. -->
+                <li
+                  class="grid grid-cols-[minmax(0,1fr)_36px] sm:grid-cols-[170px_minmax(0,1fr)_36px] items-start gap-2"
+                >
+                  <div class="min-w-0">
+                    <input
+                      type="month"
+                      [max]="mesAtual"
+                      [value]="l.mes"
+                      (input)="setMesAntes(i, 'mes', valor($event))"
+                      [attr.aria-label]="'Mês ' + (i + 1) + ' do faturamento anterior'"
+                      [attr.data-testid]="'abertura-mes-' + i"
+                      [class]="inputClass + (l.mesOk ? '' : ' border-error')"
+                    />
+                  </div>
+                  <div class="min-w-0 order-3 col-span-2 sm:order-none sm:col-span-1">
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      placeholder="0,00"
+                      [value]="l.valor"
+                      (input)="setMesAntes(i, 'valor', valor($event))"
+                      [attr.aria-label]="'Faturamento de ' + l.mes"
+                      [attr.data-testid]="'abertura-valor-' + i"
+                      [class]="
+                        inputClass + ' text-right tabular-nums' + (l.valorOk ? '' : ' border-error')
+                      "
+                    />
+                  </div>
                   <button
                     type="button"
                     (click)="removerMesAntes(i)"
