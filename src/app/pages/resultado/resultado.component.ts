@@ -19,6 +19,7 @@ import { ProfitBridgeComponent } from '../../shared/profit-bridge.component';
 import { BarChartComponent, BarSeries } from '../../shared/bar-chart.component';
 import { LineChartComponent, LineSeries } from '../../shared/line-chart.component';
 import { ToastService } from '../../shared/toast.service';
+import { ehCategoriaDeTaxa, ehTaxaDeVenda } from '../../shared/taxa-venda';
 import {
   comparisonBase,
   comparisonNote,
@@ -104,10 +105,8 @@ export function explicacaoImposto(t: {
   return 'O que sai direto do faturamento para o governo, conforme o regime tributário configurado.';
 }
 
-/** Categoria de despesa que é taxa de venda (cartão, app, maquininha), pelo nome. */
-export function ehCategoriaDeTaxa(nome: string): boolean {
-  return /\b(taxas?|tarifas?|comiss(ã|a)o|comiss(õ|o)es|maquininha)\b/i.test(nome);
-}
+/** A regra de taxa é a mesma de Custos e Receitas (shared/taxa-venda). */
+export { ehCategoriaDeTaxa };
 
 @Component({
   selector: 'app-resultado',
@@ -322,16 +321,15 @@ export class ResultadoComponent implements OnInit {
     const d = this.data();
     if (!d) return [];
     const c = d.current;
+    const taxas = d.operatingExpenseItems
+      .filter((i) => ehTaxaDeVenda(i))
+      .reduce((s, i) => s + i.amount, 0);
     const soma = (kinds: string[]) =>
       d.operatingExpenseItems
         .filter((i) => kinds.includes(i.kind))
         .reduce((s, i) => s + i.amount, 0);
-    // Reteste 18/11, item 11: além das taxas calculadas pelas contas, as despesas lançadas em categoria de taxa
-    // (ex.: "Taxas de cartão e iFood": comissão complementar, aluguel da maquininha, mensalidade do app).
-    const taxaLancada = d.operatingExpenseItems
-      .filter((i) => i.kind === 'opex' && ehCategoriaDeTaxa(i.name))
-      .reduce((s, i) => s + i.amount, 0);
-    const taxas = soma(['platformFee', 'cardFee']) + taxaLancada;
+    // Reteste 18/11, item 11, e 22/11, T4: as taxas calculadas pelas contas e as despesas em categoria de taxa
+    // (ex.: "Taxas de cartão e iFood", aluguel da maquininha), pela mesma regra de Custos e Receitas.
     const pessoal = soma(['labor']);
     const outras = Math.max(0, c.operatingExpenses - taxas - pessoal);
     const naoOp = (c.nonOperatingIncome ?? 0) !== 0 || (c.nonOperatingExpenses ?? 0) !== 0;

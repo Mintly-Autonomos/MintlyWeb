@@ -4,6 +4,7 @@ import {
   PrevMov,
   addDays,
   ajustesDe,
+  alertaDePreco,
   ALAVANCAS_ZERO,
   volumeDoPreco,
   buildBase,
@@ -315,12 +316,35 @@ describe('ajustesDe', () => {
   });
 });
 
+describe('alertaDePreco (T8: o alerta não contradiz o simulador)', () => {
+  it('margem baixa e +5% aumenta o lucro: sugere o reajuste', () => {
+    expect(alertaDePreco({ receita: 40000, margem: 8 }, 255.3)).toBe('reajustar');
+  });
+  it('margem baixa e +5% reduz o lucro (−R$ 348,03 do reteste): manda revisar custos e pratos', () => {
+    expect(alertaDePreco({ receita: 40000, margem: 8 }, -348.03)).toBe('revisar');
+    expect(alertaDePreco({ receita: 40000, margem: 8 }, 0)).toBe('revisar');
+  });
+  it('margem boa ou sem receita: nenhum alerta de preço', () => {
+    expect(alertaDePreco({ receita: 40000, margem: 15 }, 500)).toBeNull();
+    expect(alertaDePreco({ receita: 0, margem: -100 }, 500)).toBeNull();
+  });
+});
+
 describe('alavanca de preço com elasticidade (P.6)', () => {
-  it('+10% de preço tira ~15,8% das vendas com elasticidade −1,8', () => {
-    expect(volumeDoPreco(10)).toBe(-15.8);
-    expect(volumeDoPreco(-10)).toBe(20.9);
+  it('sem cardápio, o padrão é o "dia a dia" (−1,5): +10% de preço tira ~13,3% das vendas', () => {
+    expect(volumeDoPreco(10)).toBe(-13.3);
+    expect(volumeDoPreco(-10)).toBe(17.1);
     expect(volumeDoPreco(0)).toBe(0);
     expect(ajustesDe({ ...ALAVANCAS_ZERO, preco: 10 }, 'preco')).toEqual({
+      preco: 10,
+      volume: -13.3,
+      custo: 0,
+    });
+  });
+
+  it('usa a elasticidade dada (a média do cardápio)', () => {
+    expect(volumeDoPreco(10, -1.8)).toBe(-15.8);
+    expect(ajustesDe({ ...ALAVANCAS_ZERO, preco: 10 }, 'preco', -1.8)).toEqual({
       preco: 10,
       volume: -15.8,
       custo: 0,
