@@ -80,6 +80,40 @@ export function elasticidadeDoPrato(
 }
 
 export { SALES_PROFILE_LABEL };
+
+/** Elasticidade de quem ainda não tem prato com venda: o perfil "dia a dia", o mesmo padrão do simulador por prato. */
+export const ELASTICIDADE_PADRAO = SALES_PROFILE_ELASTICITY[DEFAULT_SALES_PROFILE];
+
+/**
+ * Elasticidade do cardápio inteiro para o simulador geral (reteste 22/11, T9): a média da elasticidade de cada prato
+ * (a mesma que o simulador por prato usa), pesada pelo faturamento do prato (preço × vendas no mês). Assim "+5% em
+ * tudo" usa a mesma fonte das duas telas. null sem prato ativo com venda.
+ */
+export function elasticidadeDoCardapio(
+  pratos: {
+    id: string;
+    price: number;
+    soldPerMonth: number;
+    active?: boolean;
+    category: string | null;
+    priceSensitivity?: PriceSensitivity | null;
+  }[],
+  medidas: Record<string, Medida | null>,
+  perfisSalvos: { category: string; profile: SalesProfile }[],
+): { valor: number; pratos: number } | null {
+  let peso = 0;
+  let soma = 0;
+  let n = 0;
+  for (const p of pratos) {
+    if (p.active === false) continue;
+    const w = Math.max(0, p.price) * Math.max(0, p.soldPerMonth);
+    if (w <= 0) continue;
+    soma += w * elasticidadeDoPrato(p, medidas[p.id] ?? null, perfisSalvos).valor;
+    peso += w;
+    n++;
+  }
+  return peso > 0 ? { valor: Math.round((soma / peso) * 100) / 100, pratos: n } : null;
+}
 /** Queda de volume a partir da qual o simulador avisa do risco de perder o cliente de vez. */
 export const QUEDA_RISCO = 0.3;
 /** Janela de comparação da elasticidade medida (4 semanas antes e 4 depois do reajuste). */

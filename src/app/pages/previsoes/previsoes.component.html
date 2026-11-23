@@ -300,9 +300,21 @@
                     sobre os preços de hoje
                     @if (alavancas().preco !== 0) {
                       · as vendas
-                      {{ volumeDoPreco(alavancas().preco) < 0 ? 'caem' : 'sobem' }}
-                      ~{{ pctAbs(volumeDoPreco(alavancas().preco)) }}, com clientes medianamente
-                      sensíveis a preço (elasticidade −1,8). Para cada prato, veja "Meu cardápio".
+                      {{
+                        volumeDoPreco(alavancas().preco, elasticidadeGeral().valor) < 0
+                          ? 'caem'
+                          : 'sobem'
+                      }}
+                      ~{{ pctAbs(volumeDoPreco(alavancas().preco, elasticidadeGeral().valor)) }},
+                      com elasticidade {{ fmtE(elasticidadeGeral().valor) }}
+                      <span data-testid="elasticidade-geral">{{
+                        elasticidadeGeral().doCardapio
+                          ? '(média dos ' +
+                            elasticidadeGeral().pratos +
+                            ' pratos com venda, pesada pelo faturamento)'
+                          : '(perfil "Dia a dia": ainda não há prato com venda)'
+                      }}</span
+                      >. Para cada prato, veja "Meu cardápio".
                     }
                   </div>
                 </div>
