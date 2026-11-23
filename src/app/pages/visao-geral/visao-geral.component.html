@@ -292,7 +292,7 @@
         "
         [description]="
           graficoPrincipal() === 'resultado'
-            ? 'Lucro de cada mês, igual ao Resultado (receita − impostos − custos e despesas). Verde é lucro, vermelho é prejuízo.'
+            ? 'Lucro de cada mês, igual ao Resultado (receita − impostos − custos e despesas). Verde é lucro, vermelho é prejuízo. No seletor Ano, o mesmo mês do ano anterior aparece tracejado.'
             : 'Últimos 6 meses e projeção do fechamento do mês atual.'
         "
         [loading]="loading()"
@@ -356,14 +356,17 @@
           }
         </div>
         @if (graficoPrincipal() === 'resultado') {
-          <app-bar-chart
-            [data]="resultadoMensal()"
-            categoryKey="mes"
-            [series]="resultadoSeries"
-            orientation="columns"
-            [valueFormatter]="abrev"
-            [colorFor]="resultadoCor"
-          />
+          <!-- Sobra do relatório: Dia/Semana/Mês/Ano como no Resultado; "Ano" traz o ano anterior tracejado. -->
+          <app-serie-periodo metrica="resultado">
+            <app-bar-chart
+              [data]="resultadoMensal()"
+              categoryKey="mes"
+              [series]="resultadoSeries"
+              orientation="columns"
+              [valueFormatter]="abrev"
+              [colorFor]="resultadoCor"
+            />
+          </app-serie-periodo>
         } @else {
           <app-area-chart
             [data]="mainData()"

@@ -67,16 +67,18 @@ interface AxisTick {
           </text>
         }
 
-        @for (c of categoryTicks(); track c.pos) {
-          <text
-            [attr.x]="c.pos"
-            [attr.y]="size().h - padBottom + 16"
-            text-anchor="middle"
-            font-size="11.5"
-            fill="var(--muted-foreground)"
-          >
-            {{ c.label }}
-          </text>
+        @for (c of categoryTicks(); track c.pos; let i = $index) {
+          @if (mostraRotulo(i)) {
+            <text
+              [attr.x]="c.pos"
+              [attr.y]="size().h - padBottom + 16"
+              text-anchor="middle"
+              font-size="11.5"
+              fill="var(--muted-foreground)"
+            >
+              {{ c.label }}
+            </text>
+          }
         }
 
         @if (hoverIndex(); as hi) {
@@ -232,6 +234,20 @@ export class LineChartComponent implements AfterViewInit, OnDestroy {
       label: String(field(d, this.categoryKey) ?? ''),
     }));
   });
+
+  /**
+   * Quantos rótulos do eixo cabem: em tela estreita, 12 meses ("Dez/25 Jan/26…") se encostavam. Mostra um a cada
+   * `passo`, contando a partir do último (o mês atual sempre aparece).
+   */
+  private passoRotulo = computed(() => {
+    const n = this.data.length;
+    const plot = this.size().w - this.padLeft - this.padRight;
+    const cabem = Math.max(2, Math.floor(plot / 46));
+    return n > cabem ? Math.ceil(n / cabem) : 1;
+  });
+  protected mostraRotulo(i: number): boolean {
+    return (this.data.length - 1 - i) % this.passoRotulo() === 0;
+  }
 
   protected linePaths = computed(() => {
     const ticks = this.categoryTicks();
