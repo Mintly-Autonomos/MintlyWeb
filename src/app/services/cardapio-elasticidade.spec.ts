@@ -6,6 +6,8 @@ import {
   curvaLucro,
   elasticidadeMedida,
   elasticidadeDoPrato,
+  elasticidadeDoCardapio,
+  ELASTICIDADE_PADRAO,
   precoOtimo,
   volumeNovo,
 } from './cardapio-elasticidade';
@@ -141,6 +143,38 @@ describe('elasticidade medida pelo histórico (P.6)', () => {
     ];
     const m = elasticidadeMedida(v, 'br', '2026-11-17');
     expect(m).toMatchObject({ ok: true, depois: 252 });
+  });
+});
+
+describe('elasticidadeDoCardapio (T9: o simulador geral usa a mesma fonte do simulador por prato)', () => {
+  it('média dos pratos pesada pelo faturamento (preço × vendas)', () => {
+    const pratos = [
+      // Bebida (−1,2): faturamento 10 × 100 = 1000
+      { id: 'b', price: 10, soldPerMonth: 100, active: true, category: 'Bebidas' },
+      // Escolhido "muito" (−2,5): faturamento 30 × 100 = 3000
+      {
+        id: 'c',
+        price: 30,
+        soldPerMonth: 100,
+        active: true,
+        category: 'Combos',
+        priceSensitivity: PriceSensitivity.High,
+      },
+      // Sem venda e inativo ficam fora
+      { id: 'z', price: 50, soldPerMonth: 0, active: true, category: 'Doces' },
+      { id: 'x', price: 50, soldPerMonth: 90, active: false, category: 'Doces' },
+    ];
+    // (1000 × −1,2 + 3000 × −2,5) / 4000 = −2,175
+    const r = elasticidadeDoCardapio(pratos, {}, [])!;
+    expect(r.pratos).toBe(2);
+    expect(r.valor).toBeCloseTo(-2.17, 1);
+  });
+
+  it('sem prato com venda: null (a tela usa o "dia a dia")', () => {
+    expect(
+      elasticidadeDoCardapio([{ id: 'a', price: 10, soldPerMonth: 0, category: null }], {}, []),
+    ).toBeNull();
+    expect(ELASTICIDADE_PADRAO).toBe(-1.5);
   });
 });
 

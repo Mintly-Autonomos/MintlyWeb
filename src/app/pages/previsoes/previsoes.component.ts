@@ -12,6 +12,7 @@ import {
   LeverKey,
   SimMetric,
   ajustesDe,
+  alertaDePreco,
   volumeDoPreco,
   alavancaNoNormal,
   isDefault,
@@ -19,6 +20,12 @@ import {
   conciliar,
 } from '../../services/previsoes.service';
 import { CardapioService } from '../../services/cardapio.service';
+import {
+  ELASTICIDADE_PADRAO,
+  elasticidadeDoCardapio,
+  elasticidadeMedida,
+} from '../../services/cardapio-elasticidade';
+import { localISODate } from '../../shared/format';
 import { CardapioInterativoComponent } from './cardapio-interativo.component';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { IconComponent } from '../../shared/icon.component';
@@ -237,7 +244,42 @@ export class PrevisoesComponent implements OnInit {
     { v: 'cheio', label: 'Cheio', nota: 'vende mais' },
   ];
 
-  protected ajustes = computed(() => ajustesDe(this.alavancas(), this.leverAtiva()));
+  /**
+   * Elasticidade da alavanca de preço (reteste 22/11, T9): a média dos pratos do cardápio pesada pelo faturamento,
+   * com a mesma regra do simulador por prato (escolha do prato > medida > perfil da categoria). Sem prato com venda,
+   * o "dia a dia" (−1,5).
+   */
+  protected elasticidadeGeral = computed(() => {
+    const pratos = this.cardapio.pratos();
+    const hoje = localISODate();
+    const vendas = this.cardapio.vendas();
+    const medidas: Record<string, ReturnType<typeof elasticidadeMedida>> = {};
+    for (const p of pratos) if (p.active) medidas[p.id] = elasticidadeMedida(vendas, p.id, hoje);
+    const c = elasticidadeDoCardapio(pratos, medidas, this.cardapio.perfis());
+    return c
+      ? { ...c, doCardapio: true }
+      : { valor: ELASTICIDADE_PADRAO, pratos: 0, doCardapio: false };
+  });
+  protected fmtE = (e: number) =>
+    e
+      .toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      .replace('-', '−');
+  protected ajustes = computed(() =>
+    ajustesDe(this.alavancas(), this.leverAtiva(), this.elasticidadeGeral().valor),
+  );
+  /**
+   * T8: o que +5% em todos os preços faz no lucro previsto, pela MESMA conta do simulador (com a queda de vendas da
+   * elasticidade). O alerta só sugere o reajuste quando o lucro sobe.
+   */
+  protected ganhoReajuste5 = computed(() => {
+    const e = this.elasticidadeGeral().valor;
+    const com = simular(
+      ajustesDe({ ...ALAVANCAS_ZERO, preco: 5 }, 'preco', e),
+      this.horizonte(),
+      this.dados(),
+    );
+    return com.resultado.lucro - this.base().resultado.lucro;
+  });
   protected sim = computed(() => simular(this.ajustes(), this.horizonte(), this.dados()));
   protected base = computed(() => simular(AJUSTES_ZERO, this.horizonte(), this.dados()));
   protected alterado = computed(() => !isDefault(this.ajustes()));
@@ -342,17 +384,35 @@ export class PrevisoesComponent implements OnInit {
         regra: 'Regra: saldo projetado mínimo abaixo de R$ 3.000 no horizonte selecionado.',
       },
     ];
-    if (r.receita > 0 && r.margem < 15) {
-      lista.push({
-        id: 'preco',
-        sev: 'oportunidade',
-        icon: 'lightbulb',
-        titulo: 'Um reajuste pequeno no preço ajuda',
-        frase: 'Veja o mês com os preços 5% maiores.',
-        acao: 'Simular isso',
-        onAction: () => this.aplicarSugestao('preco', { preco: 5 }),
-        regra: 'Regra: margem prevista abaixo de 15% da receita.',
-      });
+    const alertaPreco = alertaDePreco(r, this.ganhoReajuste5());
+    if (alertaPreco) {
+      // T8: antes o alerta sugeria +5% só pela margem, e o próprio simulador mostrava o lucro caindo com +5%.
+      const ganho = this.ganhoReajuste5();
+      lista.push(
+        alertaPreco === 'reajustar'
+          ? {
+              id: 'preco',
+              sev: 'oportunidade',
+              icon: 'lightbulb',
+              titulo: 'Um reajuste pequeno no preço ajuda',
+              frase: `Com os preços 5% maiores, o lucro previsto sobe ~${formatBRL(Math.round(ganho))}, já contando as vendas que caem.`,
+              acao: 'Simular isso',
+              onAction: () => this.aplicarSugestao('preco', { preco: 5 }),
+              regra:
+                'Regra: margem prevista abaixo de 15% da receita e a simulação de +5% nos preços aumenta o lucro.',
+            }
+          : {
+              id: 'preco',
+              sev: 'atencao',
+              icon: 'lightbulb',
+              titulo: 'Margem baixa, mas subir tudo não resolve',
+              frase: `Com os preços 5% maiores, as vendas caem e o lucro previsto ${ganho < 0 ? `cai ~${formatBRL(Math.abs(Math.round(ganho)))}` : 'não sobe'}. Reveja os custos ou o preço de pratos específicos.`,
+              acao: 'Ver Meu cardápio',
+              onAction: () => this.setTab('cardapio'),
+              regra:
+                'Regra: margem prevista abaixo de 15% da receita; a simulação de +5% nos preços não aumenta o lucro.',
+            },
+      );
     }
     if (r.receita > 0 && r.custoVariavel / r.receita > 0.4) {
       lista.push({

@@ -297,6 +297,15 @@
                   Quando houver um reajuste nas vendas, o Mintly mede a dos seus clientes.
                 }
               </div>
+              @if (elasticidadeCardapio(); as ec) {
+                <p
+                  class="mt-1 text-[11.5px] text-muted-foreground"
+                  data-testid="elasticidade-cardapio"
+                >
+                  No simulador geral (todos os preços juntos) vale {{ fmtE(ec.valor) }}: a média dos
+                  {{ ec.pratos }} pratos com venda, pesada pelo faturamento de cada um.
+                </p>
+              }
               @if (erroSensibilidade(); as e) {
                 <p class="mt-1 text-[12px] text-error" role="alert">{{ e }}</p>
               }
