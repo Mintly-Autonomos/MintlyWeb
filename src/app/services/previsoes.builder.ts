@@ -346,6 +346,46 @@ export function custoVarNoDia(base: PrevBase, k: number): number {
   return base.custoVarDia * ((prev.porDia[k - 1] ?? base.receitaDia) / base.receitaDia);
 }
 
+/**
+ * Problemas 23/11 (item 1): o ritmo dos custos (o que saiu nos últimos 30 dias) já traz as contas de todo mês (aluguel,
+ * salários). Somar a ele as contas JÁ LANÇADAS para os meses do horizonte contava a mesma conta duas vezes: o lucro
+ * previsto acompanhava as contas lançadas, não o negócio (−R$ 67 mil em 30 dias, sendo o pior mês real −R$ 1,5 mil).
+ * Agora, em cada mês do horizonte, a estimativa cobre só o que ainda falta lançar: ritmo do mês − já lançado (nunca
+ * negativo). Fixos e variáveis separados; as vencidas não entram (são contas de meses passados). Devolve o fator de
+ * cada dia futuro k (1..horizonte) a aplicar no ritmo de custos fixos e variáveis. Pura.
+ */
+export function fatoresRitmoCustos(
+  base: PrevBase,
+  horizonte: number,
+): { fixo: (k: number) => number; variavel: (k: number) => number } {
+  const fim = addDays(base.hoje, horizonte);
+  const lancFixo = new Map<string, number>();
+  const lancVar = new Map<string, number>();
+  for (const x of base.pendentes) {
+    if (x.date > fim || x.tipo !== 'out' || x.naoOperacional || x.vencido) continue;
+    const m = x.date.slice(0, 7);
+    lancFixo.set(m, (lancFixo.get(m) ?? 0) + x.valor * (1 - x.variavel));
+    lancVar.set(m, (lancVar.get(m) ?? 0) + x.valor * x.variavel);
+  }
+  const ritmoFixo = new Map<string, number>();
+  const ritmoVar = new Map<string, number>();
+  const mesDoDia: string[] = [];
+  for (let k = 1; k <= horizonte; k++) {
+    const m = addDays(base.hoje, k).slice(0, 7);
+    mesDoDia[k] = m;
+    ritmoFixo.set(m, (ritmoFixo.get(m) ?? 0) + base.custoFixoDia);
+    ritmoVar.set(m, (ritmoVar.get(m) ?? 0) + custoVarNoDia(base, k));
+  }
+  const fator = (ritmo: Map<string, number>, lanc: Map<string, number>, m: string) => {
+    const r = ritmo.get(m) ?? 0;
+    return r > 0 ? Math.max(0, 1 - (lanc.get(m) ?? 0) / r) : 0;
+  };
+  return {
+    fixo: (k) => fator(ritmoFixo, lancFixo, mesDoDia[k] ?? ''),
+    variavel: (k) => fator(ritmoVar, lancVar, mesDoDia[k] ?? ''),
+  };
+}
+
 export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase): Simulacao {
   const p = ajustes.preco / 100;
   const v = ajustes.volume / 100;
@@ -372,6 +412,7 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
   }
 
   const ritmoNoDia = (k: number) => ritmoVendasNoDia(base, k);
+  const fatores = fatoresRitmoCustos(base, horizonte);
 
   const ini = addDays(base.hoje, -(PASSADO - 1));
   const serie: DiaSim[] = [];
@@ -403,9 +444,10 @@ export function simular(ajustes: Ajustes, horizonte: Horizonte, base: PrevBase):
     const pend = porDia.get(date) ?? vazio();
     const ritmo = ritmoNoDia(fIdx);
     const recBase = ritmo + pend.in;
-    const cvDia = custoVarNoDia(base, fIdx);
+    // Só o que falta lançar no mês entra pelo ritmo (as contas lançadas já estão em pend).
+    const cvDia = custoVarNoDia(base, fIdx) * fatores.variavel(fIdx);
     const cvBase = cvDia + pend.outVar;
-    const cfBase = base.custoFixoDia + pend.outFixo;
+    const cfBase = base.custoFixoDia * fatores.fixo(fIdx) + pend.outFixo;
     const recSim = ritmo * (1 + p) * (1 + v) + pend.in;
     const cvSim = cvDia * (1 + v) * (1 + c) + pend.outVar;
     // T1: o DAS do MEI é fixo por dia (não sobe nem desce com as vendas simuladas).
@@ -570,7 +612,10 @@ export function conciliar(base: PrevBase, horizonte: Horizonte, lancado: number)
   let ritmoVendas = 0;
   for (let k = 1; k <= horizonte; k++) ritmoVendas += ritmoVendasNoDia(base, k);
   let ritmoCustos = 0;
-  for (let k = 1; k <= horizonte; k++) ritmoCustos += custoVarNoDia(base, k) + base.custoFixoDia;
+  const fatores = fatoresRitmoCustos(base, horizonte);
+  for (let k = 1; k <= horizonte; k++)
+    ritmoCustos +=
+      custoVarNoDia(base, k) * fatores.variavel(k) + base.custoFixoDia * fatores.fixo(k);
   const imposto = resultado.impostosCaixa;
   const previsao = resultado.caixaFim;
   const ajustes = previsao - (lancado + ritmoVendas - ritmoCustos - imposto);

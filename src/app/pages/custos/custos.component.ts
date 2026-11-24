@@ -197,11 +197,16 @@ export class CustosComponent implements OnInit {
 
   // ── P.9 (tabela 13.3): grupos de custo ──
   private receitaMes = signal<ReadonlyMap<string, number>>(new Map());
-  protected readonly grupoSeries: StackedSeries[] = [...GRUPOS, SEM_DETALHE].map((g) => ({
-    key: g.key,
-    name: g.nome,
-    color: g.cor,
-  }));
+  /**
+   * Só os grupos com valor em algum mês entram na legenda (problemas 23/11, item 4): o imposto do Simples é
+   * calculado no Resultado, não é despesa lançada, e "Impostos" aparecia na legenda sem nenhuma barra.
+   */
+  protected grupoSeries = computed<StackedSeries[]>(() => {
+    const linhas = this.porGrupo();
+    return [...GRUPOS, SEM_DETALHE]
+      .filter((g) => linhas.some((l) => ((l as Record<string, unknown>)[g.key] as number) > 0))
+      .map((g) => ({ key: g.key, name: g.nome, color: g.cor }));
+  });
   /** Custo de cada grupo, mês a mês (barras empilhadas, eixo do zero). */
   protected porGrupo = computed(() =>
     custosPorGrupo(this.data()?.items ?? [], this.data()?.history ?? []).map((l) => ({

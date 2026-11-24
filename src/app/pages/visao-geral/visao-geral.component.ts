@@ -87,6 +87,32 @@ function pillarDetail(key: string, value: number | null, mesPassado = false): st
 
 import { AlertComponent } from '../../shared/alert.component';
 
+/**
+ * A linha tracejada da projeção precisa de dois pontos (problemas 23/11, item 20). O ponto projetado é do mês ATUAL,
+ * o mesmo do último ponto real (parcial): a projeção sai do mês anterior (o último fechado) até o fechamento previsto.
+ * Sem mês anterior, ou se a projeção for de um mês ainda sem dado real, liga ao último ponto real. Pura.
+ */
+export function ligarProjecao<
+  T extends {
+    receita: number | null;
+    despesa: number | null;
+    receitaProj: number | null;
+    despesaProj: number | null;
+  },
+>(rows: T[]): T[] {
+  const i = rows.findIndex((r) => r.receitaProj !== null);
+  if (i < 0) return rows;
+  const origem =
+    rows[i].receita !== null
+      ? rows[i - 1]
+      : [...rows.slice(0, i)].reverse().find((r) => r.receita !== null);
+  if (origem && origem.receitaProj === null) {
+    origem.receitaProj = origem.receita;
+    origem.despesaProj = origem.despesa;
+  }
+  return rows;
+}
+
 @Component({
   selector: 'app-visao-geral',
   standalone: true,
@@ -286,13 +312,7 @@ export class VisaoGeralComponent implements OnInit {
       }
       byMonth.set(month, row);
     }
-    const rows = [...byMonth.values()];
-    const lastActual = [...rows].reverse().find((r) => r.receita !== null);
-    if (lastActual && lastActual.receitaProj === null) {
-      lastActual.receitaProj = lastActual.receita;
-      lastActual.despesaProj = lastActual.despesa;
-    }
-    return rows;
+    return ligarProjecao([...byMonth.values()]);
   });
 
   protected mainSeries: AreaSeries[] = [

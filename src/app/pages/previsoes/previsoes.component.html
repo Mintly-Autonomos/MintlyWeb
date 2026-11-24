@@ -744,7 +744,7 @@
               <h3 class="text-[15px] font-semibold inline-flex items-center gap-1">
                 Equipe: reforçar ou segurar?
                 <app-hint
-                  text="Produtividade = vendas do mês ÷ horas da equipe. A referência é a média dos 2 meses mais produtivos (a equipe no limite). Horas necessárias = vendas previstas ÷ produtividade de referência. Vale reforçar quando a margem das vendas extras paga as horas de reforço. Contratar fixo só se as vendas ficarem 15% acima da média por 3 meses seguidos; senão, reforço temporário (freelancer)."
+                  text="Produtividade = vendas do mês já sem as taxas dos apps e da maquininha (o que entra nas contas) ÷ horas da equipe. As vendas previstas usam a mesma base. A referência é a média dos 2 meses mais produtivos (a equipe no limite). Horas necessárias = vendas previstas ÷ produtividade de referência. Vale reforçar quando a margem das vendas extras paga as horas de reforço. Contratar fixo só se as vendas ficarem 15% acima da média por 3 meses seguidos; senão, reforço temporário (freelancer)."
                 />
               </h3>
               <p class="text-[12.5px] text-muted-foreground mt-0.5">
@@ -792,7 +792,9 @@
                   Sem custo variável lançado nos últimos 30 dias: a conta considera que toda venda
                   extra vira margem.
                 } @else {
-                  Margem de contribuição: {{ Math.round(margemContrib()! * 100) }}%.
+                  De cada venda extra sobram {{ Math.round(margemContrib()! * 100) }}% depois dos
+                  custos variáveis e do imposto sobre a venda (últimos 30 dias; as taxas dos apps já
+                  saíram da venda).
                 }
               </p>
               <div class="overflow-x-auto">

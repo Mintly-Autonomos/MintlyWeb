@@ -1016,6 +1016,24 @@
             <span class="font-medium tabular-nums">{{ details()!.salesCount }}</span>
           </div>
         }
+        <!-- Problemas 23/11 (item 12): os pratos da venda, sem precisar abrir "Editar". -->
+        @if (details()!.items?.length) {
+          <div class="p-3 rounded-xl bg-muted/60 col-span-2" data-testid="detalhe-pratos">
+            <span class="text-muted-foreground block mb-1.5"
+              >Pratos ({{ details()!.items!.length }})</span
+            >
+            <ul class="space-y-1">
+              @for (it of details()!.items!; track $index) {
+                <li class="flex items-baseline justify-between gap-3">
+                  <span class="font-medium min-w-0 break-words">{{ it.qty }} × {{ it.name }}</span>
+                  <span class="tabular-nums whitespace-nowrap text-muted-foreground"
+                    >{{ fmtBRL(it.unitPrice) }} · {{ fmtBRL(it.qty * it.unitPrice) }}</span
+                  >
+                </li>
+              }
+            </ul>
+          </div>
+        }
         @if (details()!.notes) {
           <div class="p-3 rounded-xl bg-muted/60 col-span-2">
             <span class="text-muted-foreground block mb-0.5">Observações</span>
