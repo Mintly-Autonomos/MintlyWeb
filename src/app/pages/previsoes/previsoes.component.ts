@@ -112,11 +112,15 @@ export class PrevisoesComponent implements OnInit {
   );
   /** Custo de uma hora de reforço (diária de freelancer ÷ 8). Só nesta tela, para simular. */
   protected custoHora = signal(25);
-  /** Fração das vendas que sobra depois do custo variável (últimos 30 dias). null = sem custo variável lançado. */
+  /**
+   * Fração de cada venda extra que sobra depois do custo variável e do imposto sobre a venda (últimos 30 dias). Antes
+   * se chamava "margem de contribuição" e não descontava o imposto: 61% contra 34% a 48% no Resultado (problemas
+   * 23/11, item 3). No MEI o DAS é fixo e não entra. null = sem custo variável lançado.
+   */
   protected margemContrib = computed(() => {
     const b = this.dados();
     return b.receitaDia > 0 && b.custoVarDia > 0
-      ? Math.max(0, 1 - b.custoVarDia / b.receitaDia)
+      ? Math.max(0, 1 - b.custoVarDia / b.receitaDia - b.aliquota)
       : null;
   });
   protected contratacao = computed(() => {

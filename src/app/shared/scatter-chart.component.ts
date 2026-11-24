@@ -271,15 +271,17 @@ const M = { top: 18, right: 24, bottom: 44, left: 64 };
                   }
                 }
               </g>
-              @if (p.rotulo) {
+              @if (rotulos().get(p.id); as r) {
                 <text
-                  [attr.x]="px(p.x) + 9 * (p.escala ?? 1) + 4"
-                  [attr.y]="py(p.y) + 4"
+                  [attr.x]="r.x"
+                  [attr.y]="r.y"
+                  [attr.text-anchor]="r.anchor"
                   font-size="10.5"
                   fill="var(--foreground)"
                   class="pointer-events-none select-none"
+                  data-testid="rotulo-prato"
                 >
-                  {{ p.nome.length > 18 ? p.nome.slice(0, 17) + '…' : p.nome }}
+                  {{ r.texto }}
                 </text>
               }
               @if (p.id === selectedId) {
@@ -440,6 +442,47 @@ export class ScatterChartComponent implements OnInit, OnDestroy {
       const v = this.yMin + ((this.yMax - this.yMin) * i) / 4;
       return { v, pos: this.py(v), label: `R$ ${formatCompact(Math.round(v))}` };
     });
+  }
+
+  /**
+   * Onde vai o nome de cada prato (problemas 23/11, item 24). O rótulo fica à direita do ponto; se passar da borda,
+   * vai para a esquerda. Se encostar em outro, tenta um pouco acima ou abaixo e, sem lugar, some (o nome continua no
+   * tooltip). Antes os nomes se sobrepunham e "Combo 20 peças" aparecia cortado como "Combo".
+   */
+  protected rotulos(): Map<
+    string,
+    { x: number; y: number; anchor: 'start' | 'end'; texto: string }
+  > {
+    const out = new Map<string, { x: number; y: number; anchor: 'start' | 'end'; texto: string }>();
+    const caixas: { x1: number; x2: number; y1: number; y2: number }[] = [];
+    const larguraLetra = 5.9;
+    const altura = 12;
+    const limiteDireita = this.w() - M.right;
+    const ordem = [...this.points].filter((p) => p.rotulo).sort((a, b) => b.x * b.y - a.x * a.y);
+    for (const p of ordem) {
+      const texto = p.nome.length > 18 ? p.nome.slice(0, 17) + '…' : p.nome;
+      const larg = texto.length * larguraLetra;
+      const raio = 9 * (p.escala ?? 1) + 4;
+      const cx = this.px(p.x);
+      const cy = this.py(p.y) + 4;
+      const direita = cx + raio + larg <= limiteDireita;
+      const anchor: 'start' | 'end' = direita ? 'start' : 'end';
+      const x = direita ? cx + raio : cx - raio;
+      const x1 = direita ? x : x - larg;
+      const x2 = direita ? x + larg : x;
+      if (x1 < M.left - 4) continue;
+      for (const dy of [0, -altura, altura]) {
+        const y = cy + dy;
+        const box = { x1, x2, y1: y - altura + 2, y2: y + 2 };
+        if (box.y1 < M.top - 6 || box.y2 > this.h() - M.bottom + 4) continue;
+        if (caixas.some((c) => c.x1 < box.x2 && box.x1 < c.x2 && c.y1 < box.y2 && box.y1 < c.y2))
+          continue;
+        caixas.push(box);
+        out.set(p.id, { x, y, anchor, texto });
+        break;
+      }
+    }
+    return out;
   }
 
   protected tip(): { p: ScatterPoint; left: number; top: number } | null {
