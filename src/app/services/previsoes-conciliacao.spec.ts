@@ -48,7 +48,9 @@ describe('conciliar: do Fluxo de caixa (só o lançado) até o caixa das Previs�
   it('com o mesmo lançado das duas telas, a diferença é só ritmo e imposto (sem "outros ajustes")', () => {
     const c = conciliar(base, 30, fluxo30);
     expect(c.lancado).toBe(9_300);
-    expect(c.ritmoCustos).toBeCloseTo(900, 2); // R$ 30/dia × 30 dias
+    // R$ 20/dia de variável × 30 + o fixo de R$ 10/dia só nos 15 dias de novembro: dezembro já tem o aluguel lançado
+    // (R$ 1.200), que não entra de novo pelo ritmo (problemas 23/11, item 1).
+    expect(c.ritmoCustos).toBeCloseTo(750, 2);
     // R$ 100/dia à vista × 30; a venda com prazo de 30 dias só viraria dinheiro a partir do dia 31
     expect(c.ritmoVendas).toBeCloseTo(3_000, 2);
     expect(c.imposto).toBeCloseTo(0.06 * (c.ritmoVendas + 500), 2); // imposto do ritmo e do repasse lançado

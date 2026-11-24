@@ -369,3 +369,54 @@ describe('simular com o DAS fixo do MEI (reteste 22/11, T1)', () => {
     expect(resultado.impostos).toBe(162);
   });
 });
+
+describe('custos já lançados não contam duas vezes (problemas 23/11, item 1)', () => {
+  it('o aluguel do mês que vem já lançado não soma de novo ao ritmo do aluguel', () => {
+    // Aluguel de R$ 3.000 pago à vista no último mês (ritmo de R$ 100/dia) e o do mês seguinte já lançado.
+    const base = buildBase(
+      [
+        mov({ valor: 6000 }),
+        mov({
+          tipo: 'out',
+          valor: 3000,
+          variavel: 0,
+          date: addDays(HOJE, -5),
+          lancamento: addDays(HOJE, -5),
+        }),
+        mov({
+          tipo: 'out',
+          valor: 3000,
+          variavel: 0,
+          pendente: true,
+          date: addDays(HOJE, 10),
+          lancamento: HOJE,
+        }),
+      ],
+      0,
+      0,
+      HOJE,
+    );
+    const { resultado } = simular(AJUSTES_ZERO, 30, base);
+    // HOJE = 28/10: 3 dias de outubro pelo ritmo (R$ 300) + novembro, que já tem o aluguel lançado (R$ 3.000).
+    // Antes: R$ 3.000 do ritmo + R$ 3.000 lançados = R$ 6.000.
+    expect(resultado.custoFixo).toBe(3300);
+  });
+
+  it('sem conta lançada no mês, vale o ritmo inteiro', () => {
+    const base = buildBase(
+      [
+        mov({
+          tipo: 'out',
+          valor: 3000,
+          variavel: 0,
+          date: addDays(HOJE, -5),
+          lancamento: addDays(HOJE, -5),
+        }),
+      ],
+      0,
+      0,
+      HOJE,
+    );
+    expect(simular(AJUSTES_ZERO, 30, base).resultado.custoFixo).toBe(3000);
+  });
+});

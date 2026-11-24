@@ -347,7 +347,11 @@ export class CardapioInterativoComponent {
     const ys = this.pontos().map((p) => p.y);
     return Math.max(1, (Math.max(0, ...ys, this.fantasma()?.y ?? 0) - Math.min(0, ...ys)) * 0.08);
   });
-  protected yMin = computed(() => Math.min(0, ...this.pontos().map((p) => p.y)) - this.folgaY());
+  /** Começa em R$ 0 quando nenhum prato tem margem negativa (problemas 23/11, item 24: o eixo começava em "R$ -9"). */
+  protected yMin = computed(() => {
+    const min = Math.min(0, ...this.pontos().map((p) => p.y));
+    return min < 0 ? min - this.folgaY() : 0;
+  });
   protected yMax = computed(
     () => Math.max(0, ...this.pontos().map((p) => p.y), this.fantasma()?.y ?? 0) + this.folgaY(),
   );

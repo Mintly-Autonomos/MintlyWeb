@@ -466,13 +466,16 @@ export class MovimentacoesComponent implements OnInit {
 
   private resolvedFrom(): string {
     if (this.period() === 'today') return isoToday();
-    if (this.period() === '7d') return isoAgo(7);
-    if (this.period() === '30d') return isoAgo(30);
+    // Problemas 23/11 (item 14): 7 dias = de hoje − 6 até hoje (como em Receitas); antes começava um dia antes.
+    if (this.period() === '7d') return isoAgo(6);
+    if (this.period() === '30d') return isoAgo(29);
     if (this.period() === 'custom') return this.dateFrom();
     return '';
   }
   private resolvedTo(): string {
-    if (this.period() === 'today') return isoToday();
+    // Os períodos "últimos N dias" terminam hoje: os lançamentos futuros só aparecem em "Mostrar futuros".
+    if (this.period() === 'today' || this.period() === '7d' || this.period() === '30d')
+      return isoToday();
     if (this.period() === 'custom') return this.dateTo();
     return '';
   }
@@ -708,14 +711,24 @@ export class MovimentacoesComponent implements OnInit {
    */
   protected dishAliases = signal<DishAliases>({});
 
-  /** Os pratos de cada linha, lidos das Observações (entradas): igualdade exata com o cardápio. */
-  private importDishLines = computed(() =>
-    this.importRows().map((r) =>
-      r.type === 'income'
+  /**
+   * Os pratos de cada linha, lidos das Observações: igualdade exata com o cardápio. Só em linha de VENDA
+   * (problemas 23/11, item 13): entrada em categoria não operacional ou do sistema (aporte do sócio, empréstimo,
+   * saldo inicial) tem observação comum, não pratos.
+   */
+  private importDishLines = computed(() => {
+    const naoVenda = new Set(
+      this.categoriasSvc
+        .categories()
+        .filter((c) => c.system || c.nature === 'non-operational')
+        .map((c) => c.name.trim().toLocaleLowerCase('pt-BR')),
+    );
+    return this.importRows().map((r) =>
+      r.type === 'income' && !naoVenda.has(r.categoryName.trim().toLocaleLowerCase('pt-BR'))
         ? matchDishLines(splitDishText(r.notes), this.dishOptions(), this.dishAliases())
         : [],
-    ),
-  );
+    );
+  });
 
   /** Textos das Observações que não são nenhum prato do cardápio, agrupados (o mesmo texto em várias linhas conta uma vez). */
   protected importUnmatched = computed(() => {
