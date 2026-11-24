@@ -59,7 +59,10 @@ describe('VisaoGeralComponent: textos da IA nos cards', () => {
         { provide: DashboardService, useValue: dash },
         { provide: AiService, useValue: ai },
         { provide: ToastService, useValue: toast },
-        { provide: NotificationsService, useValue: { setRecomendacoes: vi.fn() } },
+        {
+          provide: NotificationsService,
+          useValue: { setRecomendacoes: vi.fn(), avisoTetoMei: () => null },
+        },
       ],
     });
     // Template vazio: aqui só importa o texto dos cards (a lógica da classe é a mesma), sem os gráficos.

@@ -28,7 +28,10 @@ describe('Visão Geral: esqueleto na primeira carga (relatório U.1)', () => {
         },
         { provide: AiService, useValue: { textosInsights: vi.fn(() => Promise.resolve([])) } },
         { provide: ToastService, useValue: { error: vi.fn(), success: vi.fn() } },
-        { provide: NotificationsService, useValue: { setRecomendacoes: vi.fn() } },
+        {
+          provide: NotificationsService,
+          useValue: { setRecomendacoes: vi.fn(), avisoTetoMei: () => null },
+        },
       ],
     });
     const fixture = TestBed.createComponent(VisaoGeralComponent);

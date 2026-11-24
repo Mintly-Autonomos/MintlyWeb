@@ -97,6 +97,27 @@ export class NotificationsService {
     ];
   }
 
+  /**
+   * O aviso do teto do MEI, também para a Visão geral (problemas 23/11, item 25): a tela de regime promete avisar
+   * perto dos R$ 81 mil. null sem aviso. Não some com o "Agora não" do sino: a Visão geral mostra sempre.
+   */
+  readonly avisoTetoMei = computed(() => {
+    const i = this.restaurante.profile()?.tax.insights.find((x) => x.kind === 'meiCapNear');
+    if (!i || i.kind !== 'meiCapNear') return null;
+    const passou = i.usedPct >= 1;
+    return {
+      passou,
+      titulo: passou
+        ? `O faturamento do ano passou do teto do MEI (${Math.round(i.usedPct * 100)}% do teto)`
+        : `O faturamento do ano já está em ${Math.round(i.usedPct * 100)}% do teto do MEI`,
+      texto: `${formatBRL(i.yearToDateRevenue)} de ${formatBRL(i.annualLimit)} no ano. ${
+        passou
+          ? 'Acima do teto, o MEI é desenquadrado: converse com seu contador sobre a mudança para o Simples Nacional e confira o regime no Resultado.'
+          : 'Se passar do teto, o MEI é desenquadrado: vale planejar com seu contador a mudança para o Simples Nacional.'
+      }`,
+    };
+  });
+
   private meiNotice(): AppNotification[] {
     const i = this.restaurante.profile()?.tax.insights.find((x) => x.kind === 'meiCapNear');
     if (!i || i.kind !== 'meiCapNear' || this.dispensados().has(MEI_NOTICE_ID)) return [];
@@ -200,10 +221,9 @@ export class NotificationsService {
     await Promise.all([
       this.auth.podeMudarCadastros() ? this.cardapio.refreshAlertas() : Promise.resolve(),
       this.auth.podeVerRelatorios() ? this.refreshVencidos() : Promise.resolve(),
-      // O teto do MEI vem do perfil do restaurante; se nenhuma tela carregou ainda, carrega aqui.
-      this.restaurante.profile()
-        ? Promise.resolve()
-        : this.restaurante.refresh().catch(() => undefined),
+      // O teto do MEI vem do perfil do restaurante: busca o atual sempre (problemas 23/11, item 25: um perfil
+      // carregado antes, de outro regime ou de outro mês, ficava valendo e o aviso não aparecia).
+      this.restaurante.refresh().catch(() => undefined),
     ]);
   }
 

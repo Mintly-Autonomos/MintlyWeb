@@ -121,10 +121,18 @@ describe('NotificationsService: contas vencidas e teto do MEI', () => {
     expect(restaurante.refresh).toHaveBeenCalledOnce();
   });
 
-  it('com perfil já carregado, não busca de novo', async () => {
+  it('com perfil já carregado, busca o atual de novo (problemas 23/11, item 25: perfil antigo escondia o teto)', async () => {
     const { svc, restaurante } = create({ insights: [] });
     await svc.refresh();
-    expect(restaurante.refresh).not.toHaveBeenCalled();
+    expect(restaurante.refresh).toHaveBeenCalledOnce();
+  });
+
+  it('o aviso do teto também vai para a Visão geral (acima do teto é desenquadramento)', () => {
+    const { svc } = create({ insights: [mei(4.6)] });
+    const a = svc.avisoTetoMei()!;
+    expect(a.passou).toBe(true);
+    expect(a.titulo).toContain('passou do teto do MEI');
+    expect(a.texto).toContain('desenquadrado');
   });
 
   it('"Agora não" some neste acesso; os outros avisos ficam', async () => {

@@ -49,6 +49,14 @@
     }
   </div>
 
+  <!-- Problemas 23/11 (item 25): teto do MEI também na Visão geral, não só no sino. -->
+  @if (avisoTetoMei(); as t) {
+    <app-alert [variant]="t.passou ? 'error' : 'warning'" [title]="t.titulo">
+      <span data-testid="aviso-teto-mei">{{ t.texto }}</span>
+      <a routerLink="/resultado" class="ml-1 font-semibold underline">Ver resultado</a>
+    </app-alert>
+  }
+
   <!-- P.8: Estou devendo? (vale para hoje, qualquer que seja o mês escolhido) -->
   <app-estou-devendo />
 

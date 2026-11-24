@@ -33,7 +33,7 @@ const semDados = {
 describe('VisaoGeralComponent: orientação e estado vazio', () => {
   function montar(dados: unknown) {
     const data = signal<unknown>(dados);
-    const notifications = { setRecomendacoes: vi.fn() };
+    const notifications = { setRecomendacoes: vi.fn(), avisoTetoMei: () => null };
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
