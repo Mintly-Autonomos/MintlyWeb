@@ -420,3 +420,20 @@ describe('custos já lançados não contam duas vezes (problemas 23/11, item 1)'
     expect(simular(AJUSTES_ZERO, 30, base).resultado.custoFixo).toBe(3000);
   });
 });
+
+describe('imposto do Simples sobre a venda bruta (reteste 24/11)', () => {
+  it('as vendas previstas vêm sem as taxas, mas o imposto é sobre o bruto', () => {
+    // R$ 1.000 vendidos no iFood, R$ 900 entraram (10% de taxa); Simples de 6%.
+    const base = buildBase([mov({ valor: 900, bruto: 1000 })], 0, 0.06, HOJE);
+    const { resultado } = simular(AJUSTES_ZERO, 30, base);
+    expect(resultado.receita).toBe(900);
+    // 6% de R$ 1.000 (antes saía 6% de R$ 900 = R$ 54).
+    expect(resultado.impostos).toBe(60);
+    expect(resultado.lucro).toBe(840);
+  });
+
+  it('sem taxa nas vendas, nada muda', () => {
+    const base = buildBase([mov({ valor: 1000, bruto: 1000 })], 0, 0.06, HOJE);
+    expect(simular(AJUSTES_ZERO, 30, base).resultado.impostos).toBe(60);
+  });
+});

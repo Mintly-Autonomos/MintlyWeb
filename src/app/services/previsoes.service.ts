@@ -105,6 +105,7 @@ export class PrevisoesService {
       tipo: entrada ? 'in' : 'out',
       date: pendente ? (m.dueDate ?? m.date) : (m.settledAt ?? m.dueDate ?? m.date),
       valor: entrada ? (m.net ?? m.value) : m.value,
+      ...(entrada ? { bruto: m.value } : {}),
       pendente,
       variavel: entrada ? 0 : this.variavelDe(m),
       aVista: !pendente && (m.dueDate === null || m.dueDate <= m.date),
