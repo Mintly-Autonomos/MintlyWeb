@@ -134,6 +134,25 @@ export class AuthService {
   readonly podeVerRelatorios = computed(() => canViewReports(this.acesso()));
   /** Criar e editar contas, categorias e cardápio. */
   readonly podeMudarCadastros = computed(() => canManageSetup(this.acesso()));
+  /** Id de quem está logado (o `sub` do token): a tela compara com o autor do lançamento. */
+  readonly meuId = computed<string | null>(() => {
+    const t = this._accessToken();
+    const part = t?.split('.')[1];
+    if (!part) return null;
+    try {
+      const json = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+      return typeof json.sub === 'string' ? json.sub : null;
+    } catch {
+      return null;
+    }
+  });
+  /** Só o dono: assinatura, funcionários, dados do restaurante e exclusão (problemas 23/11, item 16). */
+  readonly ehDono = computed(() => this.acesso() === 'owner');
+  /**
+   * Problemas 23/11 (item 19): sobe quando a API recusa algo "pelo perfil" (o dono pode ter trocado o perfil com o
+   * app aberto). O layout confere o perfil de novo e tira a pessoa da tela que ela não pode mais ver.
+   */
+  readonly conferirPerfil = signal(0);
 
   /** Atualiza o perfil (o dono pode ter mudado): vem de /users/me. */
   setAccessLevel(level: AccessLevel): void {
@@ -207,7 +226,15 @@ export class AuthService {
    * Trata como sem assinatura e leva à tela de assinatura. Devolve true quando era esse erro.
    */
   onApiError(err: unknown): boolean {
-    const { status, code } = apiErrorInfo(err);
+    const { status, code, message } = apiErrorInfo(err) as {
+      status?: number;
+      code?: string;
+      message?: string;
+    };
+    if (status === 403 && /Seu perfil/.test(message ?? '')) {
+      this.conferirPerfil.update((n) => n + 1);
+      return false;
+    }
     if (status !== 402 || code !== 'SUBSCRIPTION-0001') return false;
     if (this.hasActiveSubscription()) {
       this.setSubscriptionEndsAt(new Date(0).toISOString(), this.subscriptionState().tier);

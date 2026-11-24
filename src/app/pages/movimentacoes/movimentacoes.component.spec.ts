@@ -11,6 +11,7 @@ import type { ImportGridRow } from '../../services/movimentacoes.service';
 import { ContasService } from '../../services/contas.service';
 import { CategoriasService } from '../../services/categorias.service';
 import { CardapioService } from '../../services/cardapio.service';
+import { AuthService } from '../../services/auth.service';
 
 interface Internals {
   form: () => {
@@ -100,6 +101,7 @@ describe('MovimentacoesComponent', () => {
     confirmImport = vi.fn().mockResolvedValue({ insertedCount: 1, items: [], failedRows: [] });
     TestBed.configureTestingModule({
       providers: [
+        { provide: AuthService, useValue: { podeMudarCadastros: () => true, meuId: () => null } },
         {
           provide: MovimentacoesService,
           useValue: {

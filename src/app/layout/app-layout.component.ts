@@ -9,7 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
+import { RouterLink, RouterLinkActive, RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
 import { AuthService } from '../services/auth.service';
 import { apiErrorInfo } from '../shared/api-error';
@@ -37,6 +37,18 @@ const NAV = [
   { to: '/contas', label: 'Contas Financeiras', icon: 'account_balance', report: false },
   { to: '/categorias', label: 'Categorias', icon: 'category', report: false },
 ] as const;
+
+/** Telas de relatório (as do `reportsGuard`). */
+const TELAS_DE_RELATORIO = [
+  '/visao-geral',
+  '/fluxo-de-caixa',
+  '/receitas',
+  '/custos',
+  '/resultado',
+  '/previsoes',
+];
+export const ehTelaDeRelatorio = (url: string): boolean =>
+  TELAS_DE_RELATORIO.some((t) => url === t || url.startsWith(t + '/') || url.startsWith(t + '?'));
 
 @Component({
   selector: 'app-layout',
@@ -347,22 +359,24 @@ const NAV = [
                       Remover foto
                     </button>
                   }
-                  <a
-                    routerLink="/assinatura"
-                    role="menuitem"
-                    (click)="userMenuOpen.set(false)"
-                    class="flex items-center gap-3 px-4 py-2.5 text-[13.5px] hover:bg-muted no-underline text-foreground"
-                  >
-                    <app-icon name="credit_card" [style]="{ fontSize: '19px' }" />
-                    <span class="leading-tight">
-                      Minha assinatura
-                      @if (subscriptionEnds) {
-                        <span class="block text-[11px] text-muted-foreground">{{
-                          subscriptionSummary
-                        }}</span>
-                      }
-                    </span>
-                  </a>
+                  @if (auth.ehDono()) {
+                    <a
+                      routerLink="/assinatura"
+                      role="menuitem"
+                      (click)="userMenuOpen.set(false)"
+                      class="flex items-center gap-3 px-4 py-2.5 text-[13.5px] hover:bg-muted no-underline text-foreground"
+                    >
+                      <app-icon name="credit_card" [style]="{ fontSize: '19px' }" />
+                      <span class="leading-tight">
+                        Minha assinatura
+                        @if (subscriptionEnds) {
+                          <span class="block text-[11px] text-muted-foreground">{{
+                            subscriptionSummary
+                          }}</span>
+                        }
+                      </span>
+                    </a>
+                  }
                   <div class="my-1.5 border-t border-border"></div>
                   <a
                     routerLink="/auth/logout"
@@ -401,7 +415,7 @@ const NAV = [
 })
 export class AppLayoutComponent implements OnInit {
   protected theme = inject(ThemeService);
-  private auth = inject(AuthService);
+  protected auth = inject(AuthService);
   private tour = inject(TourService);
   protected notifications = inject(NotificationsService);
   private conta = inject(ContaService);
@@ -423,6 +437,31 @@ export class AppLayoutComponent implements OnInit {
     // Com a gaveta aberta, a página de trás não rola.
     effect(() => {
       document.body.style.overflow = this.menuOpen() ? 'hidden' : '';
+    });
+    // Problemas 23/11 (item 19): perfil rebaixado sai na hora da tela de relatório em que estava.
+    effect(() => {
+      if (!this.auth.podeVerRelatorios() && ehTelaDeRelatorio(this.router.url)) {
+        this.router.navigate(['/movimentacoes']);
+      }
+    });
+    // A API recusou "pelo perfil": confere o perfil de novo (o effect acima tira da tela, se for o caso).
+    effect(() => {
+      if (this.auth.conferirPerfil() > 0) this.conferirPerfilAgora(true);
+    });
+    // Funcionário: a cada troca de tela, confere o perfil (no máximo a cada 15 s).
+    this.router.events.subscribe((e) => {
+      if (e instanceof NavigationEnd) this.conferirPerfilAgora(false);
+    });
+  }
+
+  private perfilConferidoEm = 0;
+  private conferirPerfilAgora(forcar: boolean): void {
+    if (this.auth.ehDono() && !forcar) return;
+    const agora = Date.now();
+    if (!forcar && agora - this.perfilConferidoEm < 15_000) return;
+    this.perfilConferidoEm = agora;
+    this.conta.carregarConta().catch(() => {
+      // Sem conseguir consultar, vale o perfil que já está aí (a API confere de qualquer jeito).
     });
   }
 

@@ -134,6 +134,17 @@ function dishesCents(items: MovForm['items']): number {
   return items.reduce((sum, i) => sum + i.qty * Math.round(i.unitPrice * 100), 0);
 }
 
+import { AuthService } from '../../services/auth.service';
+
+/** Operação só altera o que ela lançou, no mês atual (problemas 23/11). Pura. */
+export function podeAlterarMovimento(
+  m: Pick<Movement, 'createdById' | 'date'>,
+  p: { podeTudo: boolean; eu: string | null; hoje: string },
+): boolean {
+  if (p.podeTudo) return true;
+  return !!p.eu && m.createdById === p.eu && m.date.slice(0, 7) === p.hoje.slice(0, 7);
+}
+
 @Component({
   selector: 'app-movimentacoes',
   standalone: true,
@@ -151,6 +162,7 @@ function dishesCents(items: MovForm['items']): number {
   templateUrl: './movimentacoes.component.html',
 })
 export class MovimentacoesComponent implements OnInit {
+  protected auth = inject(AuthService);
   private svc = inject(MovimentacoesService);
   private contasSvc = inject(ContasService);
   private categoriasSvc = inject(CategoriasService);
@@ -248,8 +260,22 @@ export class MovimentacoesComponent implements OnInit {
     this.categoriasSvc
       .categories()
       .filter((c) => !c.system)
-      .filter((c) => c.active && c.type === this.form().type),
+      .filter((c) => c.active && c.type === this.form().type)
+      // Problemas 23/11: o perfil Operação não lança em categoria não operacional (a API recusa).
+      .filter((c) => this.auth.podeMudarCadastros() || c.nature !== 'non-operational'),
   );
+
+  /**
+   * Problemas 23/11 (decisão do Nathan): o perfil Operação só edita, muda o status ou cancela o que ele mesmo lançou
+   * e só no mês atual. Dono e Gerente alteram tudo. A API confere de novo.
+   */
+  protected podeAlterar(m: Movement): boolean {
+    return podeAlterarMovimento(m, {
+      podeTudo: this.auth.podeMudarCadastros(),
+      eu: this.auth.meuId(),
+      hoje: localISODate(),
+    });
+  }
   protected paymentMethods = PAYMENT_METHODS;
   protected statusMeta = STATUS_META;
   protected fmtBRL = formatBRL;
@@ -1550,6 +1576,7 @@ export class MovimentacoesComponent implements OnInit {
   }
 
   statusActions(m: Movement): { label: string; status: MovStatus; icon: string }[] {
+    if (!this.podeAlterar(m)) return [];
     const all: Record<MovStatus, { label: string; status: MovStatus; icon: string }> = {
       pending: { label: 'Marcar como pendente', status: 'pending', icon: 'schedule' },
       received: { label: 'Confirmar recebimento', status: 'received', icon: 'check_circle' },

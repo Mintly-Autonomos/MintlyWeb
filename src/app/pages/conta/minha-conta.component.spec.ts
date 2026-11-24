@@ -379,7 +379,7 @@ describe('MinhaContaComponent', () => {
       expect(q<HTMLButtonElement>('adicionar-membro')!.disabled).toBe(true);
       await type('membro-email', 'ana@teste.com');
       expect(q<HTMLButtonElement>('adicionar-membro')!.disabled).toBe(false);
-      expect(q('membro-perfil-desc')!.textContent).toContain('Não vê relatórios');
+      expect(q('membro-perfil-desc')!.textContent).toContain('não vê relatórios');
       await click('adicionar-membro');
       expect(svc.adicionarMembro).toHaveBeenCalledWith({
         nome: 'Ana Garçom',
