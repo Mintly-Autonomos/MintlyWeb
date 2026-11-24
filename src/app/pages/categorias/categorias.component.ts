@@ -216,6 +216,8 @@ export class CategoriasComponent implements OnInit {
   }
 
   dreLabel(c: Category): string {
+    // Problemas 23/11 (item 22): não operacional fica fora do lucro, numa linha própria do Resultado.
+    if (c.nature === 'non-operational') return 'Saídas não operacionais (fora do lucro)';
     return dreGroupShort(c.dreGroup);
   }
 

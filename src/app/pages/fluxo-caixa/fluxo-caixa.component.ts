@@ -170,6 +170,14 @@ export class FluxoCaixaComponent implements OnInit {
     return custom ? `até ${formatDia(custom)}` : `${this.horizon()} dias`;
   });
 
+  /** "até 10 de dezembro" ou "nos próximos 30 dias" (antes saía "horizonte de 10 de dez.."). */
+  protected horizonteTexto = computed(() => {
+    const custom = this.customAplicado();
+    if (!custom) return `nos próximos ${this.horizon()} dias`;
+    const [y, m, d] = custom.split('-').map(Number);
+    return `até ${new Date(y, (m ?? 1) - 1, d ?? 1).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}`;
+  });
+
   protected hoje = computed(() => this.data()?.today ?? isoFromOffset(0));
   protected hojeRotulo = computed(() => formatDia(this.hoje()));
   protected minCustomDate = isoFromOffset(1);

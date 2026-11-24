@@ -139,7 +139,7 @@
     >
       <div slot="action">
         <app-hint
-          text="Caixa de hoje mais o que já está lançado (a receber e a pagar), dia a dia. Vendas e custos que ainda não foram lançados não entram: para isso, veja Previsões, que soma o ritmo dos últimos 30 dias."
+          text="Caixa de hoje mais o que já está lançado (a receber e a pagar), dia a dia. Vendas e custos que ainda não foram lançados não entram: para isso, veja Previsões, que estima as vendas pelo seu histórico (o quadro Como prevemos diz qual período foi usado)."
         />
       </div>
       <app-area-chart
@@ -199,9 +199,7 @@
     <div id="fluxo-vencimentos" class="scroll-mt-24" data-tour="vencimentos">
       <app-section-header
         title="Próximos vencimentos"
-        [description]="
-          'Tudo que entra e sai dentro do horizonte de ' + label().replace('até ', '') + '.'
-        "
+        [description]="'Tudo que entra e sai ' + horizonteTexto() + '.'"
       >
         <div slot="action" class="flex flex-wrap items-center gap-2">
           <div
