@@ -321,9 +321,15 @@
                 [description]="
                   'Isso representa ' +
                   pctFmt((insight.revenuePct ?? 0) * 100) +
-                  ' de tudo que você vendeu. Junto com o CMV de ' +
+                  ' de tudo que você vendeu. Somada ao CMV de ' +
                   fmtBRL(d.current.cmv) +
-                  ', essas duas linhas consomem a maior parte da margem bruta.'
+                  ', as duas linhas levam ' +
+                  pctFmt(
+                    d.current.grossRevenue > 0
+                      ? ((insight.amount + d.current.cmv) / d.current.grossRevenue) * 100
+                      : 0
+                  ) +
+                  ' do que você vendeu.'
                 "
               />
             }

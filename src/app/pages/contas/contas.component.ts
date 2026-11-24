@@ -403,6 +403,9 @@ export class ContasComponent implements OnInit {
     return false;
   }
 
+  /** "26,2" (vírgula decimal, como no resto da tela); antes saía "26.2". */
+  protected pctBR = (n: number): string => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+
   /** Taxa da plataforma: um percentual entre 0 e 100 (vazio = 0). */
   get taxError(): string {
     const raw = this.form().taxPct.trim();

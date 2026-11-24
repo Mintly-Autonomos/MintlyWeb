@@ -233,8 +233,8 @@
               >
               @if (a.taxPct !== undefined) {
                 <span class="flex items-center gap-1"
-                  ><app-icon name="percent" [style]="{ fontSize: '14px' }" />{{ a.taxPct }}% de
-                  taxa</span
+                  ><app-icon name="percent" [style]="{ fontSize: '14px' }" />{{ pctBR(a.taxPct) }}%
+                  de taxa</span
                 >
               }
               @if (a.settlementRule !== undefined || a.settlementDays !== undefined) {
@@ -335,7 +335,7 @@
             }
           </div>
           <p class="text-[12px] text-muted-foreground mt-2">
-            A Mintly ajusta os campos conforme o tipo escolhido.
+            O Mintly ajusta os campos conforme o tipo escolhido.
           </p>
         </div>
       }
@@ -1026,7 +1026,7 @@
           </div>
           <div class="p-3 rounded-xl bg-muted/60">
             <span class="text-muted-foreground block">Taxa</span>
-            <span class="font-medium">{{ details()!.taxPct ?? 0 }}%</span>
+            <span class="font-medium">{{ pctBR(details()!.taxPct ?? 0) }}%</span>
             @if (feeByMethodLabel(details()!)) {
               <span class="block text-[12px] text-muted-foreground">{{
                 feeByMethodLabel(details()!)
