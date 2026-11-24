@@ -198,12 +198,12 @@ export class MinhaContaComponent {
     {
       valor: 'operations',
       nome: 'Operação',
-      desc: 'Lança e vê movimentações (sem salários e pró-labore), consulta cardápio e contas. Não vê relatórios.',
+      desc: 'Lança vendas e despesas e altera só o que lançou no mês atual, sem mão de obra (salários, pró-labore, encargos e freelancers) e sem categorias não operacionais. Consulta cardápio, contas e categorias, não transfere entre contas e não vê relatórios.',
     },
     {
       valor: 'manager',
       nome: 'Gerente',
-      desc: 'Vê e faz tudo, menos assinatura, funcionários e exclusão do restaurante.',
+      desc: 'Vê e faz tudo, menos assinatura, funcionários e os dados do restaurante (nome, equipe, abertura e exclusão), que são só do dono.',
     },
   ];
   protected readonly diasConvite = MEMBER_INVITE_EXPIRY_DAYS;

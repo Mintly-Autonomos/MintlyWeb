@@ -32,6 +32,8 @@ describe('AssinaturaComponent', () => {
     recurring,
   });
 
+  let dono = true;
+
   async function render(initial: SubscriptionOverview | null = ov('mock')) {
     overview = signal(initial);
     refresh = vi.fn().mockResolvedValue(initial);
@@ -54,6 +56,8 @@ describe('AssinaturaComponent', () => {
           provide: AuthService,
           useValue: {
             subscriptionState: () => computeSubscriptionState(endsAt, new Date(), tier),
+            ehDono: () => dono,
+            hasActiveSubscription: () => true,
             logout,
           },
         },
@@ -89,8 +93,22 @@ describe('AssinaturaComponent', () => {
     )!;
 
   beforeEach(() => {
+    dono = true;
     endsAt = null;
     tier = null;
+  });
+
+  it('problemas 23/11: funcionário vê só o aviso, sem pagar nem cancelar', async () => {
+    dono = false;
+    const f = await render();
+    expect(norm(el(f).querySelector('[data-testid=assinatura-so-dono]')?.textContent)).toContain(
+      'assinatura do restaurante está em dia',
+    );
+    expect(
+      Array.from(el(f).querySelectorAll('button')).some((b) =>
+        /Pagar|Cancelar/.test(norm(b.textContent)),
+      ),
+    ).toBe(false);
   });
 
   it('mostra os 4 planos com preço total e desconto', async () => {

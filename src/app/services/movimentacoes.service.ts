@@ -90,6 +90,8 @@ export interface Movement {
   /** Transferência entre contas (S3.2): a conta do outro lado. Não se edita; cancelar cancela os dois lados. */
   transfer?: { id: string; counterpartName: string };
   createdBy: string;
+  /** Id de quem lançou (o perfil Operação só altera o que ele mesmo lançou). */
+  createdById?: string;
   createdAt: string;
   updatedBy: string;
   updatedAt: string;
@@ -244,6 +246,7 @@ function toMovement(raw: FinancialMovement): Movement {
       ? { transfer: { id: r.transferId, counterpartName: r.transferCounterpart?.name ?? '' } }
       : {}),
     createdBy: r.audit?.createdByName ?? r.audit?.createdBy ?? '—',
+    ...(r.audit?.createdBy ? { createdById: r.audit.createdBy } : {}),
     createdAt: toISO(r.audit?.createdAt),
     updatedBy: r.audit?.updatedByName ?? r.audit?.updatedBy ?? '—',
     updatedAt: toISO(r.audit?.updatedAt),

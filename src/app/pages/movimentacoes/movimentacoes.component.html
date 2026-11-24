@@ -258,7 +258,7 @@
                   <div
                     class="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition"
                   >
-                    @if (!m.transfer) {
+                    @if (!m.transfer && podeAlterar(m)) {
                       <button
                         (click)="openEdit(m)"
                         class="h-7 w-7 rounded-lg grid place-items-center text-muted-foreground hover:bg-muted cursor-pointer"
@@ -1049,13 +1049,15 @@
 
     <ng-container ngProjectAs="[slot=footer]">
       <div class="flex justify-end gap-3">
-        <button
-          type="button"
-          (click)="openEdit(details()!); details.set(null)"
-          class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted cursor-pointer flex items-center gap-2"
-        >
-          <app-icon name="edit" [style]="{ fontSize: '16px' }" />Editar
-        </button>
+        @if (podeAlterar(details()!)) {
+          <button
+            type="button"
+            (click)="openEdit(details()!); details.set(null)"
+            class="h-10 px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted cursor-pointer flex items-center gap-2"
+          >
+            <app-icon name="edit" [style]="{ fontSize: '16px' }" />Editar
+          </button>
+        }
         <button
           type="button"
           (click)="details.set(null)"
