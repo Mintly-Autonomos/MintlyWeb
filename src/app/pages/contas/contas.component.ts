@@ -674,7 +674,7 @@ export class ContasComponent implements OnInit {
     if (this.activeCount() <= 1)
       return 'Esta é a única conta ativa. Crie ou ative outra conta antes de desativá-la.';
     if (a.balance !== 0 || a.predictedBalance !== 0)
-      return 'Esta conta possui saldo vinculado. Zere os valores antes de desativá-la.';
+      return 'Para inativar, o saldo e o previsto precisam estar zerados (transfira o saldo ou acerte as pendências).';
     if (a.isDefault)
       return 'Conta padrão não pode ser desativada diretamente. Defina outra conta como padrão primeiro.';
     return '';

@@ -264,6 +264,15 @@
               />
             </div>
           </div>
+          <!-- Sugestão da testadora (23/11): o motivo do interruptor cinza escrito no cartão (o title não aparece no celular). -->
+          @if (podeEditar() && toggleDisabled(a)) {
+            <p
+              class="text-[11.5px] text-muted-foreground leading-snug"
+              data-testid="motivo-inativar"
+            >
+              {{ toggleReason(a) }}
+            </p>
+          }
         </div>
       }
     </div>

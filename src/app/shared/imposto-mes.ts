@@ -26,6 +26,22 @@ export function impostoDoResultado(
   return { aliquota: cur && cur.grossRevenue > 0 ? cur.taxes / cur.grossRevenue : 0, fixoMes: 0 };
 }
 
+/**
+ * Acima disto o "DAS-MEI" do mês não parece guia de MEI (sugestão da testadora, 23/11). O DAS-MEI é 5% do salário
+ * mínimo mais R$ 1 de ICMS e/ou R$ 5 de ISS: em 2026, perto de R$ 82 a R$ 87. R$ 150 dá folga para os próximos
+ * reajustes. Uma guia de R$ 2.248 (27 vezes maior) costuma ser do Simples Nacional: regime errado ou guia de outro
+ * imposto lançada como DAS.
+ */
+export const DAS_MEI_MAXIMO_PLAUSIVEL = 150;
+
+/** O DAS do MEI que o Resultado usa está fora do que um DAS-MEI pode valer. */
+export function dasMeiImplausivel(tax: {
+  regime: string | null;
+  meiMonthlyDas: number | null;
+}): boolean {
+  return tax.regime === 'mei' && (tax.meiMonthlyDas ?? 0) > DAS_MEI_MAXIMO_PLAUSIVEL;
+}
+
 const diaDoMes = (s: string) => Number(s.slice(8, 10));
 const diasEntre = (a: string, b: string) =>
   Math.round((Date.parse(b + 'T12:00:00') - Date.parse(a + 'T12:00:00')) / 86_400_000) + 1;
