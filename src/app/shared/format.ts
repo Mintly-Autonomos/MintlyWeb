@@ -103,6 +103,22 @@ export function fmtMonthLong(month: string): string {
 }
 
 /** Data de HOJE (ou da data dada) no calendário de quem está usando: "AAAA-MM-DD". Não usar toISOString: é UTC e depois das 21h no Brasil já é o dia seguinte. */
+/**
+ * Dia de um instante no fuso do restaurante (São Paulo), "AAAA-MM-DD": o mesmo dia que a API usa nos relatórios
+ * (`REPORT_TIME_ZONE`). Reteste de 24/11: o web pegava o dia em UTC (`toISOString`), e a venda lançada às 21h
+ * ou depois (ou importada à meia-noite UTC) caía no dia seguinte. A do último dia do mês ia para o mês seguinte, e a
+ * Sazonalidade não batia com o Resultado (outubro 46,2 mil × R$ 48.949).
+ */
+const DIA_SP = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+export function diaEmSaoPaulo(instante: Date): string {
+  return DIA_SP.format(instante);
+}
+
 export function localISODate(date: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;

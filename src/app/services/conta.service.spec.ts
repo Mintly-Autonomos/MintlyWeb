@@ -23,6 +23,7 @@ describe('ContaService', () => {
     logout: ReturnType<typeof vi.fn>;
     setCompanyName: ReturnType<typeof vi.fn>;
     setAccessLevel: ReturnType<typeof vi.fn>;
+    setUserId: ReturnType<typeof vi.fn>;
     currentUser: ReturnType<typeof vi.fn>;
   };
 
@@ -52,6 +53,7 @@ describe('ContaService', () => {
       logout: vi.fn(() => Promise.resolve()),
       setCompanyName: vi.fn(),
       setAccessLevel: vi.fn(),
+      setUserId: vi.fn(),
       currentUser: vi.fn(() => ({ nome: 'Davi', email: 'davi@teste.com' })),
     };
     TestBed.configureTestingModule({
@@ -73,7 +75,13 @@ describe('ContaService', () => {
     flags.useMocks = false;
   });
 
-  const conta = { name: 'Davi Lee', email: 'davi@teste.com', phone: '11999990000', role: 'owner' };
+  const conta = {
+    _id: 'u-davi',
+    name: 'Davi Lee',
+    email: 'davi@teste.com',
+    phone: '11999990000',
+    role: 'owner',
+  };
 
   it('carrega a conta (nome, e-mail, telefone e papel)', async () => {
     userClient['getMe'].mockReturnValue(ok(conta));
@@ -103,6 +111,8 @@ describe('ContaService', () => {
     await svc.carregarConta();
     expect(svc.dados()?.perfil).toBe('operations');
     expect(auth.setAccessLevel).toHaveBeenCalledWith('operations');
+    // Reteste 24/11: o id do usuário vem do /users/me (o token é criptografado), para a tela saber o que é dela.
+    expect(auth.setUserId).toHaveBeenCalledWith(conta._id);
     userClient['getMe'].mockReturnValue(ok(conta));
     await svc.carregarConta();
     expect(auth.setAccessLevel).toHaveBeenLastCalledWith('owner');

@@ -34,6 +34,14 @@ export interface ScatterPoint {
   rotulo?: boolean;
 }
 
+/** Retângulo ocupado por um rótulo no gráfico. */
+interface Caixa {
+  x1: number;
+  x2: number;
+  y1: number;
+  y2: number;
+}
+
 const M = { top: 18, right: 24, bottom: 44, left: 64 };
 
 /**
@@ -445,19 +453,31 @@ export class ScatterChartComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Onde vai o nome de cada prato (problemas 23/11, item 24). O rótulo fica à direita do ponto; se passar da borda,
-   * vai para a esquerda. Se encostar em outro, tenta um pouco acima ou abaixo e, sem lugar, some (o nome continua no
-   * tooltip). Antes os nomes se sobrepunham e "Combo 20 peças" aparecia cortado como "Combo".
+   * Onde vai o nome de cada prato (problemas 23/11, item 24, e o reteste: todo prato com nome). O rótulo tenta, nesta
+   * ordem, à direita e à esquerda do ponto, na altura dele e até dois degraus acima ou abaixo, e fica no primeiro
+   * lugar livre (sem encostar em outro nome nem sair da área do gráfico). Sem lugar livre, fica onde encosta menos:
+   * nunca some. Antes, "Combo 20 peças" saía cortado e o Uramaki ficava sem nome.
    */
   protected rotulos(): Map<
     string,
     { x: number; y: number; anchor: 'start' | 'end'; texto: string }
   > {
     const out = new Map<string, { x: number; y: number; anchor: 'start' | 'end'; texto: string }>();
-    const caixas: { x1: number; x2: number; y1: number; y2: number }[] = [];
+    const caixas: Caixa[] = [];
     const larguraLetra = 5.9;
     const altura = 12;
-    const limiteDireita = this.w() - M.right;
+    const esq = M.left - 4;
+    const dir = this.w() - M.right + 4;
+    const topo = M.top - 6;
+    const base = this.h() - M.bottom + 4;
+    const sobreposicao = (box: Caixa) =>
+      caixas.reduce(
+        (soma, c) =>
+          soma +
+          Math.max(0, Math.min(c.x2, box.x2) - Math.max(c.x1, box.x1)) *
+            Math.max(0, Math.min(c.y2, box.y2) - Math.max(c.y1, box.y1)),
+        0,
+      );
     const ordem = [...this.points].filter((p) => p.rotulo).sort((a, b) => b.x * b.y - a.x * a.y);
     for (const p of ordem) {
       const texto = p.nome.length > 18 ? p.nome.slice(0, 17) + '…' : p.nome;
@@ -465,22 +485,41 @@ export class ScatterChartComponent implements OnInit, OnDestroy {
       const raio = 9 * (p.escala ?? 1) + 4;
       const cx = this.px(p.x);
       const cy = this.py(p.y) + 4;
-      const direita = cx + raio + larg <= limiteDireita;
-      const anchor: 'start' | 'end' = direita ? 'start' : 'end';
-      const x = direita ? cx + raio : cx - raio;
-      const x1 = direita ? x : x - larg;
-      const x2 = direita ? x + larg : x;
-      if (x1 < M.left - 4) continue;
-      for (const dy of [0, -altura, altura]) {
-        const y = cy + dy;
-        const box = { x1, x2, y1: y - altura + 2, y2: y + 2 };
-        if (box.y1 < M.top - 6 || box.y2 > this.h() - M.bottom + 4) continue;
-        if (caixas.some((c) => c.x1 < box.x2 && box.x1 < c.x2 && c.y1 < box.y2 && box.y1 < c.y2))
-          continue;
-        caixas.push(box);
-        out.set(p.id, { x, y, anchor, texto });
-        break;
+      let melhor: {
+        box: Caixa;
+        x: number;
+        y: number;
+        anchor: 'start' | 'end';
+        custo: number;
+      } | null = null;
+      for (const lado of ['start', 'end'] as const) {
+        const x = lado === 'start' ? cx + raio : cx - raio;
+        const x1 = lado === 'start' ? x : x - larg;
+        const x2 = lado === 'start' ? x + larg : x;
+        if (x1 < esq || x2 > dir) continue;
+        for (const dy of [0, -altura, altura, -2 * altura, 2 * altura]) {
+          const y = cy + dy;
+          const box = { x1, x2, y1: y - altura + 2, y2: y + 2 };
+          if (box.y1 < topo || box.y2 > base) continue;
+          const custo = sobreposicao(box);
+          if (!melhor || custo < melhor.custo) melhor = { box, x, y, anchor: lado, custo };
+          if (custo === 0) break;
+        }
+        if (melhor?.custo === 0) break;
       }
+      if (!melhor) {
+        // Nem à direita nem à esquerda cabe inteiro (gráfico estreito): encosta na borda que fica mais perto.
+        const x = Math.min(Math.max(cx + raio, esq), dir - larg);
+        melhor = {
+          box: { x1: x, x2: x + larg, y1: cy - altura + 2, y2: cy + 2 },
+          x,
+          y: cy,
+          anchor: 'start',
+          custo: 0,
+        };
+      }
+      caixas.push(melhor.box);
+      out.set(p.id, { x: melhor.x, y: melhor.y, anchor: melhor.anchor, texto });
     }
     return out;
   }

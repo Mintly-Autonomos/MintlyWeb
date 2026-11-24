@@ -150,6 +150,7 @@ export class ContaService {
       this.dados.set(toDados(res.payload));
       // O menu e as telas seguem o perfil atual (o dono pode ter mudado depois do login).
       this.auth.setAccessLevel(accessLevelOf(res.payload));
+      this.auth.setUserId((res.payload as { _id?: string })._id);
     }
   }
 

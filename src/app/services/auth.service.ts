@@ -31,6 +31,8 @@ export interface AuthUser {
    * perfis) = dono. A API confere de novo em todo pedido; aqui é só para não mostrar o que vai ser recusado.
    */
   acesso?: AccessLevel;
+  /** Id do usuário (o autor dos lançamentos). Vem do login e do /users/me. */
+  id?: string;
 }
 
 /**
@@ -135,17 +137,20 @@ export class AuthService {
   /** Criar e editar contas, categorias e cardápio. */
   readonly podeMudarCadastros = computed(() => canManageSetup(this.acesso()));
   /** Id de quem está logado (o `sub` do token): a tela compara com o autor do lançamento. */
-  readonly meuId = computed<string | null>(() => {
-    const t = this._accessToken();
-    const part = t?.split('.')[1];
-    if (!part) return null;
-    try {
-      const json = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
-      return typeof json.sub === 'string' ? json.sub : null;
-    } catch {
-      return null;
-    }
-  });
+  /**
+   * Id de quem está logado, para comparar com o autor do lançamento. Reteste de 24/11: o token da API é criptografado
+   * (não dá para ler o `sub` no navegador), então o id vem do login e do /users/me (`setUserId`).
+   */
+  readonly meuId = computed<string | null>(() => this._user()?.id ?? null);
+
+  /** Guarda o id do usuário (sessões de antes deste campo ganham o id no próximo /users/me). */
+  setUserId(id: string | undefined): void {
+    const user = this._user();
+    if (!user || !id || user.id === id) return;
+    const next = { ...user, id };
+    this._user.set(next);
+    this.write(KEYS.user, JSON.stringify({ ...next, avatarDataUrl: undefined }));
+  }
   /** Só o dono: assinatura, funcionários, dados do restaurante e exclusão (problemas 23/11, item 16). */
   readonly ehDono = computed(() => this.acesso() === 'owner');
   /**
@@ -414,6 +419,7 @@ export class AuthService {
       restaurantId: result.user.restaurantId,
       avatarDataUrl: result.user.person.avatar,
       acesso: accessLevelOf(result.user),
+      id: (result.user as { _id?: string })._id,
     };
     this.persistTokens(result.accessToken, result.refreshToken, entered);
     this.syncSavedAccount(remember, entered);

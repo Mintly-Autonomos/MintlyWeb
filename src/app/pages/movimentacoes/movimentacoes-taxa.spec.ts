@@ -1,4 +1,5 @@
 import { signal, WritableSignal } from '@angular/core';
+import { AuthService } from '../../services/auth.service';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { PlatformKind } from 'mintly-lib';
@@ -13,6 +14,8 @@ describe('Movimentações: prévia da taxa pela forma de pagamento (relatório S
     const vazio = { refresh: vi.fn().mockResolvedValue(undefined) };
     TestBed.configureTestingModule({
       providers: [
+        // O componente consulta o perfil (problemas 23/11): sem o falso, o AuthService de verdade pede a URL da API.
+        { provide: AuthService, useValue: { podeMudarCadastros: () => true, meuId: () => null } },
         provideRouter([]),
         {
           provide: MovimentacoesService,
