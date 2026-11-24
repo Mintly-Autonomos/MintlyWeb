@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import { AuthService } from '../../services/auth.service';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CardapioService } from '../../services/cardapio.service';
@@ -12,6 +13,8 @@ describe('Movimentações: sem "vazio" falso antes de carregar (relatório U.2)'
     const vazio = { refresh: vi.fn(() => new Promise<void>(() => undefined)) };
     TestBed.configureTestingModule({
       providers: [
+        // O componente consulta o perfil (problemas 23/11): sem o falso, o AuthService de verdade pede a URL da API.
+        { provide: AuthService, useValue: { podeMudarCadastros: () => true, meuId: () => null } },
         provideRouter([]),
         {
           provide: MovimentacoesService,
