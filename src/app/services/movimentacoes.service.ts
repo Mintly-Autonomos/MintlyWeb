@@ -27,7 +27,7 @@ import {
   templateColumns,
 } from '../shared/import-parse';
 import type { ImportField } from '../shared/import-parse';
-import { localISODate } from '../shared/format';
+import { localISODate, diaEmSaoPaulo } from '../shared/format';
 import { MintlyClientService } from './mintly-client.service';
 import mockMovements from '../mocks/mock_movements.json';
 import { loadWorkbook } from '../shared/exceljs-loader';
@@ -177,7 +177,9 @@ function fromMovStatus(status: MovStatus): MovementStatus {
 function toISODate(value: unknown): string {
   if (!value) return localISODate();
   const d = value instanceof Date ? value : new Date(value as string);
-  return isNaN(d.getTime()) ? localISODate() : d.toISOString().slice(0, 10);
+  // Só a data (AAAA-MM-DD) já é o dia; um instante vira o dia em São Paulo, como a API (reteste 24/11).
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return isNaN(d.getTime()) ? localISODate() : diaEmSaoPaulo(d);
 }
 function toISODateOrNull(value: unknown): string | null {
   if (!value) return null;

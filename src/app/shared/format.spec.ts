@@ -1,4 +1,5 @@
 import {
+  diaEmSaoPaulo,
   fmtShortDate,
   localISODate,
   localISOMonth,
@@ -101,5 +102,12 @@ describe('shortDateRange (eixo semanal com datas, relatório U.5)', () => {
     ['2026-11-07', '2026-11-07', '07/11'],
   ])('%s a %s -> %s', (a, b, esperado) => {
     expect(shortDateRange(a, b)).toBe(esperado);
+  });
+});
+
+describe('diaEmSaoPaulo (reteste 24/11: o mesmo dia da API)', () => {
+  it('meia-noite UTC é 21h do dia anterior em São Paulo', () => {
+    expect(diaEmSaoPaulo(new Date('2026-11-01T00:00:00.000Z'))).toBe('2026-10-31');
+    expect(diaEmSaoPaulo(new Date('2026-11-01T15:00:00.000Z'))).toBe('2026-11-01');
   });
 });

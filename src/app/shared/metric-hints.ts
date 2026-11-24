@@ -140,7 +140,7 @@ export const METRIC_HINTS = {
     'soma das comissões das contas de app no mês; o % é sobre o que foi vendido por esses apps.',
   ),
   evolucaoCustos: calc(
-    'Se os custos estão subindo mês a mês e qual grupo puxou: CMV, mão de obra, taxas, impostos ou outras despesas. O eixo começa no zero.',
+    'Se os custos estão subindo mês a mês e qual grupo puxou: CMV, mão de obra, taxas ou outras despesas. Só os grupos com gasto no período aparecem na legenda. O imposto sobre a venda não entra aqui: ele é calculado no Resultado. O eixo começa no zero.',
     'soma das despesas de cada grupo no mês, pela data do lançamento; a altura da coluna é o total do mês.',
   ),
   percentuaisMensais: calc(
