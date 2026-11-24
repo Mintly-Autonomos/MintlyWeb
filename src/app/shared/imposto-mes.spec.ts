@@ -1,4 +1,4 @@
-import { impostoDoResultado, impostoFixoNaJanela } from './imposto-mes';
+import { dasMeiImplausivel, impostoDoResultado, impostoFixoNaJanela } from './imposto-mes';
 
 // Reteste 22/11, T1: o imposto do MEI é o DAS fixo do mês, igual em todas as telas.
 describe('impostoDoResultado', () => {
@@ -34,5 +34,14 @@ describe('impostoFixoNaJanela', () => {
     expect(impostoFixoNaJanela(90, '2026-11-16', '2026-11-22')).toBe(21);
     expect(impostoFixoNaJanela(90, '2026-10-24', '2026-11-22')).toBe(90);
     expect(impostoFixoNaJanela(0, '2026-11-01', '2026-11-22')).toBe(0);
+  });
+});
+
+describe('dasMeiImplausivel (sugestão da testadora, 23/11)', () => {
+  it('DAS-MEI de R$ 2.248 avisa; R$ 82 não; Simples nunca', () => {
+    expect(dasMeiImplausivel({ regime: 'mei', meiMonthlyDas: 2248.08 })).toBe(true);
+    expect(dasMeiImplausivel({ regime: 'mei', meiMonthlyDas: 82.05 })).toBe(false);
+    expect(dasMeiImplausivel({ regime: 'mei', meiMonthlyDas: null })).toBe(false);
+    expect(dasMeiImplausivel({ regime: 'simplesNacionalAnexoI', meiMonthlyDas: 5000 })).toBe(false);
   });
 });

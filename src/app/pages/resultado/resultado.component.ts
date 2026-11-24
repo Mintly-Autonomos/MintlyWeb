@@ -108,10 +108,14 @@ export function explicacaoImposto(t: {
 /** A regra de taxa é a mesma de Custos e Receitas (shared/taxa-venda). */
 export { ehCategoriaDeTaxa };
 
+import { AlertComponent } from '../../shared/alert.component';
+import { dasMeiImplausivel } from '../../shared/imposto-mes';
+
 @Component({
   selector: 'app-resultado',
   standalone: true,
   imports: [
+    AlertComponent,
     SeriePeriodoComponent,
     IconComponent,
     ChipComponent,
@@ -551,6 +555,12 @@ export class ResultadoComponent implements OnInit {
 
   protected readonly breakEvenHint =
     'Quanto você precisa vender no mês só para pagar as contas, sem lucro nem prejuízo. Ponto de equilíbrio = custos fixos ÷ margem de contribuição, que é a parte de cada real vendido que sobra depois dos impostos e dos custos variáveis.';
+
+  /** O "DAS-MEI" do mês está muito acima do que um DAS-MEI vale (sugestão da testadora, 23/11). */
+  protected dasMeiAlto = computed(() => {
+    const t = this.data()?.tax;
+    return !!t && dasMeiImplausivel(t);
+  });
 
   /** Regime em uso, para a janela marcar a opção atual (reteste 18/11, item 2). */
   protected regimeAtual = computed(() => this.data()?.tax.regime ?? null);

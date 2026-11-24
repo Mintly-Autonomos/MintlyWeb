@@ -82,6 +82,24 @@
       </div>
     </div>
 
+    <!-- Sugestão da testadora (23/11): DAS-MEI muito acima do valor legal indica regime errado. -->
+    @if (dasMeiAlto()) {
+      <app-alert variant="warning" title="Esse imposto não parece de MEI">
+        <span data-testid="aviso-das-alto"
+          >O DAS deste mês está em {{ fmtBRL(d.tax.meiMonthlyDas ?? 0) }}, e a guia do MEI fica
+          perto de R$ 82 (5% do salário mínimo mais ICMS ou ISS). Guias desse tamanho costumam ser
+          do Simples Nacional: confira o regime com seu contador.</span
+        >
+        <button
+          type="button"
+          (click)="regimeOpen.set(true)"
+          class="ml-1 font-semibold underline cursor-pointer"
+        >
+          Trocar o regime
+        </button>
+      </app-alert>
+    }
+
     <!-- 2 — Big number -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="m3-card p-5 lg:col-span-2 flex flex-col justify-center">
