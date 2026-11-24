@@ -46,7 +46,10 @@ describe('Visão Geral: motivo da trava da nota e mês-base (relatório S2.3)', 
         },
         { provide: AiService, useValue: { textosInsights: vi.fn(() => Promise.resolve([])) } },
         { provide: ToastService, useValue: { error: vi.fn(), success: vi.fn() } },
-        { provide: NotificationsService, useValue: { setRecomendacoes: vi.fn() } },
+        {
+          provide: NotificationsService,
+          useValue: { setRecomendacoes: vi.fn(), avisoTetoMei: () => null },
+        },
       ],
     });
     TestBed.overrideComponent(VisaoGeralComponent, { set: { template: '', imports: [] } });

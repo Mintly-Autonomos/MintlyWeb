@@ -1,6 +1,6 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { quandoTexto } from '../../shared/quando';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import type { AiInsightText, HealthCapReason } from 'mintly-lib';
 import { AiService, textoDaIa } from '../../services/ai.service';
 import { NotificationsService } from '../../services/notifications.service';
@@ -85,10 +85,14 @@ function pillarDetail(key: string, value: number | null, mesPassado = false): st
   }
 }
 
+import { AlertComponent } from '../../shared/alert.component';
+
 @Component({
   selector: 'app-visao-geral',
   standalone: true,
   imports: [
+    RouterLink,
+    AlertComponent,
     SeriePeriodoComponent,
     BarChartComponent,
     EstouDevendoComponent,
@@ -115,6 +119,7 @@ export class VisaoGeralComponent implements OnInit {
   private router = inject(Router);
   private ai = inject(AiService);
   private notifications = inject(NotificationsService);
+  protected avisoTetoMei = this.notifications.avisoTetoMei;
 
   protected monthOpts = MONTH_OPTS;
   // Do dia 1 ao 12 abre no mês passado (já fechado); depois, no mês atual.
