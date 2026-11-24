@@ -45,6 +45,8 @@ export interface PrevMov {
   date: string;
   /** Entrada: valor líquido (após taxa de plataforma). Saída: valor bruto. */
   valor: number;
+  /** Entrada: valor bruto da venda (antes das taxas). Base do imposto do Simples. Ausente = igual a `valor`. */
+  bruto?: number;
   pendente: boolean;
   /** Só saídas: fração que varia com as vendas (CMV = 1, fixa = 0, mista = 0,5). */
   variavel: number;
@@ -142,7 +144,8 @@ export function buildBase(
     if (m.tipo === 'in' && !m.naoOperacional && m.lancamento <= hoje)
       historico.push({ data: m.lancamento, valor: m.valor });
     if (m.tipo === 'in' && !m.naoOperacional && m.lancamento >= ini && m.lancamento <= hoje)
-      realizadoLucro[m.lancamento] = (realizadoLucro[m.lancamento] ?? 0) + m.valor * (1 - aliquota);
+      realizadoLucro[m.lancamento] =
+        (realizadoLucro[m.lancamento] ?? 0) + m.valor - (m.bruto ?? m.valor) * aliquota;
     // Ritmo de vendas pela data da venda, pendente ou já recebida (cartão e iFood ficam pendentes até o repasse).
     if (m.tipo === 'in' && !m.naoOperacional && m.lancamento >= ini && m.lancamento <= hoje) {
       const prazo = Math.max(0, Math.round(m.prazo));
@@ -169,6 +172,17 @@ export function buildBase(
     custoFixo += m.valor * (1 - m.variavel);
   }
   for (const total of vendasPorPrazo.values()) receita += total;
+  // Reteste 24/11: as vendas previstas saem do que ENTRA nas contas (sem as taxas dos apps e da maquininha), mas o
+  // imposto do Simples é sobre a venda BRUTA. A alíquota passa a valer sobre o que entra: alíquota × (bruto ÷
+  // líquido) das vendas dos últimos 30 dias. Sem taxa (ou no MEI, com alíquota 0), nada muda.
+  let somaBruto = 0;
+  let somaLiquido = 0;
+  for (const m of movs) {
+    if (m.tipo !== 'in' || m.naoOperacional || m.lancamento < ini || m.lancamento > hoje) continue;
+    somaLiquido += m.valor;
+    somaBruto += m.bruto ?? m.valor;
+  }
+  const fatorBruto = somaLiquido > 0 && somaBruto > somaLiquido ? somaBruto / somaLiquido : 1;
   const receitaPrazos = [...vendasPorPrazo.entries()]
     .sort(([a], [b]) => a - b)
     .map(([prazo, total]) => ({ prazo, porDia: total / PASSADO }));
@@ -176,7 +190,7 @@ export function buildBase(
   return {
     hoje,
     caixaHoje,
-    aliquota,
+    aliquota: aliquota * fatorBruto,
     impostoFixoDia: impostoFixoMes > 0 ? impostoFixoMes / 30 : 0,
     receitaDia: receita / PASSADO,
     receitaPrazos,
