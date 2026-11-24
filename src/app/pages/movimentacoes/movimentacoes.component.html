@@ -1042,21 +1042,23 @@
         }
       </div>
 
-      <!-- Quick status change -->
-      <div>
-        <div class="font-semibold mb-2">Alterar status</div>
-        <div class="flex flex-wrap gap-2">
-          @for (action of statusActions(details()!); track action.status) {
-            <button
-              type="button"
-              (click)="changeStatus(details()!, action.status)"
-              class="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-border bg-card text-[12px] font-medium hover:bg-muted transition cursor-pointer"
-            >
-              <app-icon [name]="action.icon" [style]="{ fontSize: '15px' }" />{{ action.label }}
-            </button>
-          }
+      <!-- Quick status change (sem ação para o perfil, o título não fica sobrando vazio) -->
+      @if (statusActions(details()!).length > 0) {
+        <div>
+          <div class="font-semibold mb-2">Alterar status</div>
+          <div class="flex flex-wrap gap-2">
+            @for (action of statusActions(details()!); track action.status) {
+              <button
+                type="button"
+                (click)="changeStatus(details()!, action.status)"
+                class="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-border bg-card text-[12px] font-medium hover:bg-muted transition cursor-pointer"
+              >
+                <app-icon [name]="action.icon" [style]="{ fontSize: '15px' }" />{{ action.label }}
+              </button>
+            }
+          </div>
         </div>
-      </div>
+      }
 
       <!-- Meta -->
       <div class="text-[12px] text-muted-foreground border-t border-border pt-3 space-y-0.5">
